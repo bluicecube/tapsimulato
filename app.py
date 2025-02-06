@@ -29,8 +29,7 @@ def chat():
             model="gpt-4",  # Using stable GPT-4 model
             messages=data['messages'],
             temperature=0.7,
-            max_tokens=150,
-            response_format={"type": "json_object"}
+            max_tokens=150
         )
 
         logger.debug(f"Received response from OpenAI API: {response}")
