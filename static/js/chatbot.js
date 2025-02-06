@@ -382,6 +382,11 @@ function updateTaskBlocks() {
                     window.setBlockFocus && window.setBlockFocus(block, blockDiv);
                 }
             });
+
+            // Add region selection handler
+            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+                window.enableDrawingMode && window.enableDrawingMode(block, blockDiv);
+            });
         } else if (block.type === 'loop') {
             blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
@@ -460,3 +465,4 @@ window.processCommand = processCommand;
 // Make the simulator's functions available to chatbot.js
 window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
 window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
+window.enableDrawingMode = window.enableDrawingMode || function() { console.warn('enableDrawingMode not loaded'); };

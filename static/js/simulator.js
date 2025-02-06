@@ -241,6 +241,10 @@ function executeSelectedTask() {
 
     setTimeout(() => {
         logLiveConsole('Task execution completed', 'success');
+        // Re-enable all Add Tap buttons after execution
+        document.querySelectorAll('.add-tap-btn').forEach(btn => {
+            btn.disabled = false;
+        });
     }, delay + 500);
 }
 
@@ -568,6 +572,11 @@ function disableDrawingMode() {
         focusedBlock.element.classList.remove('focused');
         focusedBlock = null;
     }
+
+    // Re-enable all Add Tap buttons
+    document.querySelectorAll('.add-tap-btn').forEach(btn => {
+        btn.disabled = false;
+    });
 }
 
 // Event listeners for drawing mode
