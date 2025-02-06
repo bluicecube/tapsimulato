@@ -206,15 +206,42 @@ function executeSelectedTask() {
 
     logLiveConsole('Starting task execution', 'info');
 
-    if (window.processCommand) {
-        window.processCommand({
-            command: 'execute',
-            params: {},
-            message: 'Executing current task'
+    let delay = 0;
+    const simulator = document.getElementById('simulator');
+
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += Math.random() * 500 + 200; // Random delay between 200-700ms
+                setTimeout(() => {
+                    // Calculate random point within region
+                    const x = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
+                    const y = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
+
+                    // Create visual feedback
+                    const feedback = document.createElement('div');
+                    feedback.className = 'tap-feedback';
+                    feedback.style.left = `${x}px`;
+                    feedback.style.top = `${y}px`;
+
+                    simulator.appendChild(feedback);
+                    setTimeout(() => feedback.remove(), 500);
+
+                    logLiveConsole(`Tapped at (${Math.round(x)}, ${Math.round(y)})`, 'success');
+                }, delay);
+            }
         });
-    } else {
-        console.error('processCommand not found');
     }
+
+    executeBlocks(currentTask.blocks);
+
+    setTimeout(() => {
+        logLiveConsole('Task execution completed', 'success');
+    }, delay + 500);
 }
 
 function addTaskBlock(task) {
