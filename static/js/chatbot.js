@@ -701,10 +701,58 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+let focusedBlock = null; // Track the currently focused block
+
 function setBlockFocus(block, blockDiv) {
-    // Remove focus from other blocks
-    document.querySelectorAll('.block').forEach(b => b.classList.remove('focused'));
+    // Remove focus from previous block if exists
+    if (focusedBlock) {
+        focusedBlock.element.classList.remove('focused');
+        // Also ensure we remove the active-block class
+        focusedBlock.element.classList.remove('active-block');
+        hideSelectionBox(focusedBlock.block);
+    }
+
+    // Hide all selection boxes
+    document.querySelectorAll('.active-selection-box').forEach(box => {
+        box.classList.add('d-none');
+    });
+
+    // Set focus on new block
+    focusedBlock = { block, element: blockDiv };
     blockDiv.classList.add('focused');
+    blockDiv.classList.add('active-block');
+
+    // Show region for tap blocks
+    if (block.type === 'tap' && block.region) {
+        showSelectionBox(block);
+    }
+}
+
+function showSelectionBox(tapBlock) {
+    if (!tapBlock.region) return;
+
+    // Create a new selection box if one doesn't exist for this tap block
+    if (!tapBlock.selectionBoxElement) {
+        const newBox = document.createElement('div');
+        newBox.className = 'active-selection-box d-none';
+        newBox.style.border = '2px dashed blue';
+        newBox.style.position = 'absolute';
+        document.getElementById('simulator').appendChild(newBox);
+        tapBlock.selectionBoxElement = newBox;
+    }
+
+    // Update the position and size
+    tapBlock.selectionBoxElement.style.left = `${tapBlock.region.x1}px`;
+    tapBlock.selectionBoxElement.style.top = `${tapBlock.region.y1}px`;
+    tapBlock.selectionBoxElement.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
+    tapBlock.selectionBoxElement.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
+    tapBlock.selectionBoxElement.classList.remove('d-none');
+}
+
+function hideSelectionBox(tapBlock) {
+    if (tapBlock.selectionBoxElement) {
+        tapBlock.selectionBoxElement.classList.add('d-none');
+    }
 }
 
 // Export necessary functions
