@@ -206,33 +206,15 @@ function executeSelectedTask() {
 
     logLiveConsole('Starting task execution', 'info');
 
-    let delay = 0;
-    // Get blocks in DOM order
-    const blockElements = document.querySelectorAll('.block');
-    blockElements.forEach((blockElement) => {
-        const blockIndex = Array.from(blockElement.parentNode.children).indexOf(blockElement);
-        const block = currentTask.blocks[blockIndex];
-
-        if (block && block.type === 'tap') {
-            const waitTime = Math.random() * 1.5 + 0.5;
-            delay += waitTime * 1000;
-
-            setTimeout(() => {
-                if (block.region) {
-                    const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
-                    const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
-                    simulateTap(randomX, randomY);
-                    logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
-                } else {
-                    logLiveConsole('Warning: Tap block has no region defined', 'warning');
-                }
-            }, delay);
-        }
-    });
-
-    setTimeout(() => {
-        logLiveConsole('Task execution completed', 'success');
-    }, delay + 500);
+    if (window.processCommand) {
+        window.processCommand({
+            command: 'execute',
+            params: {},
+            message: 'Executing current task'
+        });
+    } else {
+        console.error('processCommand not found');
+    }
 }
 
 function addTaskBlock(task) {
@@ -380,11 +362,12 @@ function showSelectionBox(tapBlock) {
     }
 
     // Update the position and size
-    tapBlock.selectionBoxElement.style.left = `${tapBlock.region.x1}px`;
-    tapBlock.selectionBoxElement.style.top = `${tapBlock.region.y1}px`;
-    tapBlock.selectionBoxElement.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
-    tapBlock.selectionBoxElement.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
-    tapBlock.selectionBoxElement.classList.remove('d-none');
+    const selectionBox = tapBlock.selectionBoxElement;
+    selectionBox.style.left = `${tapBlock.region.x1}px`;
+    selectionBox.style.top = `${tapBlock.region.y1}px`;
+    selectionBox.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
+    selectionBox.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
+    selectionBox.classList.remove('d-none');
 }
 
 function hideSelectionBox(tapBlock) {

@@ -374,6 +374,14 @@ function updateTaskBlocks() {
                 </div>
                 <small class="text-muted">Region: ${regionText}</small>
             `;
+
+            // Add click handler to show region
+            blockDiv.addEventListener('click', (e) => {
+                if (!e.target.closest('.select-region-btn')) {
+                    // Call the simulator's setBlockFocus function
+                    window.setBlockFocus && window.setBlockFocus(block, blockDiv);
+                }
+            });
         } else if (block.type === 'loop') {
             blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
@@ -448,3 +456,7 @@ function executeTask(task) {
 window.addMessage = addMessage;
 window.handleMessage = handleMessage;
 window.processCommand = processCommand;
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
+window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
