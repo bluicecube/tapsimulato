@@ -111,27 +111,10 @@ function calculateRegionFromDescription(description) {
         }
     };
 
-    // Handle various descriptions
-    const locationMap = {
-        'upper': 'top',
-        'lower': 'bottom',
-        'middle': 'center',
-        'centre': 'center',
-        'left side': 'left',
-        'right side': 'right'
-    };
-
     // Try to match the description to a region
-    for (const [key, value] of Object.entries(locationMap)) {
+    for (const [key, value] of Object.entries(regions)) {
         if (normalized.includes(key)) {
-            normalized = normalized.replace(key, value);
-        }
-    }
-
-    // Check for compound locations (e.g., "top left")
-    for (const location of Object.keys(regions)) {
-        if (normalized.includes(location)) {
-            return regions[location];
+            return regions[key];
         }
     }
 
@@ -142,11 +125,7 @@ function calculateRegionFromDescription(description) {
 // Chat UI functions
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
-    console.log('Adding message, chatMessages element:', chatMessages);
-    if (!chatMessages) {
-        console.error('Chat messages container not found!');
-        return;
-    }
+    if (!chatMessages) return;
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${role}`;
@@ -154,19 +133,11 @@ function addMessage(role, content) {
         ${content}
         <span class="timestamp">${new Date().toLocaleTimeString()}</span>
     `;
-
-    // Clear existing messages if this is the initial greeting
-    if (role === 'assistant' && state.chatHistory.length === 0) {
-        chatMessages.innerHTML = '';
-    }
-
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     // Add to history
     state.chatHistory.push({ role, content });
-
-    console.log('Message added, current chat history:', state.chatHistory);
 }
 
 function showThinking() {
@@ -484,14 +455,12 @@ function simulateTap(x, y) {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded');
+document.addEventListener('DOMContentLoaded', () => {
     loadState();
     updateTaskDisplay();
 
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
-    const chatMessages = document.getElementById('chatMessages');
 
     if (chatInput && sendButton) {
         sendButton.addEventListener('click', handleMessage);
@@ -501,7 +470,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Show initial greeting
-    console.log('Showing initial greeting');
     addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
 });
 
