@@ -416,20 +416,77 @@ function getRegionForLocation(location) {
     return regions[regionKey] || regions['middle'];
 }
 
-function createNewTask(){
+function createNewTask() {
+    const task = {
+        id: `task-${Date.now()}`,
+        name: 'New Task',
+        blocks: [],
+        minimized: false,
+        created: new Date().toISOString()
+    };
+    tasks.push(task);
+    currentTask = task;
+
+    // Update the current task display
+    const currentTaskElement = document.getElementById('currentTask');
+    currentTaskElement.innerHTML = '';
+    addTaskBlock(task);
+
+    // Auto-save
+    saveTasksToStorage();
+    updateTaskList();
+
+    return task;
+}
+
+function addTapBlock(parent) {
     //This function is not fully defined in the original code.  Leaving as is.
 }
 
-function addTapBlock(parent){
-    //This function is not fully defined in the original code.  Leaving as is.
+function saveTasksToStorage() {
+    localStorage.setItem('savedTasks', JSON.stringify(tasks));
+    localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks));
 }
 
-function saveTasksToStorage(){
-    //This function is not fully defined in the original code.  Leaving as is.
-}
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
 
-function updateTaskList(){
-    //This function is not fully defined in the original code.  Leaving as is.
+    taskList.innerHTML = '';
+
+    tasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (currentTask && currentTask.id === task.id) {
+            taskItem.classList.add('active');
+        }
+
+        taskItem.innerHTML = `
+            <span>${task.name}</span>
+            <div>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `;
+
+        // Make the entire task item clickable
+        taskItem.addEventListener('click', (e) => {
+            if (!e.target.closest('.delete-task-btn')) {
+                loadTask(task);
+                // Update active state
+                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
+                taskItem.classList.add('active');
+            }
+        });
+
+        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTask(task);
+        });
+
+        taskList.appendChild(taskItem);
+    });
 }
 
 function loadTask(taskToLoad){
@@ -442,4 +499,24 @@ function executeSelectedTask(){
 
 function showSelectionBox(tapBlock){
     //This function is not fully defined in the original code.  Leaving as is.
+}
+
+function deleteTask(task) {
+    const index = tasks.indexOf(task);
+    if (index > -1) {
+        deletedTasks.push(tasks.splice(index, 1)[0]);
+    }
+    saveTasksToStorage();
+    updateTaskList();
+}
+
+let tasks = JSON.parse(localStorage.getItem('savedTasks')) || [];
+let deletedTasks = JSON.parse(localStorage.getItem('deletedTasks')) || [];
+let currentTask = null;
+
+function addTaskBlock(task) {
+    const taskContainer = document.getElementById('currentTask');
+    const blocksContainer = document.createElement('div');
+    blocksContainer.className = 'blocks-container';
+    taskContainer.appendChild(blocksContainer);
 }
