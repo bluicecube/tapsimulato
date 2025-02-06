@@ -342,7 +342,14 @@ async function processCommand(response_data) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                const loopDiv = addLoopBlock(currentTask);
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: params.iterations || 1,
+                    blocks: [],
+                    name: 'Loop Block'
+                };
+                currentTask.blocks.push(loopBlock);
+                const loopDiv = addLoopBlock(currentTask, params.iterations);
                 blocksContainer.appendChild(loopDiv);
                 saveTasksToStorage();
                 break;
@@ -434,4 +441,92 @@ async function processCommand(response_data) {
         console.error('Error processing command:', error);
         addMessage('assistant', 'I had trouble with that. Could you try describing what you want differently?');
     }
+}
+
+function addLoopBlock(parent, iterations = 1) {
+    const loopBlock = {
+        type: 'loop',
+        iterations: iterations,
+        blocks: [],
+        name: 'Loop Block'
+    };
+    parent.blocks.push(loopBlock);
+
+    const blockDiv = document.createElement('div');
+    blockDiv.className = 'block loop-block';
+    blockDiv.draggable = true;
+    blockDiv.innerHTML = `
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${loopBlock.name}</h6>
+        </div>
+        <div class="input-group mb-2">
+            <span class="input-group-text">Iterations</span>
+            <input type="number" class="form-control iterations-input" value="${iterations}" min="1">
+        </div>
+        <div class="nested-blocks"></div>
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+            <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
+        </div>
+    `;
+
+    setupDragAndDrop(blockDiv);
+
+    const iterationsInput = blockDiv.querySelector('.iterations-input');
+    iterationsInput.value = iterations;
+    iterationsInput.addEventListener('change', (e) => {
+        loopBlock.iterations = parseInt(e.target.value) || 1;
+        saveTasksToStorage();
+    });
+
+    blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
+        const tapDiv = addTapBlock(loopBlock);
+        blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
+        saveTasksToStorage();
+    });
+
+    return blockDiv;
+}
+
+function setupDragAndDrop(blockDiv) {
+    blockDiv.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', '');
+        blockDiv.classList.add('dragging');
+    });
+
+    blockDiv.addEventListener('dragend', () => {
+        blockDiv.classList.remove('dragging');
+    });
+
+    blockDiv.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggingBlock = document.querySelector('.dragging');
+        if (!draggingBlock) return;
+
+        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+        if (nestedBlocks && blockDiv.classList.contains('loop-block')) {
+            const afterElement = getDragAfterElement(nestedBlocks, e.clientY);
+            if (afterElement) {
+                nestedBlocks.insertBefore(draggingBlock, afterElement);
+            } else {
+                nestedBlocks.appendChild(draggingBlock);
+            }
+        }
+    });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.block:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
