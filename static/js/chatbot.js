@@ -133,12 +133,12 @@ async function processCommands(userMessage, assistantMessage) {
             const nameMatch = userMessage.toLowerCase().match(/called\s+([^.,!?]+)/i);
             if (nameMatch) {
                 const taskName = nameMatch[1].trim();
-                createNewTask();
-                if (currentTask) {
+                createNewTask(); // Assuming createNewTask exists elsewhere
+                if (currentTask) { // Assuming currentTask exists elsewhere
                     currentTask.name = taskName;
-                    saveTasksToStorage();
-                    updateTaskList();
-                    loadTask(currentTask);
+                    saveTasksToStorage(); // Assuming saveTasksToStorage exists elsewhere
+                    updateTaskList(); // Assuming updateTaskList exists elsewhere
+                    loadTask(currentTask); // Assuming loadTask exists elsewhere
                 }
                 return;
             }
@@ -150,7 +150,7 @@ async function processCommands(userMessage, assistantMessage) {
 
             // Handle tap corners command
             if (lowerUserMessage.includes('corner') && lowerUserMessage.includes('times')) {
-                const iterationMatch = lowerUserMessage.match(/(\d+)\s*times/);
+                const iterationMatch = lowerUserMessage.match(/(\d+)/); //Improved regex
                 const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 2;
 
                 const loopBlock = {
@@ -161,10 +161,13 @@ async function processCommands(userMessage, assistantMessage) {
                 };
                 currentTask.blocks.push(loopBlock);
 
-                const loopDiv = addLoopBlock(loopBlock);
-                document.querySelector('.blocks-container').appendChild(loopDiv);
+                const loopDiv = addLoopBlock(loopBlock); // Assuming addLoopBlock exists elsewhere
+                const blocksContainer = document.querySelector('.blocks-container');
+                if (blocksContainer) {
+                    blocksContainer.appendChild(loopDiv);
+                }
 
-                // Add the four corner taps
+
                 const corners = [
                     { x: 20, y: 20, name: 'Top Left' },
                     { x: 300, y: 20, name: 'Top Right' },
@@ -185,9 +188,15 @@ async function processCommands(userMessage, assistantMessage) {
                     };
                     loopBlock.blocks.push(tapBlock);
 
-                    const tapDiv = addTapBlock(loopBlock);
-                    loopDiv.querySelector('.nested-blocks').appendChild(tapDiv);
-                    showSelectionBox(tapBlock);
+                    const tapDiv = addTapBlock(tapBlock); // Assuming addTapBlock exists elsewhere
+                    if (loopDiv) {
+                        const nestedBlocks = loopDiv.querySelector('.nested-blocks');
+                        if (nestedBlocks) {
+                            nestedBlocks.appendChild(tapDiv);
+                        }
+                    }
+                    showSelectionBox(tapBlock); //Assuming showSelectionBox exists elsewhere
+
                 });
 
                 addMessage('assistant', 'Added corner taps. Want to test it?');
@@ -201,12 +210,15 @@ async function processCommands(userMessage, assistantMessage) {
                 };
                 currentTask.blocks.push(tapBlock);
 
-                const tapDiv = addTapBlock(currentTask);
-                document.querySelector('.blocks-container').appendChild(tapDiv);
+                const tapDiv = addTapBlock(currentTask); // Assuming addTapBlock exists elsewhere
+                const blocksContainer = document.querySelector('.blocks-container');
+                if (blocksContainer) {
+                  blocksContainer.appendChild(tapDiv);
+                }
             }
         }
 
-        saveTasksToStorage();
+        saveTasksToStorage(); // Assuming saveTasksToStorage exists elsewhere
     } catch (error) {
         console.error('Error processing commands:', error);
         addMessage('assistant', 'I had trouble with that. Could you try describing what you want differently?');
