@@ -42,6 +42,20 @@
                                 <div id="currentTask" class="current-task"></div>
                             </div>
                         </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h4>AI Assistant</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="chatMessages" class="chat-messages mb-3"></div>
+                                <div class="input-group">
+                                    <input type="text" id="chatInput" class="form-control" placeholder="Describe what you want to create...">
+                                    <button id="sendChatBtn" class="btn btn-primary">
+                                        <i data-feather="send"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="card">
                             <div class="card-header">
                                 <h4>Live Console</h4>
@@ -75,5 +89,6 @@
     <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
     <script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
     <script src="{{ url_for('static', filename='js/gcode.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
 </body>
 </html>
