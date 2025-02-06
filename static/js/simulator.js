@@ -369,7 +369,7 @@ function loadTask(task) {
     const currentTaskElement = document.getElementById('currentTask');
     currentTaskElement.innerHTML = '';
 
-    // Create the task container first
+    // Create the task container
     const taskDiv = document.createElement('div');
     taskDiv.className = 'task-block';
     taskDiv.innerHTML = `
@@ -384,7 +384,7 @@ function loadTask(task) {
         <div class="blocks-container"></div>
     `;
 
-    // Add event listeners for the task container
+    // Add event listeners
     const nameElement = taskDiv.querySelector('.task-name');
     nameElement.addEventListener('blur', () => {
         currentTask.name = nameElement.textContent;
@@ -392,15 +392,17 @@ function loadTask(task) {
         updateTaskList();
     });
 
+    const blocksContainer = taskDiv.querySelector('.blocks-container');
+
     taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
         const tapDiv = addTapBlock(currentTask);
-        taskDiv.querySelector('.blocks-container').appendChild(tapDiv);
+        blocksContainer.appendChild(tapDiv);
         saveTasksToStorage();
     });
 
     taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
         const loopDiv = addLoopBlock(currentTask);
-        taskDiv.querySelector('.blocks-container').appendChild(loopDiv);
+        blocksContainer.appendChild(loopDiv);
         saveTasksToStorage();
     });
 
@@ -412,56 +414,27 @@ function loadTask(task) {
 
     currentTaskElement.appendChild(taskDiv);
 
-    // Now rebuild all the blocks
-    const blocksContainer = taskDiv.querySelector('.blocks-container');
-    if (currentTask.blocks && blocksContainer) {
-        currentTask.blocks.forEach(block => {
+    // Clear existing blocks array and rebuild from saved data
+    currentTask.blocks = [];
+
+    // Rebuild blocks from saved data
+    if (task.blocks && task.blocks.length > 0) {
+        task.blocks.forEach(blockData => {
             let blockDiv;
-            if (block.type === 'tap') {
-                // Create the tap block UI
-                blockDiv = document.createElement('div');
-                blockDiv.className = 'block tap-block';
-                blockDiv.draggable = true;
-                blockDiv.innerHTML = `
-                    <div class="delete-dot"></div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="block-name" contenteditable="true">${block.name}</h6>
-                        <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
-                    </div>
-                `;
+            if (blockData.type === 'tap') {
+                // Store the region data temporarily
+                const region = blockData.region;
 
-                setupDragAndDrop(blockDiv);
+                // Add new tap block
+                blockDiv = addTapBlock(currentTask);
 
-                // Setup event listeners
-                blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-                    const index = currentTask.blocks.indexOf(block);
-                    if (index > -1) {
-                        currentTask.blocks.splice(index, 1);
-                        blockDiv.remove();
-                        logLiveConsole('Tap block removed', 'info');
-                        saveTasksToStorage();
-                    }
-                });
-
-                blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-                    enableDrawingMode(block, blockDiv);
-                });
-
-                blockDiv.addEventListener('click', (e) => {
-                    if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
-                        setBlockFocus(block, blockDiv);
-                    }
-                });
-
-                // Create visual elements for the region if it exists
-                if (block.region) {
-                    const selectionBoxElement = document.createElement('div');
-                    selectionBoxElement.className = 'active-selection-box';
-                    document.getElementById('simulator').appendChild(selectionBoxElement);
-                    block.selectionBoxElement = selectionBoxElement;
-                    showSelectionBox(block);
+                // Restore the region to the last added block
+                if (region) {
+                    const newBlock = currentTask.blocks[currentTask.blocks.length - 1];
+                    newBlock.region = region;
+                    showSelectionBox(newBlock);
                 }
-            } else if (block.type === 'loop') {
+            } else if (blockData.type === 'loop') {
                 blockDiv = addLoopBlock(currentTask);
             }
 
@@ -560,6 +533,7 @@ function addLoopBlock(task) {
     const loopDiv = document.createElement('div');
     loopDiv.className = 'loop-block';
     loopDiv.innerHTML = `<p contenteditable="true">Loop Block</p>`;
+    task.blocks.push({type: 'loop'});
     return loopDiv;
 }
 
