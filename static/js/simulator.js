@@ -1,6 +1,6 @@
 let tasks = [];
 let currentTask = null;
-let savedTasks = [];
+let deletedTasks = [];
 let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
@@ -11,8 +11,8 @@ let focusedBlock = null;
 document.addEventListener('DOMContentLoaded', () => {
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
-    document.getElementById('saveTaskBtn').addEventListener('click', saveCurrentTask);
     document.getElementById('executeBtn').addEventListener('click', executeSelectedTask);
+    document.getElementById('toggleTasksBtn').addEventListener('click', toggleTasksSidebar);
 
     const simulator = document.getElementById('simulator');
     simulator.addEventListener('mousedown', startSelection);
@@ -23,12 +23,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSavedTasks();
 });
 
+function toggleTasksSidebar() {
+    const sidebar = document.getElementById('tasksSidebar');
+    sidebar.classList.toggle('show');
+}
+
 function createNewTask() {
     const task = {
         id: `task-${Date.now()}`,
         name: 'New Task',
         blocks: [],
-        minimized: false
+        minimized: false,
+        created: new Date().toISOString()
     };
     tasks.push(task);
     currentTask = task;
@@ -38,7 +44,158 @@ function createNewTask() {
     currentTaskElement.innerHTML = '';
     addTaskBlock(task);
 
+    // Auto-save
+    saveTasksToStorage();
+    updateTaskList();
+
     logLiveConsole('New task created', 'info');
+}
+
+function saveTasksToStorage() {
+    localStorage.setItem('savedTasks', JSON.stringify(tasks));
+    localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks));
+}
+
+function loadSavedTasks() {
+    const savedTasks = localStorage.getItem('savedTasks');
+    const savedDeletedTasks = localStorage.getItem('deletedTasks');
+
+    if (savedTasks) {
+        tasks = JSON.parse(savedTasks);
+    }
+    if (savedDeletedTasks) {
+        deletedTasks = JSON.parse(savedDeletedTasks);
+    }
+
+    updateTaskList();
+    updateDeletedTaskList();
+}
+
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    taskList.innerHTML = '';
+
+    tasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (currentTask && currentTask.id === task.id) {
+            taskItem.classList.add('active');
+        }
+
+        taskItem.innerHTML = `
+            <span>${task.name}</span>
+            <div>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `;
+
+        taskItem.querySelector('span').addEventListener('click', () => loadTask(task));
+        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTask(task);
+        });
+
+        taskList.appendChild(taskItem);
+    });
+}
+
+function updateDeletedTaskList() {
+    const deletedList = document.getElementById('deletedTaskList');
+    deletedList.innerHTML = '';
+
+    deletedTasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        taskItem.innerHTML = `
+            <span>${task.name}</span>
+            <button class="btn btn-sm btn-outline-success restore-btn">
+                <i data-feather="refresh-cw"></i>
+            </button>
+        `;
+
+        taskItem.querySelector('.restore-btn').addEventListener('click', () => restoreTask(task));
+        deletedList.appendChild(taskItem);
+    });
+}
+
+function deleteTask(task) {
+    const index = tasks.findIndex(t => t.id === task.id);
+    if (index > -1) {
+        const deletedTask = tasks.splice(index, 1)[0];
+        deletedTasks.push(deletedTask);
+
+        if (currentTask && currentTask.id === task.id) {
+            currentTask = tasks.length > 0 ? tasks[tasks.length - 1] : null;
+            if (currentTask) {
+                loadTask(currentTask);
+            } else {
+                document.getElementById('currentTask').innerHTML = '';
+            }
+        }
+
+        saveTasksToStorage();
+        updateTaskList();
+        updateDeletedTaskList();
+        logLiveConsole('Task moved to recently deleted', 'info');
+    }
+}
+
+function restoreTask(task) {
+    const index = deletedTasks.findIndex(t => t.id === task.id);
+    if (index > -1) {
+        const restoredTask = deletedTasks.splice(index, 1)[0];
+        tasks.push(restoredTask);
+
+        saveTasksToStorage();
+        updateTaskList();
+        updateDeletedTaskList();
+        logLiveConsole('Task restored', 'success');
+    }
+}
+
+function executeSelectedTask() {
+    if (!currentTask) {
+        logLiveConsole('No task selected', 'error');
+        return;
+    }
+
+    // Clear any existing focus
+    if (focusedBlock) {
+        focusedBlock.element.classList.remove('focused');
+        focusedBlock = null;
+    }
+
+    logLiveConsole('Starting task execution', 'info');
+
+    let delay = 0;
+    // Get blocks in DOM order
+    const blockElements = document.querySelectorAll('.block');
+    blockElements.forEach((blockElement) => {
+        const blockIndex = Array.from(blockElement.parentNode.children).indexOf(blockElement);
+        const block = currentTask.blocks[blockIndex];
+
+        if (block && block.type === 'tap') {
+            const waitTime = Math.random() * 1.5 + 0.5;
+            delay += waitTime * 1000;
+
+            setTimeout(() => {
+                if (block.region) {
+                    const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
+                    const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
+                    simulateTap(randomX, randomY);
+                    logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
+                } else {
+                    logLiveConsole('Warning: Tap block has no region defined', 'warning');
+                }
+            }, delay);
+        }
+    });
+
+    setTimeout(() => {
+        logLiveConsole('Task execution completed', 'success');
+    }, delay + 500);
 }
 
 function addTaskBlock(task) {
@@ -61,21 +218,26 @@ function addTaskBlock(task) {
     const nameElement = taskDiv.querySelector('.task-name');
     nameElement.addEventListener('blur', () => {
         task.name = nameElement.textContent;
+        saveTasksToStorage(); //Auto-save on name change
+        updateTaskList();
     });
 
     taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
         const tapDiv = addTapBlock(task);
         taskDiv.querySelector('.blocks-container').appendChild(tapDiv);
+        saveTasksToStorage(); // Auto-save after adding a tap block
     });
 
     taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
         const loopDiv = addLoopBlock(task);
         taskDiv.querySelector('.blocks-container').appendChild(loopDiv);
+        saveTasksToStorage(); // Auto-save after adding a loop block
     });
 
     taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
         removeTask(task.id);
         taskDiv.remove();
+        saveTasksToStorage(); // Auto-save after deleting a task
     });
 
     currentTaskElement.appendChild(taskDiv);
@@ -201,45 +363,6 @@ function logLiveConsole(message, type = 'info') {
     console.scrollTop = console.scrollHeight;
 }
 
-function saveCurrentTask() {
-    if (!currentTask) return;
-
-    const taskIndex = savedTasks.findIndex(t => t.id === currentTask.id);
-    if (taskIndex === -1) {
-        savedTasks.push(JSON.parse(JSON.stringify(currentTask))); // Deep copy to preserve blocks
-    } else {
-        savedTasks[taskIndex] = JSON.parse(JSON.stringify(currentTask));
-    }
-
-    // Save to localStorage
-    localStorage.setItem('savedTasks', JSON.stringify(savedTasks));
-    updateTaskList();
-    logLiveConsole('Task saved successfully', 'success');
-}
-
-function loadSavedTasks() {
-    const saved = localStorage.getItem('savedTasks');
-    if (saved) {
-        savedTasks = JSON.parse(saved);
-        updateTaskList();
-    }
-}
-
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = '';
-
-    savedTasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        if (currentTask && currentTask.id === task.id) {
-            taskItem.classList.add('active');
-        }
-        taskItem.textContent = task.name;
-        taskItem.addEventListener('click', () => loadTask(task));
-        taskList.appendChild(taskItem);
-    });
-}
 
 function loadTask(task) {
     currentTask = JSON.parse(JSON.stringify(task)); // Deep copy to preserve blocks
@@ -311,6 +434,7 @@ function addTapBlock(parent) {
             parent.blocks.splice(index, 1);
             blockDiv.remove();
             logLiveConsole('Tap block removed', 'info');
+            saveTasksToStorage(); //Auto-save after deleting a block
         }
     });
 
@@ -337,43 +461,6 @@ function addLoopBlock(task) {
     return loopDiv;
 }
 
-function executeSelectedTask() {
-    if (!currentTask) {
-        logLiveConsole('No task selected', 'error');
-        return;
-    }
-
-    // Clear any existing focus
-    if (focusedBlock) {
-        focusedBlock.element.classList.remove('focused');
-        focusedBlock = null;
-    }
-
-    logLiveConsole('Starting task execution', 'info');
-
-    let delay = 0;
-    currentTask.blocks.forEach((block) => {
-        if (block.type === 'tap') {
-            const waitTime = Math.random() * 1.5 + 0.5;
-            delay += waitTime * 1000;
-
-            setTimeout(() => {
-                if (block.region) {
-                    const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
-                    const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
-                    simulateTap(randomX, randomY);
-                    logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
-                } else {
-                    logLiveConsole('Warning: Tap block has no region defined', 'warning');
-                }
-            }, delay);
-        }
-    });
-
-    setTimeout(() => {
-        logLiveConsole('Task execution completed', 'success');
-    }, delay + 500);
-}
 
 function generateGCode() {
     //Implementation for generating G-Code
