@@ -1,6 +1,6 @@
 :root {
-    --device-width: 320px;
-    --device-height: 720px;
+    --device-width: 720px;
+    --device-height: 1600px;
 }
 
 body {
