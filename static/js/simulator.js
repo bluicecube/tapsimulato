@@ -352,9 +352,21 @@ function executeSelectedTask() {
     logLiveConsole('Starting task execution', 'info');
 
     let delay = 0;
+    const blocks = document.querySelectorAll('.block');
+    let blockIndex = 0;
+
     currentTask.blocks.forEach((block) => {
         if (block.type === 'tap') {
             const waitTime = Math.random() * 1.5 + 0.5;
+
+            // Add highlight at the start of this block's execution
+            setTimeout(() => {
+                // Remove highlight from previous block
+                blocks.forEach(b => b.classList.remove('executing-block'));
+                // Add highlight to current block
+                blocks[blockIndex].classList.add('executing-block');
+            }, delay);
+
             delay += waitTime * 1000;
 
             setTimeout(() => {
@@ -366,13 +378,21 @@ function executeSelectedTask() {
                 } else {
                     logLiveConsole('Warning: Tap block has no region defined', 'warning');
                 }
+
+                // Remove highlight after execution
+                setTimeout(() => {
+                    blocks[blockIndex].classList.remove('executing-block');
+                }, 500);
             }, delay);
+
+            blockIndex++;
         }
     });
 
     setTimeout(() => {
+        blocks.forEach(block => block.classList.remove('executing-block'));
         logLiveConsole('Task execution completed', 'success');
-    }, delay);
+    }, delay + 500);
 }
 
 function generateGCode() {

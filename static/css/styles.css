@@ -40,7 +40,7 @@ body {
     border-radius: 4px;
     position: relative;
     cursor: move;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease-out;
 }
 
 .block.dragging {
@@ -180,4 +180,12 @@ body {
 .form-control:focus {
     background-color: var(--bs-dark);
     color: var(--bs-light);
+}
+
+.executing-block {
+    border-color: var(--bs-warning);
+    background-color: rgba(255, 193, 7, 0.2);
+    transform: translateX(10px);
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+    transition: all 0.3s ease-out;
 }
