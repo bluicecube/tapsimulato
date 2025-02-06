@@ -13,7 +13,6 @@ function addTapBlock(parent) {
         <div class="delete-dot"></div>
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="block-name" contenteditable="true">${tapBlock.name}</h6>
-            <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
         </div>
     `;
 
@@ -28,16 +27,19 @@ function addTapBlock(parent) {
         }
     });
 
-    blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-        enableDrawingMode(tapBlock, blockDiv);
-    });
-
-    // Add click handler for focus
+    // Click handler for the whole block to enable drawing mode
     blockDiv.addEventListener('click', (e) => {
-        if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
+        if (!e.target.closest('.delete-dot')) {
             setBlockFocus(tapBlock, blockDiv);
+            enableDrawingMode(tapBlock, blockDiv);
         }
     });
+
+    // Auto-focus new tap block
+    setTimeout(() => {
+        setBlockFocus(tapBlock, blockDiv);
+        enableDrawingMode(tapBlock, blockDiv);
+    }, 0);
 
     return blockDiv;
 }
@@ -92,12 +94,6 @@ function addLoopBlock(parent) {
         blockDiv.querySelector('.nested-blocks').appendChild(printDiv);
     });
 
-    // Add name editing functionality
-    const nameElement = blockDiv.querySelector('.block-name');
-    nameElement.addEventListener('blur', () => {
-        loopBlock.name = nameElement.textContent;
-    });
-
     return blockDiv;
 }
 
@@ -127,11 +123,9 @@ function addPrintBlock(parent) {
 
     blockDiv.querySelector('.message-input').addEventListener('input', (e) => {
         printBlock.message = e.target.value;
-        // Log message to console when changed
         logLiveConsole(`Print: ${e.target.value}`, 'print');
     });
 
-    // Add click handler for focus
     blockDiv.addEventListener('click', () => {
         setBlockFocus(printBlock, blockDiv);
     });
@@ -191,7 +185,6 @@ function disableDrawingMode() {
         activeBlock.classList.remove('active-block');
     }
     currentTapBlock = null;
-    selectionRectangle.classList.add('d-none');
 }
 
 // Event listeners for drawing mode
@@ -200,3 +193,9 @@ document.addEventListener('keydown', (e) => {
         disableDrawingMode();
     }
 });
+
+function hideSelectionBox(tapBlock) {
+    if (tapBlock.selectionBoxElement) {
+        tapBlock.selectionBoxElement.classList.add('d-none');
+    }
+}
