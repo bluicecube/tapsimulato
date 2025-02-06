@@ -51,7 +51,6 @@ async function sendMessage() {
     showThinking();
 
     try {
-        // Prepare messages array ensuring alternating pattern
         const messages = [
             { role: 'system', content: systemPrompt }
         ];
@@ -138,37 +137,32 @@ function hideThinking() {
 }
 
 async function processCommands(userMessage, assistantMessage) {
-    const lowerUserMessage = userMessage.toLowerCase();
-    const lowerAssistantMessage = assistantMessage.toLowerCase();
-
     try {
-        // Check if this is a task name response
-        if (lowerAssistantMessage.includes('what would you like to call it')) {
-            // Create new task and focus it
-            createNewTask();
-            if (currentTask) {
-                currentTask.name = userMessage.trim(); // Use the raw user message as the name
-                saveTasksToStorage();
-                updateTaskList();
-                // Ensure task is in focus
-                loadTask(currentTask);
+        // Extract task name from creation request
+        if (userMessage.toLowerCase().includes('create') && userMessage.toLowerCase().includes('task') && userMessage.toLowerCase().includes('called')) {
+            const nameMatch = userMessage.toLowerCase().match(/called\s+([^.,!?]+)/i);
+            if (nameMatch) {
+                const taskName = nameMatch[1].trim();
+                createNewTask();
+                if (currentTask) {
+                    currentTask.name = taskName;
+                    saveTasksToStorage();
+                    updateTaskList();
+                    loadTask(currentTask);
+                }
+                return;
             }
-            return;
         }
 
-        // Handle task creation request
-        if (!currentTask && (lowerUserMessage.includes('create') || lowerUserMessage.includes('new'))) {
-            return; // Wait for name response
-        }
-
-        // Only process tap/loop commands if we have a current task
+        // Only process commands if we have a current task
         if (currentTask) {
-            if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat')) {
-                // Extract iteration count
-                const iterationMatch = userMessage.match(/(\d+)\s*times/);
-                const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 1;
+            const lowerUserMessage = userMessage.toLowerCase();
 
-                // Create loop block
+            // Handle loop requests
+            if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat')) {
+                const iterationMatch = lowerUserMessage.match(/(\d+)\s*times/);
+                const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 2;
+
                 const loopBlock = {
                     type: 'loop',
                     iterations: iterations,
@@ -176,11 +170,10 @@ async function processCommands(userMessage, assistantMessage) {
                 };
                 currentTask.blocks.push(loopBlock);
 
-                // Add the loop block to UI
                 const loopDiv = addLoopBlock(currentTask);
                 document.querySelector('.blocks-container').appendChild(loopDiv);
 
-                // Handle corner taps within loop
+                // If the loop includes corner taps
                 if (lowerUserMessage.includes('corner')) {
                     const corners = [
                         { x: 20, y: 20 },    // Top-left
@@ -202,13 +195,14 @@ async function processCommands(userMessage, assistantMessage) {
                         };
                         loopBlock.blocks.push(tapBlock);
 
-                        // Add tap block to UI
                         const tapDiv = addTapBlock(loopBlock);
                         loopDiv.querySelector('.nested-blocks').appendChild(tapDiv);
                         showSelectionBox(tapBlock);
                     });
                 }
-            } else if (lowerUserMessage.includes('tap')) {
+            }
+            // Handle single tap requests
+            else if (lowerUserMessage.includes('tap')) {
                 const tapBlock = {
                     type: 'tap',
                     region: null,
@@ -233,7 +227,8 @@ async function processCommands(userMessage, assistantMessage) {
         }
 
         // Execute if requested
-        if (lowerAssistantMessage.includes('see it in action') && lowerUserMessage.includes('yes')) {
+        if (assistantMessage.toLowerCase().includes('see it in action') && 
+            userMessage.toLowerCase().includes('yes')) {
             executeSelectedTask();
         }
 
