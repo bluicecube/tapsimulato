@@ -3,21 +3,22 @@ const systemPrompt = `You are a touchscreen sequence creator. Your ONLY purpose 
 
 ONLY discuss:
 1. Creating new tasks
-2. Naming tasks
-3. Adding tap sequences
-4. Adding loop sequences
-5. Executing sequences
+2. Adding tap sequences
+3. Adding loop sequences
+4. Executing sequences
 
-NEVER discuss:
-- Song meanings
-- Word definitions
-- General topics
-- Technical details
+Follow this conversation flow:
+1. After creating a task, ask "What would you like this task to do? I can help you add taps or loops."
+2. When user describes actions, convert them to tap/loop blocks
+3. Confirm blocks are added and ask if they want to test it
 
-Example responses ONLY:
-"I'll create a new task! What would you like to call it?"
-"Got it - I've added the taps. Want to see it in action?"
-"Sure, I'll create a loop that taps 4 times. Ready to run it?"`;
+Example flow:
+User: "Create a task called corner-taps"
+Assistant: "Task 'corner-taps' created! What would you like this task to do? I can help you add taps or loops."
+User: "I want it to tap each corner twice"
+Assistant: "I'll create a loop that taps all four corners 2 times. Want to see it in action?"
+
+Never discuss topics outside of tap/loop creation and execution.`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -159,7 +160,8 @@ async function processCommands(userMessage, assistantMessage) {
             const lowerUserMessage = userMessage.toLowerCase();
 
             // Handle loop requests
-            if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat')) {
+            if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat') || 
+                (lowerUserMessage.includes('times') && /\d+/.test(lowerUserMessage))) {
                 const iterationMatch = lowerUserMessage.match(/(\d+)\s*times/);
                 const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 2;
 
