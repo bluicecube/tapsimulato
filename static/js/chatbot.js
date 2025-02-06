@@ -1,3 +1,4 @@
+<replit_final_file>
 // Initialize state
 const state = {
     chatHistory: [],
@@ -226,7 +227,36 @@ async function processCommand(responseData) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                // Implementation for adding blocks will go here
+
+                // Process the block definitions recursively
+                function createBlocks(blockDefs) {
+                    return blockDefs.map(def => {
+                        if (def.type === 'loop') {
+                            return {
+                                type: 'loop',
+                                iterations: def.iterations || 1,
+                                blocks: createBlocks(def.blocks || []),
+                                name: 'Loop Block'
+                            };
+                        } else if (def.type === 'tap') {
+                            // Calculate region based on location description
+                            const region = def.location ? calculateRegionFromDescription(def.location) : null;
+                            return {
+                                type: 'tap',
+                                name: 'Tap Block',
+                                region: region,
+                                description: def.location || 'Center of screen'
+                            };
+                        }
+                    });
+                }
+
+                // Add the new blocks to the current task
+                const newBlocks = createBlocks(params.blocks || []);
+                state.currentTask.blocks.push(...newBlocks);
+
+                // Update the display
+                updateTaskBlocks();
                 break;
 
             case 'execute':
@@ -234,7 +264,7 @@ async function processCommand(responseData) {
                     addMessage('assistant', 'Please select a task to execute.');
                     return;
                 }
-                // Implementation for executing task will go here
+                executeTask(state.currentTask);
                 break;
 
             default:
@@ -244,6 +274,109 @@ async function processCommand(responseData) {
         console.error('Error processing command:', error);
         addMessage('assistant', 'Error processing command. Please try again.');
     }
+}
+
+// Helper function to calculate region from description
+function calculateRegionFromDescription(description) {
+    const normalized = description.toLowerCase().trim();
+
+    // Define screen regions
+    const regions = {
+        'middle': {
+            x1: DEVICE_WIDTH * 0.25,
+            y1: DEVICE_HEIGHT * 0.25,
+            x2: DEVICE_WIDTH * 0.75,
+            y2: DEVICE_HEIGHT * 0.75
+        },
+        'center': {
+            x1: DEVICE_WIDTH * 0.25,
+            y1: DEVICE_HEIGHT * 0.25,
+            x2: DEVICE_WIDTH * 0.75,
+            y2: DEVICE_HEIGHT * 0.75
+        },
+        'top': {
+            x1: 0,
+            y1: 0,
+            x2: DEVICE_WIDTH,
+            y2: DEVICE_HEIGHT * 0.25
+        },
+        'bottom': {
+            x1: 0,
+            y1: DEVICE_HEIGHT * 0.75,
+            x2: DEVICE_WIDTH,
+            y2: DEVICE_HEIGHT
+        }
+    };
+
+    // Try to match description to a region
+    for (const [key, region] of Object.entries(regions)) {
+        if (normalized.includes(key)) {
+            return region;
+        }
+    }
+
+    // Default to center if no match
+    return regions.center;
+}
+
+const DEVICE_WIDTH = 320;  // Match simulator width
+const DEVICE_HEIGHT = 720; // Match simulator height
+
+function updateTaskBlocks() {
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement || !state.currentTask) return;
+
+    const blocksContainer = currentTaskElement.querySelector('.blocks-container');
+    if (!blocksContainer) return;
+
+    blocksContainer.innerHTML = '';
+
+    function renderBlock(block) {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `block ${block.type}-block`;
+
+        if (block.type === 'tap') {
+            blockDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="block-name mb-0">Tap Block</h6>
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
+                </div>
+                <small class="text-muted">${block.description}</small>
+            `;
+        } else if (block.type === 'loop') {
+            blockDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="block-name mb-0">Loop Block</h6>
+                    <div class="d-flex align-items-center">
+                        <input type="number" class="form-control form-control-sm iterations-input" 
+                            value="${block.iterations}" min="1" style="width: 70px">
+                        <span class="ms-2">times</span>
+                    </div>
+                </div>
+                <div class="nested-blocks mt-2"></div>
+            `;
+
+            // Render nested blocks
+            const nestedContainer = blockDiv.querySelector('.nested-blocks');
+            block.blocks.forEach(nestedBlock => {
+                nestedContainer.appendChild(renderBlock(nestedBlock));
+            });
+        }
+
+        return blockDiv;
+    }
+
+    // Render all blocks
+    state.currentTask.blocks.forEach(block => {
+        blocksContainer.appendChild(renderBlock(block));
+    });
+}
+
+function executeTask(task) {
+    // Implementation will be added later
+    console.log('Executing task:', task);
 }
 
 // Export necessary functions for external use
