@@ -1,4 +1,3 @@
-<replit_final_file>
 // Initialize state
 const state = {
     chatHistory: [],
@@ -58,10 +57,19 @@ function addMessage(role, content) {
     state.chatHistory.push({ role, content });
 }
 
-// Initialize
+// Initialize chat interface
 function initializeChat() {
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
+    const chatMessages = document.getElementById('chatMessages');
+
+    if (!chatMessages) {
+        console.error('Chat container not found');
+        return;
+    }
+
+    // Clear any existing messages
+    chatMessages.innerHTML = '';
 
     if (chatInput && sendButton) {
         sendButton.addEventListener('click', handleMessage);
@@ -70,11 +78,15 @@ function initializeChat() {
         });
     }
 
-    // Show initial greeting
-    addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
+    // Show initial greeting with a slight delay to ensure DOM is ready
+    setTimeout(() => {
+        if (state.chatHistory.length === 0) {
+            addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
+        }
+    }, 100);
 }
 
-// Ensure DOM is loaded before initializing
+// Start initialization when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeChat);
 } else {
