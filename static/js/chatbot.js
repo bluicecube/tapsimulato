@@ -86,12 +86,40 @@ For combined commands like "create a loop with 3 taps", respond with:
     "message": "Created a loop that taps 3 times"
 }`;
 
-// Wait for DOM to be fully loaded
+// Update the addMessage function to be more robust
+function addMessage(role, content) {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) {
+        console.error('Chat messages container not found!');
+        return;
+    }
+
+    console.log('Adding message:', role, content); // Debug log
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+
+    // Ensure content is properly escaped and formatted
+    const formattedContent = content.replace(/\n/g, '<br>');
+    messageDiv.innerHTML = `
+        ${formattedContent}
+        <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+    `;
+
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Add to history
+    chatHistory.push({ role, content });
+}
+
+// Ensure the chatbot is properly initialized
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing chatbot...');
+
+    const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
-    const chatMessages = document.getElementById('chatMessages');
 
     if (!chatMessages) {
         console.error('Chat messages container not found!');
@@ -115,12 +143,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Add initial greeting
-    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task? You can say things like:\n\n' + 
-        '- "create a new task called [name]"\n' +
-        '- "create a loop that taps [location] [N] times"\n' +
-        '- "tap [location]" (e.g., top left, middle, bottom right)\n' +
-        '- "load task [name]"\n' +
-        '- "execute task"');
+    setTimeout(() => {
+        addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task? You can say things like:\n\n' + 
+            '- "create a new task called [name]"\n' +
+            '- "create a loop that taps [location] [N] times"\n' +
+            '- "tap [location]" (e.g., top left, middle, bottom right)\n' +
+            '- "load task [name]"\n' +
+            '- "execute task"');
+    }, 100);
 
     console.log('Chatbot initialized');
 });
@@ -206,21 +236,6 @@ async function sendMessage() {
         hideThinking();
         addMessage('assistant', `Sorry, something went wrong. Please try again.`);
     }
-}
-
-function addMessage(role, content) {
-    const chatMessages = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-message ${role}`;
-    messageDiv.innerHTML = `
-        ${content}
-        <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-    `;
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    // Add to history
-    chatHistory.push({ role, content });
 }
 
 function showThinking() {

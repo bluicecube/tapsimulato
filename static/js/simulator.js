@@ -21,54 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load saved tasks from localStorage
     loadSavedTasks();
-
-    // Create a sample task
-    function createSampleTask() {
-        const task = {
-            id: `task-${Date.now()}`,
-            name: 'Demo Task',
-            blocks: [],
-            minimized: false,
-            created: new Date().toISOString()
-        };
-        tasks.push(task);
-
-        // Add a loop block that taps each corner
-        const loopBlock = {
-            type: 'loop',
-            iterations: 2,
-            blocks: []
-        };
-        task.blocks.push(loopBlock);
-
-        // Add corner taps
-        const corners = [
-            { x: 20, y: 20 },    // Top-left
-            { x: 300, y: 20 },   // Top-right
-            { x: 20, y: 700 },   // Bottom-left
-            { x: 300, y: 700 }   // Bottom-right
-        ];
-
-        corners.forEach(corner => {
-            const tapBlock = {
-                type: 'tap',
-                region: {
-                    x1: corner.x - 10,
-                    y1: corner.y - 10,
-                    x2: corner.x + 10,
-                    y2: corner.y + 10
-                },
-                name: 'Corner Tap'
-            };
-            loopBlock.blocks.push(tapBlock);
-        });
-
-        saveTasksToStorage();
-        updateTaskList();
-    }
-
-    // Call createSampleTask after initializing the UI
-    createSampleTask();
 });
 
 function toggleTasksSidebar() {
