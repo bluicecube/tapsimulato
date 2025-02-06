@@ -23,6 +23,8 @@ Available commands:
    Command: "create_task"
    Params: {"taskName": "<name>"}
 
+   If user just says "yes" or agrees to create a task, ask them for a name first.
+
 2. For corner taps:
    Input: "tap each corner <N> times"
    Command: "add_corner_taps"
@@ -35,7 +37,7 @@ Available commands:
 
 Keep messages short and clear. Always respond with valid JSON.
 For general conversation (like "yes", "no", "hello"), use the "chat" command with a friendly response.
-If user says "yes" to creating a task, respond with a create_task command and a default task name.`;
+If user says "yes" without providing a name, respond with a chat message asking for the task name.`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
