@@ -487,9 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Show initial greeting
-    setTimeout(() => {
-        addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
-    }, 100);
+    addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
 });
 
 // Message handling
