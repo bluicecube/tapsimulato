@@ -45,7 +45,7 @@ Your responses should be in JSON format:
 
 // Functions to convert natural language positions to screen regions
 function calculateRegionFromDescription(description) {
-    const normalized = description.toLowerCase().trim();
+    let normalized = description.toLowerCase().trim();
 
     // Screen divisions (quarters)
     const regions = {
@@ -74,6 +74,12 @@ function calculateRegionFromDescription(description) {
             y2: DEVICE.height
         },
         'center': {
+            x1: DEVICE.width * 0.25,
+            y1: DEVICE.height * 0.25,
+            x2: DEVICE.width * 0.75,
+            y2: DEVICE.height * 0.75
+        },
+        'middle': {
             x1: DEVICE.width * 0.25,
             y1: DEVICE.height * 0.25,
             x2: DEVICE.width * 0.75,
