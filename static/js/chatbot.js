@@ -12,9 +12,23 @@ For task-related commands, respond in this JSON format:
         // command specific parameters
     },
     "message": "human readable response"
+}
+
+Available commands:
+1. create_task: Create a new task
+   Params: {"taskName": "name of task"}
+2. add_corner_taps: Add taps to each corner
+   Params: {"iterations": number of times to repeat}
+3. execute: Run the current task
+   Params: {}
+
+For general chat, use:
+{
+    "command": "chat",
+    "params": {},
+    "message": "your response"
 }`;
 
-// Keep the original simple version of addMessage
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
