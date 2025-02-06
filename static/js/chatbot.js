@@ -43,21 +43,27 @@ async function sendMessage() {
     showThinking();
 
     try {
+        // Prepare messages array ensuring alternating pattern
+        const messages = [
+            { role: 'system', content: systemPrompt }
+        ];
+
+        // Add chat history ensuring alternating pattern
+        for (let i = 0; i < chatHistory.length - 1; i += 2) {
+            if (chatHistory[i].role === 'user' && chatHistory[i + 1]?.role === 'assistant') {
+                messages.push(chatHistory[i], chatHistory[i + 1]);
+            }
+        }
+
+        // Add the latest user message
+        messages.push({ role: 'user', content: message });
+
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    ...chatHistory.map(msg => ({
-                        role: msg.role,
-                        content: msg.content
-                    })),
-                    { role: 'user', content: message }
-                ]
-            })
+            body: JSON.stringify({ messages })
         });
 
         const data = await response.json();
