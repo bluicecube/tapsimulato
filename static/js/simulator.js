@@ -346,19 +346,47 @@ function addLoopBlock(task) {
 function addPrintBlock(task) {
     const printBlock = {
         type: 'print',
-        message: 'Print Block'
+        message: '',
+        name: 'Print Block'
     };
     task.blocks.push(printBlock);
 
     const printDiv = document.createElement('div');
-    printDiv.className = 'print-block';
-    const p = document.createElement('p');
-    p.contentEditable = true;
-    p.textContent = printBlock.message;
-    p.addEventListener('blur', () => {
-        printBlock.message = p.textContent;
+    printDiv.className = 'block print-block';
+    printDiv.draggable = true;
+    printDiv.innerHTML = `
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${printBlock.name}</h6>
+        </div>
+        <div class="input-group">
+            <span class="input-group-text">Message</span>
+            <input type="text" class="form-control message-input" placeholder="Enter message">
+        </div>
+    `;
+
+    setupDragAndDrop(printDiv);
+
+    const messageInput = printDiv.querySelector('.message-input');
+    messageInput.addEventListener('input', (e) => {
+        printBlock.message = e.target.value;
     });
-    printDiv.appendChild(p);
+
+    printDiv.querySelector('.delete-dot').addEventListener('click', () => {
+        const index = task.blocks.indexOf(printBlock);
+        if (index > -1) {
+            task.blocks.splice(index, 1);
+            printDiv.remove();
+            logLiveConsole('Print block removed', 'info');
+        }
+    });
+
+    printDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.delete-dot')) {
+            setBlockFocus(printBlock, printDiv);
+        }
+    });
+
     return printDiv;
 }
 
