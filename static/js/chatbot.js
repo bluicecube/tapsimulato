@@ -7,105 +7,17 @@ For task-related commands, respond in this JSON format:
         // command specific parameters
     },
     "message": "human readable response"
-}
-
-Available commands:
-1. Create task:
-   Input: "create a new task called <name>"
-   Command: "create_task"
-   Params: {"taskName": "<name>"}
-
-2. Create loop with taps:
-   Input: "create a loop that taps <location> <N> times"
-   Command: "create_loop_with_taps"
-   Params: {
-       "location": "<location>",  // "top-left", "top-right", "bottom-left", "bottom-right", "middle"
-       "iterations": <number>,
-       "custom_name": "<optional name>"
-   }
-
-3. Add tap:
-   Input: "add a tap" or "tap <location>"
-   Command: "add_tap"
-   Params: {
-       "location": "<location>",
-       "custom_name": "<optional name>"
-   }
-
-4. Add loop:
-   Input: "add a loop" or "loop <N> times"
-   Command: "add_loop"
-   Params: {"iterations": <number>}
-
-5. Corner taps:
-   Input: "tap each corner <N> times"
-   Command: "add_corner_taps"
-   Params: {"iterations": <number>}
-
-6. Remove blocks:
-   Input: "remove all blocks" or "remove last block"
-   Command: "remove_blocks"
-   Params: {"target": "all" | "last"}
-
-7. Load task:
-   Input: "load task <name>"
-   Command: "load_task"
-   Params: {"taskName": "<name>"}
-
-8. Execute task:
-   Input: "run the task" or "execute"
-   Command: "execute"
-   Params: {}
-
-Keep messages short and clear. Always respond with valid JSON.
-For general conversation (like "hi", "thanks"), use:
-{
-    "command": "chat",
-    "params": {},
-    "message": "your response"
-}
-
-For tap locations, understand these natural language inputs:
-- "top left", "upper left" → top-left
-- "top right", "upper right" → top-right
-- "bottom left", "lower left" → bottom-left
-- "bottom right", "lower right" → bottom-right
-- "middle", "center", "centre" → middle
-- "top", "top center" → top
-- "bottom", "bottom center" → bottom
-- "left", "left center" → left
-- "right", "right center" → right
-
-For combined commands like "create a loop with 3 taps", respond with:
-{
-    "command": "create_loop_with_taps",
-    "params": {
-        "iterations": 3,
-        "location": "middle"
-    },
-    "message": "Created a loop that taps 3 times"
 }`;
 
-// Update the addMessage function to be more robust
+// Keep the original simple version of addMessage
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) {
-        console.error('Chat messages container not found!');
-        return;
-    }
-
-    console.log('Adding message:', role, content); // Debug log
-
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${role}`;
-
-    // Ensure content is properly escaped and formatted
-    const formattedContent = content.replace(/\n/g, '<br>');
     messageDiv.innerHTML = `
-        ${formattedContent}
+        ${content}
         <span class="timestamp">${new Date().toLocaleTimeString()}</span>
     `;
-
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
@@ -113,46 +25,20 @@ function addMessage(role, content) {
     chatHistory.push({ role, content });
 }
 
-// Ensure the chatbot is properly initialized
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing chatbot...');
-
-    const chatMessages = document.getElementById('chatMessages');
+// Simplify back to the original initialization
+document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
 
-    if (!chatMessages) {
-        console.error('Chat messages container not found!');
-        return;
-    }
-
-    // Clear existing messages and initialize chat history
-    chatMessages.innerHTML = '';
-    chatHistory = [];
-
-    // Add event listeners
-    if (sendChatBtn) {
-        sendChatBtn.addEventListener('click', sendMessage);
-    }
-    if (chatInput) {
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-    }
+    sendChatBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
 
     // Add initial greeting
-    setTimeout(() => {
-        addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task? You can say things like:\n\n' + 
-            '- "create a new task called [name]"\n' +
-            '- "create a loop that taps [location] [N] times"\n' +
-            '- "tap [location]" (e.g., top left, middle, bottom right)\n' +
-            '- "load task [name]"\n' +
-            '- "execute task"');
-    }, 100);
-
-    console.log('Chatbot initialized');
+    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task?');
 });
 
 async function sendMessage() {
