@@ -1,13 +1,24 @@
 let chatHistory = [];
-const systemPrompt = `You are a touchscreen task creator. Be direct and concise.
+const systemPrompt = `You are a touchscreen task automation assistant. Respond in JSON format with these fields:
+{
+    "command": "create_task" | "add_corner_taps" | "add_tap" | "execute",
+    "params": {
+        "taskName": string,
+        "iterations": number,
+        "tapLocation": string
+    },
+    "message": string
+}
 
-Commands you understand:
-- "Create task [name]" -> Creates task, then ask what it should do
-- "Tap each corner [X] times" -> Creates loop with X iterations and 4 corner taps
-- "Tap [location]" -> Creates single tap at location
-- "Run task" -> Executes current task
-
-Keep responses under 10 words unless explaining a new concept.`;
+Example:
+User: "tap each corner four times"
+Response: {
+    "command": "add_corner_taps",
+    "params": {
+        "iterations": 4
+    },
+    "message": "Creating corner taps with 4 iterations."
+}`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -78,10 +89,13 @@ async function sendMessage() {
 
         // Process the response
         const assistantMessage = data.choices[0].message.content;
-        addMessage('assistant', assistantMessage);
+        const response_data = JSON.parse(assistantMessage);
 
-        // Process any commands in the response
-        await processCommands(message, assistantMessage);
+        // Add the assistant's message to chat
+        addMessage('assistant', response_data.message);
+
+        // Process commands
+        await processCommand(response_data);
 
     } catch (error) {
         console.error('Error:', error);
@@ -126,6 +140,103 @@ function hideThinking() {
     }
 }
 
+async function processCommand(response_data) {
+    try {
+        const { command, params } = response_data;
+
+        switch (command) {
+            case 'create_task':
+                createNewTask();
+                if (currentTask && params.taskName) {
+                    currentTask.name = params.taskName;
+                    saveTasksToStorage();
+                    updateTaskList();
+                    loadTask(currentTask);
+                }
+                break;
+
+            case 'add_corner_taps':
+                if (!currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+
+                const iterations = params.iterations || 2;
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: iterations,
+                    blocks: [],
+                    name: `${iterations}x Corner Taps`
+                };
+                currentTask.blocks.push(loopBlock);
+
+                const loopDiv = addLoopBlock(loopBlock);
+                const blocksContainer = document.querySelector('.blocks-container');
+                if (blocksContainer) {
+                    blocksContainer.appendChild(loopDiv);
+                }
+
+                const corners = [
+                    { x: 20, y: 20, name: 'Top Left' },
+                    { x: 300, y: 20, name: 'Top Right' },
+                    { x: 20, y: 700, name: 'Bottom Left' },
+                    { x: 300, y: 700, name: 'Bottom Right' }
+                ];
+
+                corners.forEach(corner => {
+                    const tapBlock = {
+                        type: 'tap',
+                        region: {
+                            x1: corner.x - 10,
+                            y1: corner.y - 10,
+                            x2: corner.x + 10,
+                            y2: corner.y + 10
+                        },
+                        name: `${corner.name} Corner`
+                    };
+                    loopBlock.blocks.push(tapBlock);
+
+                    const tapDiv = addTapBlock(tapBlock);
+                    const nestedBlocks = loopDiv.querySelector('.nested-blocks');
+                    if (nestedBlocks) {
+                        nestedBlocks.appendChild(tapDiv);
+                    }
+                    showSelectionBox(tapBlock);
+                });
+                break;
+
+            case 'add_tap':
+                if (!currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+
+                const tapBlock = {
+                    type: 'tap',
+                    region: null,
+                    name: 'New Tap'
+                };
+                currentTask.blocks.push(tapBlock);
+
+                const tapDiv = addTapBlock(tapBlock);
+                blocksContainer = document.querySelector('.blocks-container');
+                if (blocksContainer) {
+                    blocksContainer.appendChild(tapDiv);
+                }
+                break;
+
+            case 'execute':
+                executeSelectedTask();
+                break;
+        }
+
+        saveTasksToStorage();
+    } catch (error) {
+        console.error('Error processing command:', error);
+        addMessage('assistant', 'I had trouble with that. Could you try again?');
+    }
+}
+
 async function processCommands(userMessage, assistantMessage) {
     try {
         // Extract task name from creation request
@@ -133,12 +244,12 @@ async function processCommands(userMessage, assistantMessage) {
             const nameMatch = userMessage.toLowerCase().match(/called\s+([^.,!?]+)/i);
             if (nameMatch) {
                 const taskName = nameMatch[1].trim();
-                createNewTask(); // Assuming createNewTask exists elsewhere
-                if (currentTask) { // Assuming currentTask exists elsewhere
+                createNewTask(); 
+                if (currentTask) { 
                     currentTask.name = taskName;
-                    saveTasksToStorage(); // Assuming saveTasksToStorage exists elsewhere
-                    updateTaskList(); // Assuming updateTaskList exists elsewhere
-                    loadTask(currentTask); // Assuming loadTask exists elsewhere
+                    saveTasksToStorage(); 
+                    updateTaskList(); 
+                    loadTask(currentTask); 
                 }
                 return;
             }
@@ -150,7 +261,7 @@ async function processCommands(userMessage, assistantMessage) {
 
             // Handle tap corners command
             if (lowerUserMessage.includes('corner') && lowerUserMessage.includes('times')) {
-                const iterationMatch = lowerUserMessage.match(/(\d+)/); //Improved regex
+                const iterationMatch = lowerUserMessage.match(/(\d+)/); 
                 const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 2;
 
                 const loopBlock = {
@@ -161,7 +272,7 @@ async function processCommands(userMessage, assistantMessage) {
                 };
                 currentTask.blocks.push(loopBlock);
 
-                const loopDiv = addLoopBlock(loopBlock); // Assuming addLoopBlock exists elsewhere
+                const loopDiv = addLoopBlock(loopBlock); 
                 const blocksContainer = document.querySelector('.blocks-container');
                 if (blocksContainer) {
                     blocksContainer.appendChild(loopDiv);
@@ -188,14 +299,14 @@ async function processCommands(userMessage, assistantMessage) {
                     };
                     loopBlock.blocks.push(tapBlock);
 
-                    const tapDiv = addTapBlock(tapBlock); // Assuming addTapBlock exists elsewhere
+                    const tapDiv = addTapBlock(tapBlock); 
                     if (loopDiv) {
                         const nestedBlocks = loopDiv.querySelector('.nested-blocks');
                         if (nestedBlocks) {
                             nestedBlocks.appendChild(tapDiv);
                         }
                     }
-                    showSelectionBox(tapBlock); //Assuming showSelectionBox exists elsewhere
+                    showSelectionBox(tapBlock); 
 
                 });
 
@@ -210,7 +321,7 @@ async function processCommands(userMessage, assistantMessage) {
                 };
                 currentTask.blocks.push(tapBlock);
 
-                const tapDiv = addTapBlock(currentTask); // Assuming addTapBlock exists elsewhere
+                const tapDiv = addTapBlock(currentTask); 
                 const blocksContainer = document.querySelector('.blocks-container');
                 if (blocksContainer) {
                   blocksContainer.appendChild(tapDiv);
@@ -218,7 +329,7 @@ async function processCommands(userMessage, assistantMessage) {
             }
         }
 
-        saveTasksToStorage(); // Assuming saveTasksToStorage exists elsewhere
+        saveTasksToStorage(); 
     } catch (error) {
         console.error('Error processing commands:', error);
         addMessage('assistant', 'I had trouble with that. Could you try describing what you want differently?');
