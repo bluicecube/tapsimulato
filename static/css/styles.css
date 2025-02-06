@@ -183,9 +183,14 @@ body {
 }
 
 .executing-block {
-    border-color: var(--bs-warning);
-    background-color: rgba(255, 193, 7, 0.2);
-    transform: translateX(10px);
-    box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
-    transition: all 0.3s ease-out;
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    transition: background-color 0.3s ease-out;
+}
+
+.tap-block.executing-block {
+    background-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+.loop-block.executing-block {
+    background-color: rgba(25, 135, 84, 0.3) !important;
 }
