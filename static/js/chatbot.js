@@ -144,33 +144,43 @@ async function processCommands(userMessage, assistantMessage) {
     try {
         // Check if this is a task name response
         if (lowerAssistantMessage.includes('what would you like to call it')) {
-            // Create new task with provided name
+            // Create new task and focus it
             createNewTask();
             if (currentTask) {
-                currentTask.name = userMessage.trim();
+                currentTask.name = userMessage.trim(); // Use the raw user message as the name
                 saveTasksToStorage();
                 updateTaskList();
+                // Ensure task is in focus
+                loadTask(currentTask);
             }
             return;
         }
 
         // Handle task creation request
         if (!currentTask && (lowerUserMessage.includes('create') || lowerUserMessage.includes('new'))) {
-            return; // Don't create task yet, wait for name
+            return; // Wait for name response
         }
 
         // Only process tap/loop commands if we have a current task
-        if (currentTask && (lowerUserMessage.includes('create') || lowerUserMessage.includes('add') || lowerUserMessage.includes('tap'))) {
+        if (currentTask) {
             if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat')) {
                 // Extract iteration count
                 const iterationMatch = userMessage.match(/(\d+)\s*times/);
                 const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 1;
 
                 // Create loop block
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: iterations,
+                    blocks: []
+                };
+                currentTask.blocks.push(loopBlock);
+
+                // Add the loop block to UI
                 const loopDiv = addLoopBlock(currentTask);
                 document.querySelector('.blocks-container').appendChild(loopDiv);
 
-                // Handle corner taps
+                // Handle corner taps within loop
                 if (lowerUserMessage.includes('corner')) {
                     const corners = [
                         { x: 20, y: 20 },    // Top-left
@@ -180,19 +190,34 @@ async function processCommands(userMessage, assistantMessage) {
                     ];
 
                     corners.forEach(corner => {
-                        const tapBlock = addTapBlock(currentTask);
-                        tapBlock.region = {
-                            x1: corner.x - 10,
-                            y1: corner.y - 10,
-                            x2: corner.x + 10,
-                            y2: corner.y + 10
+                        const tapBlock = {
+                            type: 'tap',
+                            region: {
+                                x1: corner.x - 10,
+                                y1: corner.y - 10,
+                                x2: corner.x + 10,
+                                y2: corner.y + 10
+                            },
+                            name: 'Corner Tap'
                         };
+                        loopBlock.blocks.push(tapBlock);
+
+                        // Add tap block to UI
+                        const tapDiv = addTapBlock(loopBlock);
+                        loopDiv.querySelector('.nested-blocks').appendChild(tapDiv);
                         showSelectionBox(tapBlock);
                     });
                 }
             } else if (lowerUserMessage.includes('tap')) {
-                const tapBlock = addTapBlock(currentTask);
-                document.querySelector('.blocks-container').appendChild(tapBlock);
+                const tapBlock = {
+                    type: 'tap',
+                    region: null,
+                    name: 'Tap Block'
+                };
+                currentTask.blocks.push(tapBlock);
+
+                const tapDiv = addTapBlock(currentTask);
+                document.querySelector('.blocks-container').appendChild(tapDiv);
 
                 // Set region based on description
                 if (lowerUserMessage.includes('center')) {
