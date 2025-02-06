@@ -404,17 +404,14 @@ function executeSelectedTask() {
 
     logLiveConsole('Starting task execution', 'info');
 
-    // Execute each block in sequence
     let delay = 0;
-    currentTask.blocks.forEach((block, index) => {
+    currentTask.blocks.forEach((block) => {
         switch (block.type) {
             case 'tap':
-                const waitTime = Math.random() * 1.5 + 0.5; // Random delay between 0.5 and 2 seconds
+                const waitTime = Math.random() * 1.5 + 0.5;
                 delay += waitTime * 1000;
 
                 setTimeout(() => {
-                    logLiveConsole(`Waiting: ${waitTime.toFixed(1)} seconds`, 'info');
-
                     if (block.region) {
                         const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
                         const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
@@ -427,16 +424,15 @@ function executeSelectedTask() {
                 break;
 
             case 'print':
-                // Execute print blocks immediately without delay
                 setTimeout(() => {
-                    if (block.message && block.message.trim()) {
-                        logLiveConsole(`Print Block: ${block.message}`, 'info');
+                    const message = block.message;
+                    if (message && message.trim()) {
+                        logLiveConsole(`Print Message: "${message}"`, 'info');
                     } else {
                         logLiveConsole('Warning: Print block has empty message', 'warning');
                     }
                 }, delay);
-                // Add a small delay after print for readability
-                delay += 500;
+                delay += 500; // Add a small delay after print for readability
                 break;
         }
     });

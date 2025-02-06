@@ -115,7 +115,7 @@ function addPrintBlock(parent) {
         </div>
         <div class="input-group">
             <span class="input-group-text">Message</span>
-            <input type="text" class="form-control message-input" placeholder="Enter message">
+            <input type="text" class="form-control message-input" value="${printBlock.message}" placeholder="Enter message">
         </div>
     `;
 
@@ -124,6 +124,7 @@ function addPrintBlock(parent) {
     const messageInput = blockDiv.querySelector('.message-input');
     messageInput.addEventListener('input', (e) => {
         printBlock.message = e.target.value;
+        console.log('Print block message updated:', printBlock.message); // Debug log
     });
 
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
