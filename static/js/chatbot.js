@@ -8,12 +8,25 @@ const state = {
 
 // System prompt for the AI assistant
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
+Your responses should help interpret user intent for creating tap and loop sequences. 
+
 Your responses should be in JSON format:
 {
-    "command": "create_task|add_corner_taps|execute|chat",
+    "command": "create_task|add_tap_sequence|execute|chat",
     "params": {
-        "taskName": "string",  // for create_task
-        "iterations": "number" // for add_corner_taps
+        "taskName": "string",           // for create_task
+        "iterations": number,           // number of times to repeat the sequence
+        "locations": [                  // array of tap locations (optional)
+            {
+                "description": "string", // natural language description of where to tap
+                "region": {             // optional, if user specified exact coordinates
+                    "x1": number,
+                    "y1": number,
+                    "x2": number,
+                    "y2": number
+                }
+            }
+        ]
     },
     "message": "human readable response"
 }`;
@@ -205,12 +218,50 @@ async function processCommand(response_data) {
                 updateTaskDisplay();
                 break;
 
-            case 'add_corner_taps':
+            case 'add_tap_sequence':
                 if (!state.currentTask) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                await addCornerTapsToTask(state.currentTask, params.iterations || 1);
+
+                // Create a loop block if iterations > 1
+                const iterations = params.iterations || 1;
+                let targetBlocks = state.currentTask.blocks;
+
+                if (iterations > 1) {
+                    const loopBlock = {
+                        type: 'loop',
+                        iterations: iterations,
+                        blocks: [],
+                        name: 'Loop'
+                    };
+                    state.currentTask.blocks.push(loopBlock);
+                    targetBlocks = loopBlock.blocks;
+                }
+
+                // Add tap blocks based on locations
+                if (params.locations && params.locations.length > 0) {
+                    params.locations.forEach(location => {
+                        const tapBlock = {
+                            type: 'tap',
+                            name: 'Tap',
+                            region: location.region || null,
+                            description: location.description
+                        };
+                        targetBlocks.push(tapBlock);
+                    });
+                } else {
+                    // If no locations specified, add a single tap block
+                    const tapBlock = {
+                        type: 'tap',
+                        name: 'Tap',
+                        region: null,
+                        description: 'Tap location to be defined'
+                    };
+                    targetBlocks.push(tapBlock);
+                }
+
+                updateTaskBlocks();
                 break;
 
             case 'execute':
@@ -229,91 +280,59 @@ async function processCommand(response_data) {
     }
 }
 
-async function addCornerTapsToTask(task, iterations = 1) {
-    try {
-        // First, clear existing blocks
-        task.blocks = [];
+function updateTaskBlocks() {
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement || !state.currentTask) return;
 
-        // Create main loop block
-        const loopBlock = {
-            type: 'loop',
-            iterations: iterations,
-            blocks: [],
-            name: 'Corner Taps'
-        };
-        task.blocks.push(loopBlock);
+    currentTaskElement.innerHTML = '';
+    const blocksContainer = document.createElement('div');
+    blocksContainer.className = 'blocks-container';
 
-        // Define the corners
-        const corners = [
-            { name: 'Top Left', x1: 0, y1: 0, x2: 50, y2: 50 },
-            { name: 'Top Right', x1: 270, y1: 0, x2: 320, y2: 50 },
-            { name: 'Bottom Left', x1: 0, y1: 670, x2: 50, y2: 720 },
-            { name: 'Bottom Right', x1: 270, y1: 670, x2: 320, y2: 720 }
-        ];
+    function renderBlocks(blocks, container) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                const loopDiv = document.createElement('div');
+                loopDiv.className = 'block loop-block';
+                loopDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="block-name">${block.name}</h6>
+                        <span class="badge bg-secondary">${block.iterations}x</span>
+                    </div>
+                    <div class="nested-blocks"></div>
+                `;
+                container.appendChild(loopDiv);
+                renderBlocks(block.blocks, loopDiv.querySelector('.nested-blocks'));
+            } else if (block.type === 'tap') {
+                const tapDiv = document.createElement('div');
+                tapDiv.className = `block tap-block${!block.region ? ' undefined-region' : ''}`;
+                tapDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="block-name">
+                            ${block.name}
+                            ${!block.region ? '<span class="blink-warning">⚠</span>' : ''}
+                        </h6>
+                        <button class="btn btn-sm btn-outline-primary select-region-btn">
+                            ${block.region ? 'Change Region' : 'Set Region'}
+                        </button>
+                    </div>
+                    ${block.description ? `<small class="text-muted">${block.description}</small>` : ''}
+                `;
 
-        // Add tap blocks for each corner
-        corners.forEach(corner => {
-            const tapBlock = {
-                type: 'tap',
-                region: {
-                    x1: corner.x1,
-                    y1: corner.y1,
-                    x2: corner.x2,
-                    y2: corner.y2
-                },
-                name: `Tap ${corner.name}`
-            };
-            loopBlock.blocks.push(tapBlock);
+                // Add region selection functionality
+                const selectRegionBtn = tapDiv.querySelector('.select-region-btn');
+                selectRegionBtn.addEventListener('click', () => {
+                    enableDrawingMode(block, tapDiv);
+                });
+
+                container.appendChild(tapDiv);
+            }
         });
-
-        // Update the display
-        const currentTaskElement = document.getElementById('currentTask');
-        if (currentTaskElement) {
-            currentTaskElement.innerHTML = '';
-            const blocksContainer = document.createElement('div');
-            blocksContainer.className = 'blocks-container';
-
-            // Create and append the loop block UI
-            const loopDiv = createLoopBlockUI(loopBlock);
-            blocksContainer.appendChild(loopDiv);
-            currentTaskElement.appendChild(blocksContainer);
-        }
-
-        // Save state
-        saveState();
-        updateTaskDisplay();
-
-    } catch (error) {
-        console.error('Error in addCornerTapsToTask:', error);
-        addMessage('assistant', `Error: ${error.message}`);
     }
-}
 
-function createLoopBlockUI(loopBlock) {
-    const blockDiv = document.createElement('div');
-    blockDiv.className = 'block loop-block';
-    blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="block-name">${loopBlock.name}</h6>
-            <span class="badge bg-secondary">${loopBlock.iterations}x</span>
-        </div>
-        <div class="nested-blocks">
-            ${loopBlock.blocks.map(block => createTapBlockUI(block)).join('')}
-        </div>
-    `;
-    return blockDiv;
+    renderBlocks(state.currentTask.blocks, blocksContainer);
+    currentTaskElement.appendChild(blocksContainer);
+    saveState();
 }
-
-function createTapBlockUI(tapBlock) {
-    return `
-        <div class="block tap-block">
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="block-name">${tapBlock.name}</h6>
-            </div>
-        </div>
-    `;
-}
-
 
 function executeTask(task) {
     if (!task || !task.blocks || task.blocks.length === 0) {
@@ -321,50 +340,73 @@ function executeTask(task) {
         return;
     }
 
-    // Execute each block in sequence
-    task.blocks.forEach(block => {
-        if (block.type === 'loop') {
-            for (let i = 0; i < block.iterations; i++) {
-                block.blocks.forEach(tapBlock => {
-                    if (tapBlock.type === 'tap' && tapBlock.region) {
-                        const { x1, y1, x2, y2 } = tapBlock.region;
-                        const x = x1 + (x2 - x1) / 2;
-                        const y = y1 + (y2 - y1) / 2;
-                        simulateTap(x, y);
-                    }
-                });
-            }
-        }
-    });
+    let hasUndefinedRegions = false;
 
+    function checkBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'tap' && !block.region) {
+                hasUndefinedRegions = true;
+            } else if (block.type === 'loop') {
+                checkBlocks(block.blocks);
+            }
+        });
+    }
+
+    checkBlocks(task.blocks);
+
+    if (hasUndefinedRegions) {
+        addMessage('assistant', 'Some tap regions are not defined. Please define all tap regions before executing the task.');
+        return;
+    }
+
+    // Execute each block in sequence
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                const { x1, y1, x2, y2 } = block.region;
+                const x = x1 + (x2 - x1) / 2;
+                const y = y1 + (y2 - y1) / 2;
+                simulateTap(x, y);
+            }
+        });
+    }
+
+    executeBlocks(task.blocks);
     addMessage('assistant', 'Task executed successfully.');
 }
 
-// Function to simulate a tap at given coordinates
 function simulateTap(x, y) {
-    // Create a visual feedback element
     const tapFeedback = document.createElement('div');
     tapFeedback.className = 'tap-feedback';
     tapFeedback.style.left = `${x}px`;
     tapFeedback.style.top = `${y}px`;
 
-    // Add to simulator
     const simulator = document.getElementById('simulator');
     if (simulator) {
         simulator.appendChild(tapFeedback);
-
-        // Remove after animation
         setTimeout(() => tapFeedback.remove(), 500);
     }
 }
 
+// Placeholder for region selection (needs implementation)
+function enableDrawingMode(block, tapDiv) {
+    // Implement region selection logic here using a drawing library or similar
+    // Update block.region with the selected region coordinates
+    // Update the UI to reflect the change
+    console.log("Region selection needs implementation", block, tapDiv);
+    alert("Region selection is not yet implemented.  Please manually specify coordinates in your commands.");
+}
+
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    // Load saved state
     loadState();
     updateTaskDisplay();
 
-    // Setup message handlers
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
 
@@ -384,6 +426,8 @@ window.addMessage = addMessage;
 window.handleMessage = handleMessage;
 window.createNewTask = createNewTask;
 window.processCommand = processCommand;
+
+//Functions below this line were in the original code and are kept as is.
 
 function addLoopBlock(parent, iterations = 1) {
     const loopBlock = {
@@ -559,7 +603,33 @@ function getRegionForLocation(location) {
 }
 
 function addTapBlock(parent) {
-    //This function is not fully defined in the original code.  Leaving as is.
+    const tapBlock = {
+        type: 'tap',
+        name: 'Tap',
+        region: null,
+        description: 'Tap location to be defined'
+    };
+    parent.blocks.push(tapBlock);
+
+    const tapDiv = document.createElement('div');
+    tapDiv.className = 'block tap-block undefined-region';
+    tapDiv.draggable = true;
+    tapDiv.innerHTML = `
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="block-name">Tap<span class="blink-warning">⚠</span></h6>
+            <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
+        </div>
+        <small class="text-muted">Tap location to be defined</small>
+    `;
+
+    const selectRegionBtn = tapDiv.querySelector('.select-region-btn');
+    selectRegionBtn.addEventListener('click', () => {
+        enableDrawingMode(tapBlock, tapDiv);
+    });
+    setupDragAndDrop(tapDiv);
+
+    return tapDiv;
 }
 
 function deleteTask(task) {
@@ -572,7 +642,8 @@ function deleteTask(task) {
 }
 
 function loadTask(taskToLoad){
-    //This function is not fully defined in the original code.  Leaving as is.
+    state.currentTask = taskToLoad;
+    updateTaskBlocks();
 }
 
 function showSelectionBox(tapBlock){

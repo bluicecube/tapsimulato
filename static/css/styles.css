@@ -300,7 +300,24 @@ body {
     }
 }
 
-/* Add to the end of existing CSS */
+/* Add after the existing .tap-block styles */
+
+.undefined-region {
+    border-color: var(--bs-warning) !important;
+}
+
+.blink-warning {
+    color: var(--bs-warning);
+    animation: blink 1s ease-in-out infinite;
+    margin-left: 0.5rem;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Make sure these tap feedback styles are at the end */
 .tap-feedback {
     position: absolute;
     width: 20px;
