@@ -11,7 +11,7 @@ For task-related commands, respond in this JSON format:
 
 Available commands:
 1. Create task:
-   Input: "create a new task called <name>" or similar
+   Input: "create a new task called <name>"
    Command: "create_task"
    Params: {"taskName": "<name>"}
 
@@ -86,23 +86,33 @@ For combined commands like "create a loop with 3 taps", respond with:
     "message": "Created a loop that taps 3 times"
 }`;
 
-document.addEventListener('DOMContentLoaded', () => {
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing chatbot...');
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
     const chatMessages = document.getElementById('chatMessages');
 
-    // Clear existing messages
-    chatMessages.innerHTML = '';
+    if (!chatMessages) {
+        console.error('Chat messages container not found!');
+        return;
+    }
 
-    // Initialize chat history
+    // Clear existing messages and initialize chat history
+    chatMessages.innerHTML = '';
     chatHistory = [];
 
-    sendChatBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
+    // Add event listeners
+    if (sendChatBtn) {
+        sendChatBtn.addEventListener('click', sendMessage);
+    }
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    }
 
     // Add initial greeting
     addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task? You can say things like:\n\n' + 
@@ -111,6 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
         '- "tap [location]" (e.g., top left, middle, bottom right)\n' +
         '- "load task [name]"\n' +
         '- "execute task"');
+
+    console.log('Chatbot initialized');
 });
 
 async function sendMessage() {
