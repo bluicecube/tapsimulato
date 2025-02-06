@@ -434,19 +434,19 @@ function loadTask(task) {
     const blocksContainer = taskDiv.querySelector('.blocks-container');
 
     taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-        const tapDiv = addTapBlock(currentTask);
+        const tapDiv = addTapBlock(task);
         blocksContainer.appendChild(tapDiv);
         saveTasksToStorage();
     });
 
     taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
-        const loopDiv = addLoopBlock(currentTask);
+        const loopDiv = addLoopBlock(task);
         blocksContainer.appendChild(loopDiv);
         saveTasksToStorage();
     });
 
     taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
-        deleteTask(currentTask);
+        deleteTask(task);
         taskDiv.remove();
         saveTasksToStorage();
     });
@@ -456,35 +456,73 @@ function loadTask(task) {
     // Clear existing visual elements
     document.querySelectorAll('.active-selection-box').forEach(box => box.remove());
 
-    // Rebuild blocks from task data
-    if (task.blocks && task.blocks.length > 0) {
-        task.blocks.forEach((block, index) => {
-            let blockDiv;
-            if (block.type === 'tap') {
-                blockDiv = addTapBlock(task);
-                const lastBlock = task.blocks[task.blocks.length - 1];
+    // Store the original blocks array
+    const originalBlocks = [...task.blocks];
+    // Clear the blocks array before rebuilding
+    task.blocks = [];
 
-                // Copy properties from saved block to new block
-                lastBlock.name = block.name;
-                lastBlock.region = block.region;
+    // Rebuild blocks from saved data
+    originalBlocks.forEach(blockData => {
+        let blockDiv;
+        if (blockData.type === 'tap') {
+            blockDiv = document.createElement('div');
+            blockDiv.className = 'block tap-block';
+            blockDiv.draggable = true;
+            blockDiv.innerHTML = `
+                <div class="delete-dot"></div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="block-name" contenteditable="true">${blockData.name || 'Tap Block'}</h6>
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
+                </div>
+            `;
 
-                if (block.region) {
-                    // Create and show selection box
-                    const selectionBoxElement = document.createElement('div');
-                    selectionBoxElement.className = 'active-selection-box';
-                    document.getElementById('simulator').appendChild(selectionBoxElement);
-                    lastBlock.selectionBoxElement = selectionBoxElement;
-                    showSelectionBox(lastBlock);
+            setupDragAndDrop(blockDiv);
+
+            // Create the block data structure
+            const tapBlock = {
+                type: 'tap',
+                region: blockData.region,
+                name: blockData.name || 'Tap Block'
+            };
+            task.blocks.push(tapBlock);
+
+            // Setup event listeners
+            blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
+                const index = task.blocks.indexOf(tapBlock);
+                if (index > -1) {
+                    task.blocks.splice(index, 1);
+                    blockDiv.remove();
+                    logLiveConsole('Tap block removed', 'info');
+                    saveTasksToStorage();
                 }
-            } else if (block.type === 'loop') {
-                blockDiv = addLoopBlock(task);
-            }
+            });
 
-            if (blockDiv) {
-                blocksContainer.appendChild(blockDiv);
+            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+                enableDrawingMode(tapBlock, blockDiv);
+            });
+
+            blockDiv.addEventListener('click', (e) => {
+                if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
+                    setBlockFocus(tapBlock, blockDiv);
+                }
+            });
+
+            // Create and show selection box if region exists
+            if (blockData.region) {
+                const selectionBoxElement = document.createElement('div');
+                selectionBoxElement.className = 'active-selection-box';
+                document.getElementById('simulator').appendChild(selectionBoxElement);
+                tapBlock.selectionBoxElement = selectionBoxElement;
+                showSelectionBox(tapBlock);
             }
-        });
-    }
+        } else if (blockData.type === 'loop') {
+            blockDiv = addLoopBlock(task);
+        }
+
+        if (blockDiv) {
+            blocksContainer.appendChild(blockDiv);
+        }
+    });
 
     updateTaskList();
     logLiveConsole(`Loaded task: ${task.name}`, 'info');
