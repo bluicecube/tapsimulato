@@ -376,11 +376,24 @@ function loadTask(task) {
         currentTask.blocks.forEach(block => {
             let blockDiv;
             if (block.type === 'tap') {
+                const tapBlock = {
+                    type: 'tap',
+                    region: block.region, // Preserve the region data
+                    name: block.name || 'Tap Block'
+                };
                 blockDiv = addTapBlock(currentTask);
-                // Restore the region if it exists
+
+                // Restore the region data to the new block
+                const index = currentTask.blocks.length - 1;
+                currentTask.blocks[index] = tapBlock;
+
+                // Create visual elements for the region
                 if (block.region) {
-                    blockDiv.querySelector('.select-region-btn').classList.add('active');
-                    showSelectionBox(block);
+                    const selectionBoxElement = document.createElement('div');
+                    selectionBoxElement.className = 'active-selection-box';
+                    document.getElementById('simulator').appendChild(selectionBoxElement);
+                    tapBlock.selectionBoxElement = selectionBoxElement;
+                    showSelectionBox(tapBlock);
                 }
             } else if (block.type === 'loop') {
                 blockDiv = addLoopBlock(currentTask);
