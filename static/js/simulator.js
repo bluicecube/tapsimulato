@@ -1,3 +1,7 @@
+// Constants for device dimensions
+const DEVICE_WIDTH = 720;   // Galaxy A11 width
+const DEVICE_HEIGHT = 1600; // Galaxy A11 height
+
 let tasks = [];
 let currentTask = null;
 let deletedTasks = [];
@@ -11,7 +15,13 @@ let focusedBlock = null;
 document.addEventListener('DOMContentLoaded', () => {
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
-    document.getElementById('executeBtn').addEventListener('click', executeSelectedTask);
+    document.getElementById('executeBtn').addEventListener('click', () => {
+        if (currentTask) {
+            executeSelectedTask();
+        } else {
+            logLiveConsole('No task selected', 'error');
+        }
+    });
     document.getElementById('toggleTasksBtn').addEventListener('click', toggleTasksSidebar);
 
     const simulator = document.getElementById('simulator');

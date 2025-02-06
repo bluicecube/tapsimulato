@@ -37,8 +37,8 @@ Your responses should be in JSON format:
 }`;
 
 // Constants for device dimensions
-const DEVICE_WIDTH = 320;  // Match simulator width
-const DEVICE_HEIGHT = 720; // Match simulator height
+const DEVICE_WIDTH = 720;  // Galaxy A11 width
+const DEVICE_HEIGHT = 1600; // Galaxy A11 height
 
 // Chat UI functions
 function addMessage(role, content) {
@@ -361,8 +361,8 @@ function updateTaskBlocks() {
         blockDiv.className = `block ${block.type}-block`;
 
         if (block.type === 'tap') {
-            const regionText = block.region ? 
-                `(${block.region.x1},${block.region.y1}) to (${block.region.x2},${block.region.y2})` : 
+            const regionText = block.region ?
+                `(${block.region.x1},${block.region.y1}) to (${block.region.x2},${block.region.y2})` :
                 'No region set';
 
             blockDiv.innerHTML = `
@@ -392,7 +392,7 @@ function updateTaskBlocks() {
                 <div class="d-flex justify-content-between align-items-center">
                     <h6 class="block-name mb-0">Loop Block</h6>
                     <div class="d-flex align-items-center">
-                        <input type="number" class="form-control form-control-sm iterations-input" 
+                        <input type="number" class="form-control form-control-sm iterations-input"
                             value="${block.iterations}" min="1" style="width: 70px">
                         <span class="ms-2">times</span>
                     </div>

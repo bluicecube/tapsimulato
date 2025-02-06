@@ -1,6 +1,6 @@
 :root {
-    --device-width: 320px;
-    --device-height: 720px;
+    --device-width: 720px;
+    --device-height: 1600px;
 }
 
 body {
@@ -261,7 +261,6 @@ body {
     padding: 10px;
     margin-bottom: 10px;
 }
-
 
 .delete-dot {
     position: absolute;
