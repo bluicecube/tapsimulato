@@ -161,7 +161,7 @@ async function processCommands(userMessage, assistantMessage) {
                 };
                 currentTask.blocks.push(loopBlock);
 
-                const loopDiv = addLoopBlock(currentTask);
+                const loopDiv = addLoopBlock(loopBlock);
                 document.querySelector('.blocks-container').appendChild(loopDiv);
 
                 // Add the four corner taps
@@ -190,7 +190,7 @@ async function processCommands(userMessage, assistantMessage) {
                     showSelectionBox(tapBlock);
                 });
 
-                executeSelectedTask();
+                addMessage('assistant', 'Added corner taps. Want to test it?');
             }
             // Handle single tap request
             else if (lowerUserMessage.includes('tap')) {

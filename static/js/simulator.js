@@ -670,13 +670,49 @@ function addTapBlock(parent) {
     return blockDiv;
 }
 
-function addLoopBlock(task) {
-    const loopDiv = document.createElement('div');
-    loopDiv.className = 'loop-block';
-    loopDiv.innerHTML = `<p contenteditable="true">Loop Block</p>`;
-    task.blocks.push({type: 'loop'});
-    return loopDiv;
+function addLoopBlock(parent) {
+    const loopBlock = {
+        type: 'loop',
+        iterations: 1,
+        blocks: [],
+        name: 'Loop Block'
+    };
+    parent.blocks.push(loopBlock);
+
+    const blockDiv = document.createElement('div');
+    blockDiv.className = 'block loop-block';
+    blockDiv.innerHTML = `
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${loopBlock.name}</h6>
+        </div>
+        <div class="input-group mb-2">
+            <span class="input-group-text">Iterations</span>
+            <input type="number" class="form-control iterations-input" value="1" min="1">
+        </div>
+        <div class="nested-blocks"></div>
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+            <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
+        </div>
+    `;
+
+    const iterationsInput = blockDiv.querySelector('.iterations-input');
+    iterationsInput.value = parent.iterations || 1;
+    iterationsInput.addEventListener('change', (e) => {
+        loopBlock.iterations = parseInt(e.target.value) || 1;
+        saveTasksToStorage();
+    });
+
+    blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
+        const tapDiv = addTapBlock(loopBlock);
+        blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
+        saveTasksToStorage();
+    });
+
+    return blockDiv;
 }
+
 
 
 function generateGCode() {
