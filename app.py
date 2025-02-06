@@ -25,14 +25,30 @@ def chat():
         data = request.json
         logger.debug(f"Received chat request with data: {data}")
 
+        if not data or 'messages' not in data:
+            logger.error("Invalid request data")
+            return jsonify({'error': 'Invalid request data'}), 400
+
+        # Ensure the messages array follows the correct format
+        messages = data['messages']
+        if not messages or not isinstance(messages, list):
+            logger.error("Invalid messages format")
+            return jsonify({'error': 'Invalid messages format'}), 400
+
         response = openai.chat.completions.create(
-            model="gpt-4",  # Using stable GPT-4 model
-            messages=data['messages'],
+            model="gpt-4",
+            messages=messages,
             temperature=0.7,
             max_tokens=150
         )
 
-        logger.debug(f"Received response from OpenAI API: {response}")
+        logger.debug(f"OpenAI API response: {response}")
+
+        # Extract the response content
+        if not response.choices or not response.choices[0].message:
+            logger.error("Invalid response from OpenAI")
+            return jsonify({'error': 'Invalid response from OpenAI'}), 500
+
         return jsonify({
             "choices": [{
                 "message": {

@@ -34,7 +34,8 @@ Available commands:
    Params: {}
 
 Keep messages short and clear. Always respond with valid JSON.
-For general conversation (like "yes", "no", "hello"), use the "chat" command.`;
+For general conversation (like "yes", "no", "hello"), use the "chat" command with a friendly response.
+If user says "yes" to creating a task, respond with a create_task command and a default task name.`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -78,6 +79,8 @@ async function sendMessage() {
         // Add the latest user message
         messages.push({ role: 'user', content: message });
 
+        console.log('Sending chat request:', messages);
+
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
@@ -87,6 +90,7 @@ async function sendMessage() {
         });
 
         const data = await response.json();
+        console.log('Received chat response:', data);
 
         // Hide thinking indicator
         hideThinking();
@@ -101,9 +105,12 @@ async function sendMessage() {
 
         // Process the response
         const assistantMessage = data.choices[0].message.content;
+        console.log('Processing assistant message:', assistantMessage);
+
         let response_data;
         try {
             response_data = JSON.parse(assistantMessage);
+            console.log('Parsed response data:', response_data);
         } catch (e) {
             console.error('Failed to parse JSON response:', e);
             response_data = {
@@ -118,6 +125,7 @@ async function sendMessage() {
 
         // Only process command if it's not a chat command
         if (response_data.command !== 'chat') {
+            console.log('Processing command:', response_data.command);
             await processCommand(response_data);
         }
 
@@ -158,18 +166,20 @@ function showThinking() {
 }
 
 function hideThinking() {
-    const thinkingIndicator = document.getElementById('thinkingIndicator');
-    if (thinkingIndicator) {
-        thinkingIndicator.remove();
+    const thinkingDiv = document.getElementById('thinkingIndicator');
+    if (thinkingDiv) {
+        thinkingDiv.remove();
     }
 }
 
 async function processCommand(response_data) {
     try {
+        console.log('Processing command:', response_data);
         const { command, params } = response_data;
 
         switch (command) {
             case 'create_task':
+                console.log('Creating new task with params:', params);
                 createNewTask();
                 if (currentTask && params.taskName) {
                     currentTask.name = params.taskName;
@@ -227,26 +237,6 @@ async function processCommand(response_data) {
                     }
                     showSelectionBox(tapBlock);
                 });
-                break;
-
-            case 'add_tap':
-                if (!currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-
-                const tapBlock = {
-                    type: 'tap',
-                    region: null,
-                    name: 'New Tap'
-                };
-                currentTask.blocks.push(tapBlock);
-
-                const tapDiv = addTapBlock(tapBlock);
-                blocksContainer = document.querySelector('.blocks-container');
-                if (blocksContainer) {
-                    blocksContainer.appendChild(tapDiv);
-                }
                 break;
 
             case 'execute':
