@@ -1,36 +1,28 @@
-// Initialize task-related variables
-let tasks = [];
-let deletedTasks = [];
-let currentTask = null;
-let chatHistory = [];
+// Initialize state
+const state = {
+    tasks: [],
+    deletedTasks: [],
+    currentTask: null,
+    chatHistory: []
+};
 
-const systemPrompt = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
-For task-related commands, respond in this JSON format:
+// System prompt for the AI assistant
+const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
+Your responses should be in JSON format:
 {
-    "command": "<command_type>",
+    "command": "create_task|add_corner_taps|execute|chat",
     "params": {
-        // command specific parameters
+        "taskName": "string",  // for create_task
+        "iterations": "number" // for add_corner_taps
     },
     "message": "human readable response"
-}
-
-Available commands:
-1. create_task: Create a new task
-   Params: {"taskName": "name of task"}
-2. add_corner_taps: Add taps to each corner
-   Params: {"iterations": number of times to repeat}
-3. execute: Run the current task
-   Params: {}
-
-For general chat, use:
-{
-    "command": "chat",
-    "params": {},
-    "message": "your response"
 }`;
 
+// Chat UI functions
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${role}`;
     messageDiv.innerHTML = `
@@ -41,118 +33,19 @@ function addMessage(role, content) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     // Add to history
-    chatHistory.push({ role, content });
-}
-
-// Initialize chatbot
-document.addEventListener('DOMContentLoaded', () => {
-    const chatInput = document.getElementById('chatInput');
-    const sendChatBtn = document.getElementById('sendChatBtn');
-
-    // Load saved tasks
-    const savedTasks = localStorage.getItem('savedTasks');
-    if (savedTasks) {
-        tasks = JSON.parse(savedTasks);
-        updateTaskList();
-    }
-
-    sendChatBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
-
-    // Add initial greeting
-    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task?');
-});
-
-async function sendMessage() {
-    const chatInput = document.getElementById('chatInput');
-    const message = chatInput.value.trim();
-
-    if (!message) return;
-
-    // Clear input
-    chatInput.value = '';
-
-    // Add user message to chat
-    addMessage('user', message);
-
-    // Show thinking indicator
-    showThinking();
-
-    try {
-        const messages = [
-            { role: 'system', content: systemPrompt }
-        ];
-
-        // Add relevant chat history
-        chatHistory.slice(-4).forEach(msg => messages.push(msg));
-
-        // Add the latest user message
-        messages.push({ role: 'user', content: message });
-
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ messages })
-        });
-
-        const data = await response.json();
-
-        // Hide thinking indicator
-        hideThinking();
-
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-            throw new Error('Invalid response format from API');
-        }
-
-        // Process the response
-        const assistantMessage = data.choices[0].message.content;
-
-        let response_data;
-        try {
-            response_data = JSON.parse(assistantMessage);
-        } catch (e) {
-            response_data = {
-                command: 'chat',
-                params: {},
-                message: assistantMessage
-            };
-        }
-
-        // Add the assistant's message to chat
-        addMessage('assistant', response_data.message);
-
-        // Process command if not chat
-        if (response_data.command !== 'chat') {
-            await processCommand(response_data);
-        }
-
-    } catch (error) {
-        console.error('Error:', error);
-        hideThinking();
-        addMessage('assistant', `Sorry, something went wrong. Please try again.`);
-    }
+    state.chatHistory.push({ role, content });
 }
 
 function showThinking() {
     const chatMessages = document.getElementById('chatMessages');
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'chat-thinking';
+    thinkingDiv.id = 'thinkingIndicator';
     thinkingDiv.innerHTML = `
         <div class="dot"></div>
         <div class="dot"></div>
         <div class="dot"></div>
     `;
-    thinkingDiv.id = 'thinkingIndicator';
     chatMessages.appendChild(thinkingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -164,44 +57,31 @@ function hideThinking() {
     }
 }
 
-function createNewTask() {
+// Task management functions
+function createNewTask(taskName = 'New Task') {
     const task = {
         id: `task-${Date.now()}`,
-        name: 'New Task',
+        name: taskName,
         blocks: [],
-        minimized: false,
         created: new Date().toISOString()
     };
-    tasks.push(task);
-    currentTask = task;
+    state.tasks.push(task);
+    state.currentTask = task;
 
-    // Update the current task display
-    const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = '';
-    addTaskBlock(task);
-
-    // Auto-save
-    saveTasksToStorage();
-    updateTaskList();
-
+    updateTaskDisplay();
+    saveState();
     return task;
 }
 
-function saveTasksToStorage() {
-    localStorage.setItem('savedTasks', JSON.stringify(tasks));
-    localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks));
-}
-
-function updateTaskList() {
+function updateTaskDisplay() {
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
 
     taskList.innerHTML = '';
-
-    tasks.forEach(task => {
+    state.tasks.forEach(task => {
         const taskItem = document.createElement('div');
         taskItem.className = 'task-list-item';
-        if (currentTask && currentTask.id === task.id) {
+        if (state.currentTask?.id === task.id) {
             taskItem.classList.add('active');
         }
 
@@ -214,13 +94,9 @@ function updateTaskList() {
             </div>
         `;
 
-        // Make the entire task item clickable
         taskItem.addEventListener('click', (e) => {
             if (!e.target.closest('.delete-task-btn')) {
                 loadTask(task);
-                // Update active state
-                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-                taskItem.classList.add('active');
             }
         });
 
@@ -233,109 +109,202 @@ function updateTaskList() {
     });
 }
 
-function addTaskBlock(task) {
-    const taskContainer = document.getElementById('currentTask');
-    const blocksContainer = document.createElement('div');
-    blocksContainer.className = 'blocks-container';
-    taskContainer.appendChild(blocksContainer);
+// State management
+function saveState() {
+    localStorage.setItem('appState', JSON.stringify({
+        tasks: state.tasks,
+        deletedTasks: state.deletedTasks,
+        currentTask: state.currentTask
+    }));
 }
 
-async function processCommand(response_data) {
-    try {
-        console.log('Processing command:', response_data);
-        const { command, params } = response_data;
+function loadState() {
+    const savedState = localStorage.getItem('appState');
+    if (savedState) {
+        const parsed = JSON.parse(savedState);
+        state.tasks = parsed.tasks || [];
+        state.deletedTasks = parsed.deletedTasks || [];
+        state.currentTask = parsed.currentTask;
+    }
+}
 
-        // Get the blocks container for the current task
-        const currentTaskElement = document.getElementById('currentTask');
-        const blocksContainer = currentTaskElement?.querySelector('.blocks-container');
-        if (!blocksContainer && command !== 'create_task') {
-            addMessage('assistant', 'Please create a task first.');
-            return;
+// Message handling
+async function handleMessage(event) {
+    const chatInput = document.getElementById('chatInput');
+    const message = chatInput.value.trim();
+
+    if (!message) return;
+
+    // Clear input
+    chatInput.value = '';
+
+    // Add user message
+    addMessage('user', message);
+
+    // Show thinking indicator
+    showThinking();
+
+    try {
+        const messages = [
+            { role: 'system', content: SYSTEM_PROMPT }
+        ];
+
+        // Add recent chat history
+        state.chatHistory.slice(-4).forEach(msg => messages.push(msg));
+
+        // Add current message
+        messages.push({ role: 'user', content: message });
+
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages })
+        });
+
+        const data = await response.json();
+        hideThinking();
+
+        if (data.error) throw new Error(data.error);
+
+        const assistantMessage = data.choices[0].message.content;
+        let responseData;
+
+        try {
+            responseData = JSON.parse(assistantMessage);
+        } catch (e) {
+            responseData = {
+                command: 'chat',
+                params: {},
+                message: assistantMessage
+            };
         }
 
-        switch (command) {
-            case 'create_task':
-                createNewTask();
-                if (params.taskName) {
-                    currentTask.name = params.taskName;
-                    const taskNameElement = document.querySelector('.task-name');
-                    if (taskNameElement) {
-                        taskNameElement.textContent = params.taskName;
-                    }
-                    saveTasksToStorage();
-                    updateTaskList();
-                }
-                break;
+        // Add assistant's message to chat
+        addMessage('assistant', responseData.message);
 
-            case 'add_corner_taps':
-                if (!currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-
-                // Create the main loop block that will contain the corner taps
-                const loopBlock = {
-                    type: 'loop',
-                    iterations: params.iterations || 4,
-                    blocks: [],
-                    name: 'Corner Taps Loop'
-                };
-                currentTask.blocks.push(loopBlock);
-
-                // Create and add the loop div
-                const loopDiv = addLoopBlock(currentTask, params.iterations || 4);
-                blocksContainer.appendChild(loopDiv);
-
-                // Get the nested blocks container where we'll add the tap blocks
-                const nestedBlocks = loopDiv.querySelector('.nested-blocks');
-
-                // Define the corners
-                const corners = [
-                    { name: 'Top Left', x1: 0, y1: 0, x2: 50, y2: 50 },
-                    { name: 'Top Right', x1: 270, y1: 0, x2: 320, y2: 50 },
-                    { name: 'Bottom Left', x1: 0, y1: 670, x2: 50, y2: 720 },
-                    { name: 'Bottom Right', x1: 270, y1: 670, x2: 320, y2: 720 }
-                ];
-
-                // Add tap blocks for each corner
-                corners.forEach(corner => {
-                    const tapBlock = {
-                        type: 'tap',
-                        region: {
-                            x1: corner.x1,
-                            y1: corner.y1,
-                            x2: corner.x2,
-                            y2: corner.y2
-                        },
-                        name: `Tap ${corner.name}`
-                    };
-                    loopBlock.blocks.push(tapBlock);
-
-                    // Create the tap block UI element
-                    const tapDiv = addTapBlock(loopBlock);
-                    if (nestedBlocks) {
-                        nestedBlocks.appendChild(tapDiv);
-                        showSelectionBox(tapBlock);
-                    }
-                });
-
-                saveTasksToStorage();
-                break;
-
-            case 'execute':
-                executeSelectedTask();
-                break;
-
-            default:
-                console.log('Unknown command:', command);
-                break;
+        // Process any commands
+        if (responseData.command !== 'chat') {
+            await processCommand(responseData);
         }
 
     } catch (error) {
-        console.error('Error processing command:', error);
-        addMessage('assistant', 'I had trouble with that. Could you try describing what you want differently?');
+        console.error('Error:', error);
+        hideThinking();
+        addMessage('assistant', 'Sorry, something went wrong. Please try again.');
     }
 }
+
+// Command processing
+async function processCommand(response_data) {
+    const { command, params } = response_data;
+
+    switch (command) {
+        case 'create_task':
+            const task = createNewTask(params.taskName);
+            updateTaskDisplay();
+            break;
+
+        case 'add_corner_taps':
+            if (!state.currentTask) {
+                addMessage('assistant', 'Please create a task first.');
+                return;
+            }
+            await addCornerTapsToTask(state.currentTask, params.iterations || 1);
+            break;
+
+        case 'execute':
+            if (!state.currentTask) {
+                addMessage('assistant', 'Please select a task to execute.');
+                return;
+            }
+            executeTask(state.currentTask);
+            break;
+        default:
+            console.log("Unknown command:", command);
+    }
+}
+
+
+async function addCornerTapsToTask(task, iterations) {
+    // Create the main loop block that will contain the corner taps
+    const loopBlock = {
+        type: 'loop',
+        iterations: iterations || 4,
+        blocks: [],
+        name: 'Corner Taps Loop'
+    };
+    task.blocks.push(loopBlock);
+
+    // Create and add the loop div
+    const loopDiv = addLoopBlock(task, iterations || 4);
+    const currentTaskElement = document.getElementById('currentTask');
+    const blocksContainer = currentTaskElement?.querySelector('.blocks-container');
+    if (blocksContainer) blocksContainer.appendChild(loopDiv);
+
+
+    // Get the nested blocks container where we'll add the tap blocks
+    const nestedBlocks = loopDiv.querySelector('.nested-blocks');
+
+    // Define the corners
+    const corners = [
+        { name: 'Top Left', x1: 0, y1: 0, x2: 50, y2: 50 },
+        { name: 'Top Right', x1: 270, y1: 0, x2: 320, y2: 50 },
+        { name: 'Bottom Left', x1: 0, y1: 670, x2: 50, y2: 720 },
+        { name: 'Bottom Right', x1: 270, y1: 670, x2: 320, y2: 720 }
+    ];
+
+    // Add tap blocks for each corner
+    corners.forEach(corner => {
+        const tapBlock = {
+            type: 'tap',
+            region: {
+                x1: corner.x1,
+                y1: corner.y1,
+                x2: corner.x2,
+                y2: corner.y2
+            },
+            name: `Tap ${corner.name}`
+        };
+        loopBlock.blocks.push(tapBlock);
+
+        // Create the tap block UI element
+        const tapDiv = addTapBlock(loopBlock);
+        if (nestedBlocks) {
+            nestedBlocks.appendChild(tapDiv);
+            showSelectionBox(tapBlock);
+        }
+    });
+
+    saveState();
+}
+
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    // Load saved state
+    loadState();
+    updateTaskDisplay();
+
+    // Setup message handlers
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendChatBtn');
+
+    if (chatInput && sendButton) {
+        sendButton.addEventListener('click', handleMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleMessage(e);
+        });
+    }
+
+    // Show initial greeting
+    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task?');
+});
+
+// Export necessary functions
+window.addMessage = addMessage;
+window.handleMessage = handleMessage;
+window.createNewTask = createNewTask;
+window.processCommand = processCommand;
 
 function addLoopBlock(parent, iterations = 1) {
     const loopBlock = {
@@ -371,13 +340,13 @@ function addLoopBlock(parent, iterations = 1) {
     iterationsInput.value = iterations;
     iterationsInput.addEventListener('change', (e) => {
         loopBlock.iterations = parseInt(e.target.value) || 1;
-        saveTasksToStorage();
+        saveState();
     });
 
     blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
         const tapDiv = addTapBlock(loopBlock);
         blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
-        saveTasksToStorage();
+        saveState();
     });
 
     return blockDiv;
@@ -515,19 +484,19 @@ function addTapBlock(parent) {
 }
 
 function deleteTask(task) {
-    const index = tasks.indexOf(task);
+    const index = state.tasks.indexOf(task);
     if (index > -1) {
-        deletedTasks.push(tasks.splice(index, 1)[0]);
+        state.deletedTasks.push(state.tasks.splice(index, 1)[0]);
     }
-    saveTasksToStorage();
-    updateTaskList();
+    saveState();
+    updateTaskDisplay();
 }
 
 function loadTask(taskToLoad){
     //This function is not fully defined in the original code.  Leaving as is.
 }
 
-function executeSelectedTask(){
+function executeTask(task){
     //This function is not fully defined in the original code.  Leaving as is.
 }
 
