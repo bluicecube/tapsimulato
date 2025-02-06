@@ -1,7 +1,8 @@
 function addTapBlock(parent) {
     const tapBlock = {
         type: 'tap',
-        region: null
+        region: null,
+        name: 'Tap Block'
     };
     parent.blocks.push(tapBlock);
 
@@ -9,9 +10,10 @@ function addTapBlock(parent) {
     blockDiv.className = 'block tap-block';
     blockDiv.innerHTML = `
         <div class="delete-dot"></div>
-        <h6>Tap Block</h6>
-        <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
-        <button class="btn btn-sm btn-outline-secondary view-region-btn ms-2">View Region</button>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${tapBlock.name}</h6>
+            <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
+        </div>
     `;
 
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
@@ -27,42 +29,31 @@ function addTapBlock(parent) {
         enableDrawingMode(tapBlock, blockDiv);
     });
 
-    blockDiv.querySelector('.view-region-btn').addEventListener('click', () => {
-        if (tapBlock.region) {
-            showSelectionBox(tapBlock);
-            logLiveConsole('Showing tap region', 'info');
-        } else {
-            logLiveConsole('No region set for this tap block', 'warning');
+    // Add click handler for the whole block to show region
+    blockDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
+            if (tapBlock.region) {
+                // showSelectionBox(tapBlock);  Removed the call to the old function.
+                logLiveConsole('Showing tap region', 'info');
+            }
         }
     });
 
+    // Add name editing functionality
+    const nameElement = blockDiv.querySelector('.block-name');
+    nameElement.addEventListener('blur', () => {
+        tapBlock.name = nameElement.textContent;
+    });
+
     return blockDiv;
-}
-
-function showSelectionBox(tapBlock) {
-    //Implementation to visualize the region.  This will depend on how regions are defined and stored in tapBlock.region
-    //Example:  Assume tapBlock.region is an object with x, y, width, height properties.
-    const selectionBox = document.createElement('div');
-    selectionBox.style.position = 'absolute';
-    selectionBox.style.border = '2px dashed blue';
-    selectionBox.style.left = tapBlock.region.x + 'px';
-    selectionBox.style.top = tapBlock.region.y + 'px';
-    selectionBox.style.width = tapBlock.region.width + 'px';
-    selectionBox.style.height = tapBlock.region.height + 'px';
-    document.body.appendChild(selectionBox);
-
-    // Add functionality to remove the selection box after a certain time or on another event.  For example:
-    setTimeout(() => {
-        document.body.removeChild(selectionBox);
-    }, 5000); //remove after 5 seconds
-
 }
 
 function addLoopBlock(parent) {
     const loopBlock = {
         type: 'loop',
         iterations: 1,
-        blocks: []
+        blocks: [],
+        name: 'Loop Block'
     };
     parent.blocks.push(loopBlock);
 
@@ -70,7 +61,9 @@ function addLoopBlock(parent) {
     blockDiv.className = 'block loop-block';
     blockDiv.innerHTML = `
         <div class="delete-dot"></div>
-        <h6>Loop Block</h6>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${loopBlock.name}</h6>
+        </div>
         <div class="input-group mb-2">
             <span class="input-group-text">Iterations</span>
             <input type="number" class="form-control iterations-input" value="1" min="1">
@@ -105,13 +98,20 @@ function addLoopBlock(parent) {
         blockDiv.querySelector('.nested-blocks').appendChild(printDiv);
     });
 
+    // Add name editing functionality
+    const nameElement = blockDiv.querySelector('.block-name');
+    nameElement.addEventListener('blur', () => {
+        loopBlock.name = nameElement.textContent;
+    });
+
     return blockDiv;
 }
 
 function addPrintBlock(parent) {
     const printBlock = {
         type: 'print',
-        message: ''
+        message: '',
+        name: 'Print Block'
     };
     parent.blocks.push(printBlock);
 
@@ -119,7 +119,9 @@ function addPrintBlock(parent) {
     blockDiv.className = 'block print-block';
     blockDiv.innerHTML = `
         <div class="delete-dot"></div>
-        <h6>Print Block</h6>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${printBlock.name}</h6>
+        </div>
         <div class="input-group">
             <span class="input-group-text">Message</span>
             <input type="text" class="form-control message-input" placeholder="Enter message">
@@ -139,36 +141,31 @@ function addPrintBlock(parent) {
         printBlock.message = e.target.value;
     });
 
+    // Add name editing functionality
+    const nameElement = blockDiv.querySelector('.block-name');
+    nameElement.addEventListener('blur', () => {
+        printBlock.name = nameElement.textContent;
+    });
+
     return blockDiv;
 }
 
 function enableDrawingMode(tapBlock, tapDiv) {
-    if (currentTapBlock) {
-        disableDrawingMode();
-    }
     currentTapBlock = tapBlock;
     tapDiv.classList.add('active-block');
     logLiveConsole('Drawing mode enabled - Select tap region', 'info');
 }
 
 function disableDrawingMode() {
-    if (currentTapBlock) {
-        const activeBlock = document.querySelector('.active-block');
-        if (activeBlock) {
-            activeBlock.classList.remove('active-block');
-        }
-        currentTapBlock = null;
-        selectionRectangle.classList.add('d-none');
+    const activeBlock = document.querySelector('.active-block');
+    if (activeBlock) {
+        activeBlock.classList.remove('active-block');
     }
+    currentTapBlock = null;
+    selectionRectangle.classList.add('d-none');
 }
 
 // Event listeners for drawing mode
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.tap-block') && currentTapBlock) {
-        disableDrawingMode();
-    }
-});
-
 document.addEventListener('keydown', (e) => {
     if ((e.key === 'Enter' || e.key === ' ') && currentTapBlock) {
         disableDrawingMode();

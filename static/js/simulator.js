@@ -5,14 +5,10 @@ let selectionStartX = 0;
 let selectionStartY = 0;
 let selectionRectangle = null;
 let currentTapBlock = null;
-let activeSelectionBox = null;
+
 
 document.addEventListener('DOMContentLoaded', () => {
     selectionRectangle = document.getElementById('selectionBox');
-    activeSelectionBox = document.createElement('div');
-    activeSelectionBox.className = 'active-selection-box d-none';
-    document.getElementById('simulator').appendChild(activeSelectionBox);
-
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('executeBtn').addEventListener('click', executeSelectedTask);
     document.getElementById('generateGCodeBtn').addEventListener('click', generateGCode);
@@ -26,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function createNewTask() {
     const task = {
         id: `task-${Date.now()}`,
+        name: `Task ${tasks.length + 1}`,
         blocks: [],
         minimized: false
     };
@@ -41,7 +38,7 @@ function addTaskBlock(task) {
     taskDiv.className = 'task-block';
     taskDiv.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0">Task ${tasks.length}</h5>
+            <h5 class="task-name mb-0" contenteditable="true">${task.name}</h5>
             <div>
                 <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
                 <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
@@ -51,6 +48,12 @@ function addTaskBlock(task) {
         </div>
         <div class="blocks-container"></div>
     `;
+
+    // Add task name editing functionality
+    const nameElement = taskDiv.querySelector('.task-name');
+    nameElement.addEventListener('blur', () => {
+        task.name = nameElement.textContent;
+    });
 
     taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
         const tapDiv = addTapBlock(task);
@@ -142,15 +145,26 @@ function stopSelection(event) {
 function showSelectionBox(tapBlock) {
     if (!tapBlock.region) return;
 
-    activeSelectionBox.style.left = `${tapBlock.region.x1}px`;
-    activeSelectionBox.style.top = `${tapBlock.region.y1}px`;
-    activeSelectionBox.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
-    activeSelectionBox.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
-    activeSelectionBox.classList.remove('d-none');
+    // Create a new selection box if one doesn't exist for this tap block
+    if (!tapBlock.selectionBoxElement) {
+        const newBox = document.createElement('div');
+        newBox.className = 'active-selection-box';
+        document.getElementById('simulator').appendChild(newBox);
+        tapBlock.selectionBoxElement = newBox;
+    }
+
+    // Update the position and size
+    tapBlock.selectionBoxElement.style.left = `${tapBlock.region.x1}px`;
+    tapBlock.selectionBoxElement.style.top = `${tapBlock.region.y1}px`;
+    tapBlock.selectionBoxElement.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
+    tapBlock.selectionBoxElement.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
+    tapBlock.selectionBoxElement.classList.remove('d-none');
 }
 
-function hideSelectionBox() {
-    activeSelectionBox.classList.add('d-none');
+function hideSelectionBox(tapBlock) {
+    if (tapBlock.selectionBoxElement) {
+        tapBlock.selectionBoxElement.classList.add('d-none');
+    }
 }
 
 function logLiveConsole(message, type = 'info') {
@@ -165,22 +179,24 @@ function logLiveConsole(message, type = 'info') {
 function addTapBlock(task) {
     const tapDiv = document.createElement('div');
     tapDiv.className = 'tap-block';
-    tapDiv.innerHTML = `<p>Tap Block</p>`;
-    currentTapBlock = tapDiv;
+    tapDiv.innerHTML = `<p contenteditable="true">Tap Block</p>`;
+    tapDiv.addEventListener('click', () => {
+        currentTapBlock = tapDiv;
+    });
     return tapDiv;
 }
 
 function addLoopBlock(task) {
     const loopDiv = document.createElement('div');
     loopDiv.className = 'loop-block';
-    loopDiv.innerHTML = `<p>Loop Block</p>`;
+    loopDiv.innerHTML = `<p contenteditable="true">Loop Block</p>`;
     return loopDiv;
 }
 
 function addPrintBlock(task) {
     const printDiv = document.createElement('div');
     printDiv.className = 'print-block';
-    printDiv.innerHTML = `<p>Print Block</p>`;
+    printDiv.innerHTML = `<p contenteditable="true">Print Block</p>`;
     return printDiv;
 }
 
