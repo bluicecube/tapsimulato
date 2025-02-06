@@ -2,15 +2,12 @@ let chatHistory = [];
 const systemPrompt = `You are a touchscreen task creator. Be direct and concise.
 
 Commands you understand:
-- "Create task [name]" -> Creates new task
-- "Tap [location]" -> Creates tap block at location
-- "Tap corners [X] times" -> Creates loop with corner taps
+- "Create task [name]" -> Creates task, then ask what it should do
+- "Tap each corner [X] times" -> Creates loop with X iterations and 4 corner taps
+- "Tap [location]" -> Creates single tap at location
 - "Run task" -> Executes current task
 
-Example responses:
-"Task created. What should it do?"
-"Added tap sequence. Need anything else?"
-"Created loop with corner taps. Want to test it?"`;
+Keep responses under 10 words unless explaining a new concept.`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -132,7 +129,7 @@ function hideThinking() {
 async function processCommands(userMessage, assistantMessage) {
     try {
         // Extract task name from creation request
-        if (userMessage.toLowerCase().includes('create') && userMessage.toLowerCase().includes('task') && userMessage.toLowerCase().includes('called')) {
+        if (userMessage.toLowerCase().includes('create') && userMessage.toLowerCase().includes('task')) {
             const nameMatch = userMessage.toLowerCase().match(/called\s+([^.,!?]+)/i);
             if (nameMatch) {
                 const taskName = nameMatch[1].trim();
@@ -151,51 +148,51 @@ async function processCommands(userMessage, assistantMessage) {
         if (currentTask) {
             const lowerUserMessage = userMessage.toLowerCase();
 
-            // Handle loop requests
-            if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat') || 
-                (lowerUserMessage.includes('times') && /\d+/.test(lowerUserMessage))) {
+            // Handle tap corners command
+            if (lowerUserMessage.includes('corner') && lowerUserMessage.includes('times')) {
                 const iterationMatch = lowerUserMessage.match(/(\d+)\s*times/);
                 const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 2;
 
                 const loopBlock = {
                     type: 'loop',
                     iterations: iterations,
-                    blocks: []
+                    blocks: [],
+                    name: `${iterations}x Corner Taps`
                 };
                 currentTask.blocks.push(loopBlock);
 
                 const loopDiv = addLoopBlock(currentTask);
-                blocksContainer.appendChild(loopDiv);
+                document.querySelector('.blocks-container').appendChild(loopDiv);
 
-                // If the loop includes corner taps
-                if (lowerUserMessage.includes('corner')) {
-                    const corners = [
-                        { x: 20, y: 20 },    // Top-left
-                        { x: 300, y: 20 },   // Top-right
-                        { x: 20, y: 700 },   // Bottom-left
-                        { x: 300, y: 700 }   // Bottom-right
-                    ];
+                // Add the four corner taps
+                const corners = [
+                    { x: 20, y: 20, name: 'Top Left' },
+                    { x: 300, y: 20, name: 'Top Right' },
+                    { x: 20, y: 700, name: 'Bottom Left' },
+                    { x: 300, y: 700, name: 'Bottom Right' }
+                ];
 
-                    corners.forEach(corner => {
-                        const tapBlock = {
-                            type: 'tap',
-                            region: {
-                                x1: corner.x - 10,
-                                y1: corner.y - 10,
-                                x2: corner.x + 10,
-                                y2: corner.y + 10
-                            },
-                            name: 'Corner Tap'
-                        };
-                        loopBlock.blocks.push(tapBlock);
+                corners.forEach(corner => {
+                    const tapBlock = {
+                        type: 'tap',
+                        region: {
+                            x1: corner.x - 10,
+                            y1: corner.y - 10,
+                            x2: corner.x + 10,
+                            y2: corner.y + 10
+                        },
+                        name: `${corner.name} Corner`
+                    };
+                    loopBlock.blocks.push(tapBlock);
 
-                        const tapDiv = addTapBlock(loopBlock);
-                        loopDiv.querySelector('.nested-blocks').appendChild(tapDiv);
-                        showSelectionBox(tapBlock);
-                    });
-                }
+                    const tapDiv = addTapBlock(loopBlock);
+                    loopDiv.querySelector('.nested-blocks').appendChild(tapDiv);
+                    showSelectionBox(tapBlock);
+                });
+
+                executeSelectedTask();
             }
-            // Handle single tap requests
+            // Handle single tap request
             else if (lowerUserMessage.includes('tap')) {
                 const tapBlock = {
                     type: 'tap',
@@ -206,24 +203,7 @@ async function processCommands(userMessage, assistantMessage) {
 
                 const tapDiv = addTapBlock(currentTask);
                 document.querySelector('.blocks-container').appendChild(tapDiv);
-
-                // Set region based on description
-                if (lowerUserMessage.includes('center')) {
-                    tapBlock.region = {
-                        x1: 150,
-                        y1: 350,
-                        x2: 170,
-                        y2: 370
-                    };
-                    showSelectionBox(tapBlock);
-                }
             }
-        }
-
-        // Execute if requested
-        if (assistantMessage.toLowerCase().includes('see it in action') && 
-            userMessage.toLowerCase().includes('yes')) {
-            executeSelectedTask();
         }
 
         saveTasksToStorage();
