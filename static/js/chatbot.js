@@ -1,24 +1,16 @@
 let chatHistory = [];
-const systemPrompt = `You are a touchscreen sequence creator. Your ONLY purpose is to help users create tap and loop sequences for a touchscreen device. 
+const systemPrompt = `You are a touchscreen task creator. Be direct and concise.
 
-ONLY discuss:
-1. Creating new tasks
-2. Adding tap sequences
-3. Adding loop sequences
-4. Executing sequences
+Commands you understand:
+- "Create task [name]" -> Creates new task
+- "Tap [location]" -> Creates tap block at location
+- "Tap corners [X] times" -> Creates loop with corner taps
+- "Run task" -> Executes current task
 
-Follow this conversation flow:
-1. After creating a task, ask "What would you like this task to do? I can help you add taps or loops."
-2. When user describes actions, convert them to tap/loop blocks
-3. Confirm blocks are added and ask if they want to test it
-
-Example flow:
-User: "Create a task called corner-taps"
-Assistant: "Task 'corner-taps' created! What would you like this task to do? I can help you add taps or loops."
-User: "I want it to tap each corner twice"
-Assistant: "I'll create a loop that taps all four corners 2 times. Want to see it in action?"
-
-Never discuss topics outside of tap/loop creation and execution.`;
+Example responses:
+"Task created. What should it do?"
+"Added tap sequence. Need anything else?"
+"Created loop with corner taps. Want to test it?"`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -173,7 +165,7 @@ async function processCommands(userMessage, assistantMessage) {
                 currentTask.blocks.push(loopBlock);
 
                 const loopDiv = addLoopBlock(currentTask);
-                document.querySelector('.blocks-container').appendChild(loopDiv);
+                blocksContainer.appendChild(loopDiv);
 
                 // If the loop includes corner taps
                 if (lowerUserMessage.includes('corner')) {
