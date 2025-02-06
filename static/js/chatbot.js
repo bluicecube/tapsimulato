@@ -1,7 +1,40 @@
 // Initialize state
 const state = {
-    chatHistory: []
+    chatHistory: [],
+    tasks: [],
+    currentTask: null
 };
+
+// System prompt for the AI assistant
+const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
+
+1. Tap Block: Defines a single tap action in a specific region of the screen
+2. Loop Block: Repeats its nested blocks a specified number of times
+
+Interpret natural language to create these sequences. For example:
+- "tap the screen 3 times" → Create a loop block with iterations=3 containing a tap block
+- "tap top of screen" → Create a tap block with region set to the top portion
+- "tap each corner twice" → Create a loop with iterations=2 containing tap blocks for corners
+
+Your responses should be in JSON format:
+{
+    "command": "create_task|add_blocks|execute|chat",
+    "params": {
+        "taskName": "string",           // for create_task
+        "blocks": [                     // array of block definitions
+            {
+                "type": "loop",
+                "iterations": number,
+                "blocks": []            // nested blocks
+            },
+            {
+                "type": "tap",
+                "location": "string"    // natural language location description
+            }
+        ]
+    },
+    "message": "human readable response"
+}`;
 
 // Chat UI functions
 function addMessage(role, content) {
@@ -130,15 +163,90 @@ function hideThinking() {
     }
 }
 
+// Task management
+function createNewTask(taskName = 'New Task') {
+    const task = {
+        id: `task-${Date.now()}`,
+        name: taskName,
+        blocks: [],
+        created: new Date().toISOString()
+    };
+    state.tasks.push(task);
+    state.currentTask = task;
+    updateTaskDisplay();
+    return task;
+}
+
+function updateTaskDisplay() {
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement || !state.currentTask) return;
+
+    currentTaskElement.innerHTML = `
+        <div class="task-block">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="task-name mb-0" contenteditable="true">${state.currentTask.name}</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                    <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+                </div>
+            </div>
+            <div class="blocks-container"></div>
+        </div>
+    `;
+
+    // Update task list
+    const taskList = document.getElementById('taskList');
+    if (taskList) {
+        taskList.innerHTML = state.tasks.map(task => `
+            <div class="task-list-item ${state.currentTask.id === task.id ? 'active' : ''}" 
+                 data-task-id="${task.id}">
+                <span>${task.name}</span>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+}
+
+// Command processing
+async function processCommand(responseData) {
+    try {
+        const { command, params, message } = responseData;
+
+        switch (command) {
+            case 'create_task':
+                const taskName = params.taskName || 'New Task';
+                createNewTask(taskName);
+                addMessage('assistant', `Created new task: ${taskName}`);
+                break;
+
+            case 'add_blocks':
+                if (!state.currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+                // Implementation for adding blocks will go here
+                break;
+
+            case 'execute':
+                if (!state.currentTask) {
+                    addMessage('assistant', 'Please select a task to execute.');
+                    return;
+                }
+                // Implementation for executing task will go here
+                break;
+
+            default:
+                console.log('Unknown command:', command);
+        }
+    } catch (error) {
+        console.error('Error processing command:', error);
+        addMessage('assistant', 'Error processing command. Please try again.');
+    }
+}
+
 // Export necessary functions for external use
 window.addMessage = addMessage;
 window.handleMessage = handleMessage;
 window.processCommand = processCommand;
-
-// Placeholder for processCommand -  This needs to be defined elsewhere or provided as part of the original code.
-async function processCommand(response_data) {
-    //  Implementation for processing commands would go here.
-    // This is a placeholder; the actual implementation is likely in the original file and needs to be included.
-    console.log("Processing command:", response_data);
-    addMessage('assistant', "Command received and processed (placeholder).");
-}
