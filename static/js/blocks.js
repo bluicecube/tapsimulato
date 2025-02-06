@@ -4,7 +4,7 @@ function addTapBlock(parent) {
         region: null
     };
     parent.blocks.push(tapBlock);
-    
+
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block tap-block';
     blockDiv.innerHTML = `
@@ -12,15 +12,20 @@ function addTapBlock(parent) {
         <h6>Tap Block</h6>
         <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
     `;
-    
+
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-        removeTapBlock(tapBlock, blockDiv, parent);
+        const index = parent.blocks.indexOf(tapBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Tap block removed', 'info');
+        }
     });
-    
+
     blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
         enableDrawingMode(tapBlock, blockDiv);
     });
-    
+
     return blockDiv;
 }
 
@@ -31,7 +36,7 @@ function addLoopBlock(parent) {
         blocks: []
     };
     parent.blocks.push(loopBlock);
-    
+
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block loop-block';
     blockDiv.innerHTML = `
@@ -42,28 +47,35 @@ function addLoopBlock(parent) {
             <input type="number" class="form-control iterations-input" value="1" min="1">
         </div>
         <div class="nested-blocks"></div>
-        <button class="btn btn-sm btn-outline-success add-tap-btn">Add Tap</button>
-        <button class="btn btn-sm btn-outline-success add-print-btn">Add Print</button>
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+            <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
+        </div>
     `;
-    
+
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-        removeLoopBlock(loopBlock, blockDiv, parent);
+        const index = parent.blocks.indexOf(loopBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Loop block removed', 'info');
+        }
     });
-    
+
     blockDiv.querySelector('.iterations-input').addEventListener('change', (e) => {
         loopBlock.iterations = parseInt(e.target.value) || 1;
     });
-    
+
     blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
         const tapDiv = addTapBlock(loopBlock);
         blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
     });
-    
+
     blockDiv.querySelector('.add-print-btn').addEventListener('click', () => {
         const printDiv = addPrintBlock(loopBlock);
         blockDiv.querySelector('.nested-blocks').appendChild(printDiv);
     });
-    
+
     return blockDiv;
 }
 
@@ -73,7 +85,7 @@ function addPrintBlock(parent) {
         message: ''
     };
     parent.blocks.push(printBlock);
-    
+
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block print-block';
     blockDiv.innerHTML = `
@@ -81,18 +93,23 @@ function addPrintBlock(parent) {
         <h6>Print Block</h6>
         <div class="input-group">
             <span class="input-group-text">Message</span>
-            <input type="text" class="form-control message-input">
+            <input type="text" class="form-control message-input" placeholder="Enter message">
         </div>
     `;
-    
+
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-        removePrintBlock(printBlock, blockDiv, parent);
+        const index = parent.blocks.indexOf(printBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Print block removed', 'info');
+        }
     });
-    
+
     blockDiv.querySelector('.message-input').addEventListener('input', (e) => {
         printBlock.message = e.target.value;
     });
-    
+
     return blockDiv;
 }
 
