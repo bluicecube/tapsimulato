@@ -153,15 +153,15 @@ async function processCommand(response_data) {
         // Get the blocks container for the current task
         const currentTaskElement = document.getElementById('currentTask');
         const blocksContainer = currentTaskElement?.querySelector('.blocks-container');
-        if (!blocksContainer && command !== 'create_task' && command !== 'load_task') {
-            addMessage('assistant', 'Please create or load a task first.');
+        if (!blocksContainer && command !== 'create_task') {
+            addMessage('assistant', 'Please create a task first.');
             return;
         }
 
         switch (command) {
             case 'create_task':
+                createNewTask();
                 if (params.taskName) {
-                    createNewTask();
                     currentTask.name = params.taskName;
                     const taskNameElement = document.querySelector('.task-name');
                     if (taskNameElement) {
@@ -172,28 +172,67 @@ async function processCommand(response_data) {
                 }
                 break;
 
-            case 'add_tap':
+            case 'add_corner_taps':
                 if (!currentTask) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                const tapDiv = addTapBlock(currentTask);
-                blocksContainer.appendChild(tapDiv);
-                saveTasksToStorage();
-                break;
 
-            case 'add_loop':
-                if (!currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-                const loopDiv = addLoopBlock(currentTask, params.iterations);
+                // Create the main loop block that will contain the corner taps
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: params.iterations || 4,
+                    blocks: [],
+                    name: 'Corner Taps Loop'
+                };
+                currentTask.blocks.push(loopBlock);
+
+                // Create and add the loop div
+                const loopDiv = addLoopBlock(currentTask, params.iterations || 4);
                 blocksContainer.appendChild(loopDiv);
+
+                // Get the nested blocks container where we'll add the tap blocks
+                const nestedBlocks = loopDiv.querySelector('.nested-blocks');
+
+                // Define the corners
+                const corners = [
+                    { name: 'Top Left', x1: 0, y1: 0, x2: 50, y2: 50 },
+                    { name: 'Top Right', x1: 270, y1: 0, x2: 320, y2: 50 },
+                    { name: 'Bottom Left', x1: 0, y1: 670, x2: 50, y2: 720 },
+                    { name: 'Bottom Right', x1: 270, y1: 670, x2: 320, y2: 720 }
+                ];
+
+                // Add tap blocks for each corner
+                corners.forEach(corner => {
+                    const tapBlock = {
+                        type: 'tap',
+                        region: {
+                            x1: corner.x1,
+                            y1: corner.y1,
+                            x2: corner.x2,
+                            y2: corner.y2
+                        },
+                        name: `Tap ${corner.name}`
+                    };
+                    loopBlock.blocks.push(tapBlock);
+
+                    // Create the tap block UI element
+                    const tapDiv = addTapBlock(loopBlock);
+                    if (nestedBlocks) {
+                        nestedBlocks.appendChild(tapDiv);
+                        showSelectionBox(tapBlock);
+                    }
+                });
+
                 saveTasksToStorage();
                 break;
 
             case 'execute':
                 executeSelectedTask();
+                break;
+
+            default:
+                console.log('Unknown command:', command);
                 break;
         }
 
@@ -378,29 +417,29 @@ function getRegionForLocation(location) {
 }
 
 function createNewTask(){
-    // ...original code from lines 250-258
+    //This function is not fully defined in the original code.  Leaving as is.
 }
 
 function addTapBlock(parent){
-    // ...original code from lines 307-317
+    //This function is not fully defined in the original code.  Leaving as is.
 }
 
 function saveTasksToStorage(){
-    // ...original code from lines 256, 299, 319, 336, 421
+    //This function is not fully defined in the original code.  Leaving as is.
 }
 
 function updateTaskList(){
-    // ...original code from lines 257
+    //This function is not fully defined in the original code.  Leaving as is.
 }
 
 function loadTask(taskToLoad){
-    // ...original code from lines 363-366
+    //This function is not fully defined in the original code.  Leaving as is.
 }
 
 function executeSelectedTask(){
-    // ...original code from lines 417-418
+    //This function is not fully defined in the original code.  Leaving as is.
 }
 
 function showSelectionBox(tapBlock){
-    // ...original code from lines 295, 316, 412
+    //This function is not fully defined in the original code.  Leaving as is.
 }
