@@ -142,7 +142,11 @@ function calculateRegionFromDescription(description) {
 // Chat UI functions
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
+    console.log('Adding message, chatMessages element:', chatMessages);
+    if (!chatMessages) {
+        console.error('Chat messages container not found!');
+        return;
+    }
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${role}`;
@@ -150,11 +154,19 @@ function addMessage(role, content) {
         ${content}
         <span class="timestamp">${new Date().toLocaleTimeString()}</span>
     `;
+
+    // Clear existing messages if this is the initial greeting
+    if (role === 'assistant' && state.chatHistory.length === 0) {
+        chatMessages.innerHTML = '';
+    }
+
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     // Add to history
     state.chatHistory.push({ role, content });
+
+    console.log('Message added, current chat history:', state.chatHistory);
 }
 
 function showThinking() {
@@ -472,12 +484,14 @@ function simulateTap(x, y) {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
     loadState();
     updateTaskDisplay();
 
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
+    const chatMessages = document.getElementById('chatMessages');
 
     if (chatInput && sendButton) {
         sendButton.addEventListener('click', handleMessage);
@@ -487,6 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Show initial greeting
+    console.log('Showing initial greeting');
     addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
 });
 
