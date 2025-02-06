@@ -374,6 +374,8 @@ function executeSelectedTask() {
         focusedBlock = null;
     }
 
+    logLiveConsole('Starting task execution', 'info');
+
     // Execute each block in sequence
     let delay = 0;
     currentTask.blocks.forEach((block, index) => {
@@ -390,10 +392,16 @@ function executeSelectedTask() {
                         const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
                         simulateTap(randomX, randomY);
                         logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
+                    } else {
+                        logLiveConsole('Warning: Tap block has no region defined', 'warning');
                     }
                     break;
                 case 'print':
-                    logLiveConsole(`Print: ${block.message}`, 'print');
+                    if (block.message) {
+                        logLiveConsole(`Print: ${block.message}`, 'info');
+                    } else {
+                        logLiveConsole('Warning: Print block has no message', 'warning');
+                    }
                     break;
             }
         }, delay);
