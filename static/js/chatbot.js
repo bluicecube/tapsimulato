@@ -37,17 +37,12 @@ Your responses should be in JSON format:
 }`;
 
 // Constants for device dimensions
-const DEVICE_WIDTH = 720;  // Galaxy A11 width
-const DEVICE_HEIGHT = 1600; // Galaxy A11 height
+const DEVICE_WIDTH = 320;  // Match simulator width
+const DEVICE_HEIGHT = 720; // Match simulator height
 
 // Chat UI functions
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) {
-        console.error('Chat container not found');
-        return;
-    }
-
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${role}`;
     messageDiv.innerHTML = `
@@ -65,15 +60,6 @@ function addMessage(role, content) {
 function initializeChat() {
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
-    const chatMessages = document.getElementById('chatMessages');
-
-    if (!chatMessages) {
-        console.error('Chat container not found');
-        return;
-    }
-
-    // Clear any existing messages
-    chatMessages.innerHTML = '';
 
     if (chatInput && sendButton) {
         sendButton.addEventListener('click', handleMessage);
@@ -82,18 +68,16 @@ function initializeChat() {
         });
     }
 
-    // Show initial greeting with a slight delay to ensure DOM is ready
-    setTimeout(() => {
-        if (chatMessages && state.chatHistory.length === 0) {
-            addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
-        }
-    }, 500);
+    // Show initial greeting
+    addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
 }
 
 // Start initialization when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeChat);
+} else {
     initializeChat();
-});
+}
 
 // Message handling
 async function handleMessage(event) {
