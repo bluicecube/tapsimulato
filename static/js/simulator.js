@@ -349,6 +349,8 @@ function setBlockFocus(block, element) {
     // Remove focus from previous block if exists
     if (focusedBlock) {
         focusedBlock.element.classList.remove('focused');
+        // Also ensure we remove the active-block class
+        focusedBlock.element.classList.remove('active-block');
     }
 
     // Hide all selection boxes
@@ -489,6 +491,12 @@ function loadTask(task) {
 }
 
 function enableDrawingMode(tapBlock, tapDiv) {
+    // Clear any existing focus first
+    if (focusedBlock && focusedBlock.element !== tapDiv) {
+        focusedBlock.element.classList.remove('focused');
+        focusedBlock.element.classList.remove('active-block');
+    }
+
     // Hide all other selection boxes first
     document.querySelectorAll('.active-selection-box').forEach(box => {
         box.classList.add('d-none');
@@ -496,6 +504,7 @@ function enableDrawingMode(tapBlock, tapDiv) {
 
     currentTapBlock = tapBlock;
     tapDiv.classList.add('active-block');
+    setBlockFocus(tapBlock, tapDiv);
     logLiveConsole('Drawing mode enabled - Select tap region', 'info');
 }
 
@@ -505,6 +514,12 @@ function disableDrawingMode() {
         activeBlock.classList.remove('active-block');
     }
     currentTapBlock = null;
+
+    // Also clear focus when disabling drawing mode
+    if (focusedBlock) {
+        focusedBlock.element.classList.remove('focused');
+        focusedBlock = null;
+    }
 }
 
 // Event listeners for drawing mode
