@@ -425,8 +425,9 @@ function executeSelectedTask() {
                     }
                     break;
                 case 'print':
+                    // Execute print block by displaying the user-entered message
                     if (block.message && block.message.trim()) {
-                        logLiveConsole(`Print message: "${block.message}"`, 'success');
+                        logLiveConsole(`Print Block Output: "${block.message}"`, 'info');
                     } else {
                         logLiveConsole('Warning: Print block has empty message', 'warning');
                     }
@@ -434,6 +435,10 @@ function executeSelectedTask() {
             }
         }, delay);
     });
+
+    setTimeout(() => {
+        logLiveConsole('Task execution completed', 'success');
+    }, delay);
 }
 
 function generateGCode() {
