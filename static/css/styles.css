@@ -61,11 +61,6 @@ body {
     border: 1px solid var(--bs-success);
 }
 
-.print-block {
-    background-color: rgba(13, 202, 240, 0.1);
-    border: 1px solid var(--bs-info);
-}
-
 .block.focused {
     border-color: var(--bs-warning);
     box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
@@ -180,17 +175,4 @@ body {
 .form-control:focus {
     background-color: var(--bs-dark);
     color: var(--bs-light);
-}
-
-.executing-block {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-    transition: background-color 0.3s ease-out;
-}
-
-.tap-block.executing-block {
-    background-color: rgba(13, 110, 253, 0.3) !important;
-}
-
-.loop-block.executing-block {
-    background-color: rgba(25, 135, 84, 0.3) !important;
 }
