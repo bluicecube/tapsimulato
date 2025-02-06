@@ -51,7 +51,6 @@ function addTaskBlock(task) {
             <div>
                 <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
                 <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-                <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
                 <button class="btn btn-sm btn-outline-danger delete-task-btn">Delete</button>
             </div>
         </div>
@@ -72,11 +71,6 @@ function addTaskBlock(task) {
     taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
         const loopDiv = addLoopBlock(task);
         taskDiv.querySelector('.blocks-container').appendChild(loopDiv);
-    });
-
-    taskDiv.querySelector('.add-print-btn').addEventListener('click', () => {
-        const printDiv = addPrintBlock(task);
-        taskDiv.querySelector('.blocks-container').appendChild(printDiv);
     });
 
     taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
@@ -343,53 +337,6 @@ function addLoopBlock(task) {
     return loopDiv;
 }
 
-function addPrintBlock(task) {
-    const printBlock = {
-        type: 'print',
-        message: '',
-        name: 'Print Block'
-    };
-    task.blocks.push(printBlock);
-
-    const printDiv = document.createElement('div');
-    printDiv.className = 'block print-block';
-    printDiv.draggable = true;
-    printDiv.innerHTML = `
-        <div class="delete-dot"></div>
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="block-name" contenteditable="true">${printBlock.name}</h6>
-        </div>
-        <div class="input-group">
-            <span class="input-group-text">Message</span>
-            <input type="text" class="form-control message-input" placeholder="Enter message">
-        </div>
-    `;
-
-    setupDragAndDrop(printDiv);
-
-    const messageInput = printDiv.querySelector('.message-input');
-    messageInput.addEventListener('input', (e) => {
-        printBlock.message = e.target.value;
-    });
-
-    printDiv.querySelector('.delete-dot').addEventListener('click', () => {
-        const index = task.blocks.indexOf(printBlock);
-        if (index > -1) {
-            task.blocks.splice(index, 1);
-            printDiv.remove();
-            logLiveConsole('Print block removed', 'info');
-        }
-    });
-
-    printDiv.addEventListener('click', (e) => {
-        if (!e.target.closest('.delete-dot')) {
-            setBlockFocus(printBlock, printDiv);
-        }
-    });
-
-    return printDiv;
-}
-
 function executeSelectedTask() {
     if (!currentTask) {
         logLiveConsole('No task selected', 'error');
@@ -406,34 +353,20 @@ function executeSelectedTask() {
 
     let delay = 0;
     currentTask.blocks.forEach((block) => {
-        switch (block.type) {
-            case 'tap':
-                const waitTime = Math.random() * 1.5 + 0.5;
-                delay += waitTime * 1000;
+        if (block.type === 'tap') {
+            const waitTime = Math.random() * 1.5 + 0.5;
+            delay += waitTime * 1000;
 
-                setTimeout(() => {
-                    if (block.region) {
-                        const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
-                        const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
-                        simulateTap(randomX, randomY);
-                        logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
-                    } else {
-                        logLiveConsole('Warning: Tap block has no region defined', 'warning');
-                    }
-                }, delay);
-                break;
-
-            case 'print':
-                setTimeout(() => {
-                    const message = block.message;
-                    if (message && message.trim()) {
-                        logLiveConsole(`Print Message: "${message}"`, 'info');
-                    } else {
-                        logLiveConsole('Warning: Print block has empty message', 'warning');
-                    }
-                }, delay);
-                delay += 500; // Add a small delay after print for readability
-                break;
+            setTimeout(() => {
+                if (block.region) {
+                    const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
+                    const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
+                    simulateTap(randomX, randomY);
+                    logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
+                } else {
+                    logLiveConsole('Warning: Tap block has no region defined', 'warning');
+                }
+            }, delay);
         }
     });
 
