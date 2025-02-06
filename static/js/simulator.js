@@ -91,7 +91,16 @@ function updateTaskList() {
             </div>
         `;
 
-        taskItem.querySelector('span').addEventListener('click', () => loadTask(task));
+        // Make the entire task item clickable
+        taskItem.addEventListener('click', (e) => {
+            if (!e.target.closest('.delete-task-btn')) {
+                loadTask(task);
+                // Update active state
+                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
+                taskItem.classList.add('active');
+            }
+        });
+
         taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             deleteTask(task);
@@ -393,7 +402,7 @@ function logLiveConsole(message, type = 'info') {
 
 
 function loadTask(task) {
-    currentTask = task; // Don't deep copy to maintain references
+    currentTask = task;
     const currentTaskElement = document.getElementById('currentTask');
     currentTaskElement.innerHTML = '';
 
@@ -447,16 +456,17 @@ function loadTask(task) {
 
     // Rebuild blocks from task data
     if (task.blocks && task.blocks.length > 0) {
-        task.blocks.forEach(blockData => {
+        task.blocks.forEach((block, index) => {
             let blockDiv;
-            if (blockData.type === 'tap') {
+            if (block.type === 'tap') {
                 blockDiv = addTapBlock(task);
+                const lastBlock = task.blocks[task.blocks.length - 1];
 
-                // Restore the region if it exists
-                if (blockData.region) {
-                    const lastBlock = task.blocks[task.blocks.length - 1];
-                    lastBlock.region = blockData.region;
+                // Copy properties from saved block to new block
+                lastBlock.name = block.name;
+                lastBlock.region = block.region;
 
+                if (block.region) {
                     // Create and show selection box
                     const selectionBoxElement = document.createElement('div');
                     selectionBoxElement.className = 'active-selection-box';
@@ -464,7 +474,7 @@ function loadTask(task) {
                     lastBlock.selectionBoxElement = selectionBoxElement;
                     showSelectionBox(lastBlock);
                 }
-            } else if (blockData.type === 'loop') {
+            } else if (block.type === 'loop') {
                 blockDiv = addLoopBlock(task);
             }
 
