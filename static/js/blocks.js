@@ -11,6 +11,7 @@ function addTapBlock(parent) {
         <div class="delete-dot"></div>
         <h6>Tap Block</h6>
         <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
+        <button class="btn btn-sm btn-outline-secondary view-region-btn ms-2">View Region</button>
     `;
 
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
@@ -26,7 +27,35 @@ function addTapBlock(parent) {
         enableDrawingMode(tapBlock, blockDiv);
     });
 
+    blockDiv.querySelector('.view-region-btn').addEventListener('click', () => {
+        if (tapBlock.region) {
+            showSelectionBox(tapBlock);
+            logLiveConsole('Showing tap region', 'info');
+        } else {
+            logLiveConsole('No region set for this tap block', 'warning');
+        }
+    });
+
     return blockDiv;
+}
+
+function showSelectionBox(tapBlock) {
+    //Implementation to visualize the region.  This will depend on how regions are defined and stored in tapBlock.region
+    //Example:  Assume tapBlock.region is an object with x, y, width, height properties.
+    const selectionBox = document.createElement('div');
+    selectionBox.style.position = 'absolute';
+    selectionBox.style.border = '2px dashed blue';
+    selectionBox.style.left = tapBlock.region.x + 'px';
+    selectionBox.style.top = tapBlock.region.y + 'px';
+    selectionBox.style.width = tapBlock.region.width + 'px';
+    selectionBox.style.height = tapBlock.region.height + 'px';
+    document.body.appendChild(selectionBox);
+
+    // Add functionality to remove the selection box after a certain time or on another event.  For example:
+    setTimeout(() => {
+        document.body.removeChild(selectionBox);
+    }, 5000); //remove after 5 seconds
+
 }
 
 function addLoopBlock(parent) {

@@ -26,13 +26,15 @@ function generateStepGCode(step) {
     switch (step.type) {
         case 'tap':
             if (step.region) {
-                const centerX = (step.region.x1 + step.region.x2) / 2;
-                const centerY = (step.region.y1 + step.region.y2) / 2;
+                // Randomize tap location within the region
+                const randomX = step.region.x1 + Math.random() * (step.region.x2 - step.region.x1);
+                const randomY = step.region.y1 + Math.random() * (step.region.y2 - step.region.y1);
+
                 // Add a random delay between 0.5 and 2 seconds
                 const delay = (Math.random() * 1.5 + 0.5).toFixed(2);
                 gcode += `; Wait ${delay} seconds\n`;
                 gcode += `G4 P${delay}\n`;
-                gcode += `G0 X${centerX.toFixed(2)} Y${centerY.toFixed(2)}\n`;
+                gcode += `G0 X${randomX.toFixed(2)} Y${randomY.toFixed(2)}\n`;
                 gcode += `M400 ; Wait for movement completion\n`;
                 gcode += `M25 ; Tap at position\n`;
             }

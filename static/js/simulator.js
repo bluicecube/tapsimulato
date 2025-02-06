@@ -5,9 +5,13 @@ let selectionStartX = 0;
 let selectionStartY = 0;
 let selectionRectangle = null;
 let currentTapBlock = null;
+let activeSelectionBox = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     selectionRectangle = document.getElementById('selectionBox');
+    activeSelectionBox = document.createElement('div');
+    activeSelectionBox.className = 'active-selection-box d-none';
+    document.getElementById('simulator').appendChild(activeSelectionBox);
 
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('executeBtn').addEventListener('click', executeSelectedTask);
@@ -128,11 +132,25 @@ function stopSelection(event) {
             x2: Math.max(selectionStartX, endX),
             y2: Math.max(selectionStartY, endY)
         };
+        showSelectionBox(currentTapBlock);
         logLiveConsole('Tap region set', 'success');
     }
 
-    selectionRectangle.classList.add('d-none');
     currentTapBlock = null;
+}
+
+function showSelectionBox(tapBlock) {
+    if (!tapBlock.region) return;
+
+    activeSelectionBox.style.left = `${tapBlock.region.x1}px`;
+    activeSelectionBox.style.top = `${tapBlock.region.y1}px`;
+    activeSelectionBox.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
+    activeSelectionBox.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
+    activeSelectionBox.classList.remove('d-none');
+}
+
+function hideSelectionBox() {
+    activeSelectionBox.classList.add('d-none');
 }
 
 function logLiveConsole(message, type = 'info') {
@@ -174,5 +192,4 @@ function executeSelectedTask() {
 function generateGCode() {
     //Implementation for generating G-Code
     logLiveConsole("Generating G-Code", "info");
-
 }
