@@ -149,7 +149,8 @@ function stopSelection(event) {
         logLiveConsole('Tap region set', 'success');
     }
 
-    currentTapBlock = null;
+    selectionRectangle.classList.add('d-none');
+    disableDrawingMode();
 }
 
 
@@ -330,4 +331,22 @@ function generateGCode() {
 
 // Placeholder functions -  These need actual implementations
 function setupDragAndDrop(blockDiv) {}
-function enableDrawingMode(tapBlock, blockDiv) {}
+
+function enableDrawingMode(tapBlock, tapDiv) {
+    // Hide all other selection boxes first
+    document.querySelectorAll('.active-selection-box').forEach(box => {
+        box.classList.add('d-none');
+    });
+
+    currentTapBlock = tapBlock;
+    tapDiv.classList.add('active-block');
+    logLiveConsole('Drawing mode enabled - Select tap region', 'info');
+}
+
+function disableDrawingMode() {
+    const activeBlock = document.querySelector('.active-block');
+    if (activeBlock) {
+        activeBlock.classList.remove('active-block');
+    }
+    currentTapBlock = null;
+}
