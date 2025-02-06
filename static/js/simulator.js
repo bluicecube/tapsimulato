@@ -103,21 +103,50 @@ function updateTaskList() {
 
 function updateDeletedTaskList() {
     const deletedList = document.getElementById('deletedTaskList');
-    deletedList.innerHTML = '';
+    deletedList.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Recently Deleted</h5>
+            ${deletedTasks.length > 0 ? `
+                <button class="btn btn-sm btn-outline-danger clear-all-btn">
+                    Clear All
+                </button>
+            ` : ''}
+        </div>
+    `;
 
     deletedTasks.forEach(task => {
         const taskItem = document.createElement('div');
         taskItem.className = 'task-list-item';
         taskItem.innerHTML = `
             <span>${task.name}</span>
-            <button class="btn btn-sm btn-outline-success restore-btn">
-                <i data-feather="refresh-cw"></i>
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-success restore-btn">
+                    <i data-feather="refresh-cw"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger remove-btn">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
         `;
 
         taskItem.querySelector('.restore-btn').addEventListener('click', () => restoreTask(task));
+        taskItem.querySelector('.remove-btn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to permanently delete this task?')) {
+                permanentlyDeleteTask(task);
+            }
+        });
+
         deletedList.appendChild(taskItem);
     });
+
+    if (deletedTasks.length > 0) {
+        const clearAllBtn = deletedList.querySelector('.clear-all-btn');
+        clearAllBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to permanently delete all tasks in the recently deleted list?')) {
+                clearAllDeletedTasks();
+            }
+        });
+    }
 }
 
 function deleteTask(task) {
@@ -546,3 +575,20 @@ function generateGCode() {
 // Placeholder functions -  These need actual implementations
 function setupDragAndDrop(blockDiv) {}
 function simulateTap(x, y) {}
+
+function permanentlyDeleteTask(task) {
+    const index = deletedTasks.findIndex(t => t.id === task.id);
+    if (index > -1) {
+        deletedTasks.splice(index, 1);
+        saveTasksToStorage();
+        updateDeletedTaskList();
+        logLiveConsole('Task permanently deleted', 'info');
+    }
+}
+
+function clearAllDeletedTasks() {
+    deletedTasks = [];
+    saveTasksToStorage();
+    updateDeletedTaskList();
+    logLiveConsole('All deleted tasks cleared', 'info');
+}
