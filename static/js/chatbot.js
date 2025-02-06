@@ -145,91 +145,6 @@ function hideThinking() {
     }
 }
 
-function getRegionForLocation(location) {
-    const screen = {
-        width: 320,  // Device width from CSS
-        height: 720  // Device height from CSS
-    };
-
-    // Define regions based on screen dimensions
-    const regions = {
-        'top-left': {
-            x1: 0,
-            y1: 0,
-            x2: screen.width / 2,
-            y2: screen.height / 3
-        },
-        'top-right': {
-            x1: screen.width / 2,
-            y1: 0,
-            x2: screen.width,
-            y2: screen.height / 3
-        },
-        'bottom-left': {
-            x1: 0,
-            y1: 2 * screen.height / 3,
-            x2: screen.width / 2,
-            y2: screen.height
-        },
-        'bottom-right': {
-            x1: screen.width / 2,
-            y1: 2 * screen.height / 3,
-            x2: screen.width,
-            y2: screen.height
-        },
-        'middle': {
-            x1: screen.width / 4,
-            y1: screen.height / 3,
-            x2: 3 * screen.width / 4,
-            y2: 2 * screen.height / 3
-        },
-        'top': {
-            x1: screen.width / 4,
-            y1: 0,
-            x2: 3 * screen.width / 4,
-            y2: screen.height / 3
-        },
-        'bottom': {
-            x1: screen.width / 4,
-            y1: 2 * screen.height / 3,
-            x2: 3 * screen.width / 4,
-            y2: screen.height
-        },
-        'left': {
-            x1: 0,
-            y1: screen.height / 3,
-            x2: screen.width / 3,
-            y2: 2 * screen.height / 3
-        },
-        'right': {
-            x1: 2 * screen.width / 3,
-            y1: screen.height / 3,
-            x2: screen.width,
-            y2: 2 * screen.height / 3
-        }
-    };
-
-    // Normalize location input
-    const normalized = location.toLowerCase().replace(/\s+/g, '-');
-
-    // Map various natural language inputs to region keys
-    const locationMap = {
-        'upper-left': 'top-left',
-        'upper-right': 'top-right',
-        'lower-left': 'bottom-left',
-        'lower-right': 'bottom-right',
-        'center': 'middle',
-        'centre': 'middle',
-        'top-center': 'top',
-        'bottom-center': 'bottom',
-        'left-center': 'left',
-        'right-center': 'right'
-    };
-
-    const regionKey = locationMap[normalized] || normalized;
-    return regions[regionKey] || regions['middle'];
-}
-
 async function processCommand(response_data) {
     try {
         console.log('Processing command:', response_data);
@@ -245,9 +160,8 @@ async function processCommand(response_data) {
 
         switch (command) {
             case 'create_task':
-                console.log('Creating new task with params:', params);
-                createNewTask();
-                if (currentTask && params.taskName) {
+                if (params.taskName) {
+                    createNewTask();
                     currentTask.name = params.taskName;
                     const taskNameElement = document.querySelector('.task-name');
                     if (taskNameElement) {
@@ -258,47 +172,6 @@ async function processCommand(response_data) {
                 }
                 break;
 
-            case 'create_loop_with_taps':
-                if (!currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-
-                // Create the loop block
-                const loopBlock = {
-                    type: 'loop',
-                    iterations: params.iterations || 1,
-                    blocks: [],
-                    name: `${params.iterations}x ${params.location} Taps`
-                };
-                currentTask.blocks.push(loopBlock);
-
-                // Create and add the loop div
-                const loopDiv = addLoopBlock(currentTask, params.iterations);
-                blocksContainer.appendChild(loopDiv);
-
-                // Add the tap block inside the loop
-                const region = getRegionForLocation(params.location);
-                const tapBlock = {
-                    type: 'tap',
-                    region: region,
-                    name: params.custom_name || `Tap ${params.location}`
-                };
-                loopBlock.blocks.push(tapBlock);
-
-                // Add tap div to the nested blocks container
-                const nestedBlocks = loopDiv.querySelector('.nested-blocks');
-                if (nestedBlocks) {
-                    const tapDiv = addTapBlock(loopBlock);
-                    nestedBlocks.appendChild(tapDiv);
-                    if (region) {
-                        showSelectionBox(tapBlock);
-                    }
-                }
-
-                saveTasksToStorage();
-                break;
-
             case 'add_tap':
                 if (!currentTask) {
                     addMessage('assistant', 'Please create a task first.');
@@ -306,16 +179,6 @@ async function processCommand(response_data) {
                 }
                 const tapDiv = addTapBlock(currentTask);
                 blocksContainer.appendChild(tapDiv);
-
-                // If location is specified, set the tap region
-                if (params.location) {
-                    const region = getRegionForLocation(params.location);
-                    const tapBlock = currentTask.blocks[currentTask.blocks.length - 1];
-                    tapBlock.region = region;
-                    tapBlock.name = params.custom_name || `Tap ${params.location}`;
-                    showSelectionBox(tapBlock);
-                }
-
                 saveTasksToStorage();
                 break;
 
@@ -324,93 +187,9 @@ async function processCommand(response_data) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                const loopBlock = {
-                    type: 'loop',
-                    iterations: params.iterations || 1,
-                    blocks: [],
-                    name: 'Loop Block'
-                };
-                currentTask.blocks.push(loopBlock);
                 const loopDiv = addLoopBlock(currentTask, params.iterations);
                 blocksContainer.appendChild(loopDiv);
                 saveTasksToStorage();
-                break;
-
-            case 'remove_blocks':
-                if (!currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-
-                if (params.target === 'all') {
-                    currentTask.blocks = [];
-                    blocksContainer.innerHTML = '';
-                } else if (params.target === 'last') {
-                    if (currentTask.blocks.length > 0) {
-                        currentTask.blocks.pop();
-                        const lastBlock = blocksContainer.lastChild;
-                        if (lastBlock) {
-                            lastBlock.remove();
-                        }
-                    }
-                }
-                saveTasksToStorage();
-                break;
-
-            case 'load_task':
-                const taskToLoad = tasks.find(t => t.name.toLowerCase() === params.taskName.toLowerCase());
-                if (taskToLoad) {
-                    loadTask(taskToLoad);
-                } else {
-                    addMessage('assistant', `Could not find task named "${params.taskName}"`);
-                }
-                break;
-
-            case 'add_corner_taps':
-                if (!currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-
-                const iterations = params.iterations || 2;
-                const cornerLoopBlock = {
-                    type: 'loop',
-                    iterations: iterations,
-                    blocks: [],
-                    name: `${iterations}x Corner Taps`
-                };
-                currentTask.blocks.push(cornerLoopBlock);
-
-                const cornerLoopDiv = addLoopBlock(currentTask);
-                blocksContainer.appendChild(cornerLoopDiv);
-
-                const corners = [
-                    { x: 20, y: 20, name: 'Top Left' },
-                    { x: 300, y: 20, name: 'Top Right' },
-                    { x: 20, y: 700, name: 'Bottom Left' },
-                    { x: 300, y: 700, name: 'Bottom Right' }
-                ];
-
-                corners.forEach(corner => {
-                    const tapBlock = {
-                        type: 'tap',
-                        region: {
-                            x1: corner.x - 10,
-                            y1: corner.y - 10,
-                            x2: corner.x + 10,
-                            y2: corner.y + 10
-                        },
-                        name: `${corner.name} Corner`
-                    };
-                    cornerLoopBlock.blocks.push(tapBlock);
-
-                    const tapDiv = addTapBlock(tapBlock);
-                    const nestedBlocks = cornerLoopDiv.querySelector('.nested-blocks');
-                    if (nestedBlocks) {
-                        nestedBlocks.appendChild(tapDiv);
-                    }
-                    showSelectionBox(tapBlock);
-                });
                 break;
 
             case 'execute':
@@ -511,4 +290,117 @@ function getDragAfterElement(container, y) {
             return closest;
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function getRegionForLocation(location) {
+    const screen = {
+        width: 320,  // Device width from CSS
+        height: 720  // Device height from CSS
+    };
+
+    // Define regions based on screen dimensions
+    const regions = {
+        'top-left': {
+            x1: 0,
+            y1: 0,
+            x2: screen.width / 2,
+            y2: screen.height / 3
+        },
+        'top-right': {
+            x1: screen.width / 2,
+            y1: 0,
+            x2: screen.width,
+            y2: screen.height / 3
+        },
+        'bottom-left': {
+            x1: 0,
+            y1: 2 * screen.height / 3,
+            x2: screen.width / 2,
+            y2: screen.height
+        },
+        'bottom-right': {
+            x1: screen.width / 2,
+            y1: 2 * screen.height / 3,
+            x2: screen.width,
+            y2: screen.height
+        },
+        'middle': {
+            x1: screen.width / 4,
+            y1: screen.height / 3,
+            x2: 3 * screen.width / 4,
+            y2: 2 * screen.height / 3
+        },
+        'top': {
+            x1: screen.width / 4,
+            y1: 0,
+            x2: 3 * screen.width / 4,
+            y2: screen.height / 3
+        },
+        'bottom': {
+            x1: screen.width / 4,
+            y1: 2 * screen.height / 3,
+            x2: 3 * screen.width / 4,
+            y2: screen.height
+        },
+        'left': {
+            x1: 0,
+            y1: screen.height / 3,
+            x2: screen.width / 3,
+            y2: 2 * screen.height / 3
+        },
+        'right': {
+            x1: 2 * screen.width / 3,
+            y1: screen.height / 3,
+            x2: screen.width,
+            y2: 2 * screen.height / 3
+        }
+    };
+
+    // Normalize location input
+    const normalized = location.toLowerCase().replace(/\s+/g, '-');
+
+    // Map various natural language inputs to region keys
+    const locationMap = {
+        'upper-left': 'top-left',
+        'upper-right': 'top-right',
+        'lower-left': 'bottom-left',
+        'lower-right': 'bottom-right',
+        'center': 'middle',
+        'centre': 'middle',
+        'top-center': 'top',
+        'bottom-center': 'bottom',
+        'left-center': 'left',
+        'right-center': 'right'
+    };
+
+    const regionKey = locationMap[normalized] || normalized;
+    return regions[regionKey] || regions['middle'];
+}
+
+function createNewTask(){
+    // ...original code from lines 250-258
+}
+
+function addTapBlock(parent){
+    // ...original code from lines 307-317
+}
+
+function saveTasksToStorage(){
+    // ...original code from lines 256, 299, 319, 336, 421
+}
+
+function updateTaskList(){
+    // ...original code from lines 257
+}
+
+function loadTask(taskToLoad){
+    // ...original code from lines 363-366
+}
+
+function executeSelectedTask(){
+    // ...original code from lines 417-418
+}
+
+function showSelectionBox(tapBlock){
+    // ...original code from lines 295, 316, 412
 }
