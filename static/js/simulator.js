@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function createNewTask() {
     const task = {
         id: `task-${Date.now()}`,
-        name: `Task ${tasks.length + 1}`,
+        name: 'New Task',
         blocks: [],
         minimized: false
     };
@@ -36,7 +36,7 @@ function createNewTask() {
 
     // Update the current task display
     const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = ''; // Clear current content
+    currentTaskElement.innerHTML = '';
     addTaskBlock(task);
 
     logLiveConsole('New task created', 'info');
@@ -158,9 +158,9 @@ function saveCurrentTask() {
 
     const taskIndex = savedTasks.findIndex(t => t.id === currentTask.id);
     if (taskIndex === -1) {
-        savedTasks.push({...currentTask});
+        savedTasks.push(JSON.parse(JSON.stringify(currentTask))); // Deep copy to preserve blocks
     } else {
-        savedTasks[taskIndex] = {...currentTask};
+        savedTasks[taskIndex] = JSON.parse(JSON.stringify(currentTask));
     }
 
     // Save to localStorage
@@ -194,7 +194,7 @@ function updateTaskList() {
 }
 
 function loadTask(task) {
-    currentTask = {...task};
+    currentTask = JSON.parse(JSON.stringify(task)); // Deep copy to preserve blocks
     const currentTaskElement = document.getElementById('currentTask');
     currentTaskElement.innerHTML = '';
     addTaskBlock(currentTask);
@@ -203,13 +203,15 @@ function loadTask(task) {
 }
 
 function setBlockFocus(block, element) {
-    // Remove focus from previous block
+    // Remove focus from all blocks
     if (focusedBlock) {
         focusedBlock.element.classList.remove('focused');
-        if (focusedBlock.block.type === 'tap' && focusedBlock.block.selectionBoxElement) {
-            focusedBlock.block.selectionBoxElement.classList.add('d-none');
-        }
     }
+
+    // Hide all selection boxes
+    document.querySelectorAll('.active-selection-box').forEach(box => {
+        box.classList.add('d-none');
+    });
 
     // Set focus on new block
     focusedBlock = { block, element };
@@ -255,15 +257,51 @@ function logLiveConsole(message, type = 'info') {
     console.scrollTop = console.scrollHeight;
 }
 
-function addTapBlock(task) {
-    const tapDiv = document.createElement('div');
-    tapDiv.className = 'tap-block';
-    tapDiv.innerHTML = `<p contenteditable="true">Tap Block</p>`;
-    tapDiv.addEventListener('click', () => {
-        currentTapBlock = tapDiv;
-        setBlockFocus({type: 'tap'}, tapDiv);
+function addTapBlock(parent) {
+    const tapBlock = {
+        type: 'tap',
+        region: null,
+        name: 'Tap Block'
+    };
+    parent.blocks.push(tapBlock);
+
+    const blockDiv = document.createElement('div');
+    blockDiv.className = 'block tap-block';
+    blockDiv.draggable = true;
+    blockDiv.innerHTML = `
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${tapBlock.name}</h6>
+            <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
+        </div>
+    `;
+
+    setupDragAndDrop(blockDiv);
+
+    // Setup event listeners and drag-and-drop
+    blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
+        const index = parent.blocks.indexOf(tapBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Tap block removed', 'info');
+        }
     });
-    return tapDiv;
+
+    blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+        enableDrawingMode(tapBlock, blockDiv);
+    });
+
+    blockDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
+            setBlockFocus(tapBlock, blockDiv);
+        }
+    });
+
+    // Auto-focus new tap block
+    setTimeout(() => setBlockFocus(tapBlock, blockDiv), 0);
+
+    return blockDiv;
 }
 
 function addLoopBlock(task) {
@@ -289,3 +327,7 @@ function generateGCode() {
     //Implementation for generating G-Code
     logLiveConsole("Generating G-Code", "info");
 }
+
+// Placeholder functions -  These need actual implementations
+function setupDragAndDrop(blockDiv) {}
+function enableDrawingMode(tapBlock, blockDiv) {}
