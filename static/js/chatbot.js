@@ -30,18 +30,18 @@ document.addEventListener('DOMContentLoaded', () => {
 async function sendMessage() {
     const chatInput = document.getElementById('chatInput');
     const message = chatInput.value.trim();
-    
+
     if (!message) return;
-    
+
     // Clear input
     chatInput.value = '';
-    
+
     // Add user message to chat
     addMessage('user', message);
-    
+
     // Show thinking indicator
     showThinking();
-    
+
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -60,26 +60,30 @@ async function sendMessage() {
             })
         });
 
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-
         const data = await response.json();
-        
+
         // Hide thinking indicator
         hideThinking();
-        
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error('Invalid response format from API');
+        }
+
         // Process the response
         const assistantMessage = data.choices[0].message.content;
         addMessage('assistant', assistantMessage);
-        
+
         // Process any commands in the response
         await processCommands(assistantMessage);
-        
+
     } catch (error) {
         console.error('Error:', error);
         hideThinking();
-        addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+        addMessage('assistant', `I encountered an error: ${error.message}. Please try again.`);
     }
 }
 
@@ -93,7 +97,7 @@ function addMessage(role, content) {
     `;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
     // Add to history
     chatHistory.push({ role, content });
 }
@@ -124,56 +128,63 @@ async function processCommands(message) {
     if (!currentTask) {
         createNewTask();
     }
-    
-    if (message.toLowerCase().includes('create a loop') || message.toLowerCase().includes('repeat')) {
-        // Extract iteration count
-        const iterationMatch = message.match(/(\d+)\s*times/);
-        const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 1;
-        
-        // Create loop block
-        const loopDiv = addLoopBlock(currentTask);
-        document.querySelector('.blocks-container').appendChild(loopDiv);
-        
-        // Create tap blocks within the loop based on corner mentions
-        if (message.toLowerCase().includes('corner')) {
-            const corners = [
-                { x: 20, y: 20 },        // Top-left
-                { x: 300, y: 20 },       // Top-right
-                { x: 20, y: 700 },       // Bottom-left
-                { x: 300, y: 700 }       // Bottom-right
-            ];
-            
-            corners.forEach(corner => {
-                const tapBlock = addTapBlock(currentTask);
+
+    const lowerMessage = message.toLowerCase();
+
+    try {
+        if (lowerMessage.includes('create a loop') || lowerMessage.includes('repeat')) {
+            // Extract iteration count
+            const iterationMatch = message.match(/(\d+)\s*times/);
+            const iterations = iterationMatch ? parseInt(iterationMatch[1]) : 1;
+
+            // Create loop block
+            const loopDiv = addLoopBlock(currentTask);
+            document.querySelector('.blocks-container').appendChild(loopDiv);
+
+            // Create tap blocks within the loop based on corner mentions
+            if (lowerMessage.includes('corner')) {
+                const corners = [
+                    { x: 20, y: 20 },        // Top-left
+                    { x: 300, y: 20 },       // Top-right
+                    { x: 20, y: 700 },       // Bottom-left
+                    { x: 300, y: 700 }       // Bottom-right
+                ];
+
+                corners.forEach(corner => {
+                    const tapBlock = addTapBlock(currentTask);
+                    tapBlock.region = {
+                        x1: corner.x - 10,
+                        y1: corner.y - 10,
+                        x2: corner.x + 10,
+                        y2: corner.y + 10
+                    };
+                    showSelectionBox(tapBlock);
+                });
+            }
+        } else if (lowerMessage.includes('tap')) {
+            const tapBlock = addTapBlock(currentTask);
+            document.querySelector('.blocks-container').appendChild(tapBlock);
+
+            // Set region based on description
+            if (lowerMessage.includes('center')) {
                 tapBlock.region = {
-                    x1: corner.x - 10,
-                    y1: corner.y - 10,
-                    x2: corner.x + 10,
-                    y2: corner.y + 10
+                    x1: 150,
+                    y1: 350,
+                    x2: 170,
+                    y2: 370
                 };
                 showSelectionBox(tapBlock);
-            });
+            }
         }
-    } else if (message.toLowerCase().includes('tap')) {
-        const tapBlock = addTapBlock(currentTask);
-        document.querySelector('.blocks-container').appendChild(tapBlock);
-        
-        // Set region based on description
-        if (message.toLowerCase().includes('center')) {
-            tapBlock.region = {
-                x1: 150,
-                y1: 350,
-                x2: 170,
-                y2: 370
-            };
-            showSelectionBox(tapBlock);
+
+        // If the message suggests execution
+        if (lowerMessage.includes('execute') || lowerMessage.includes('run') || lowerMessage.includes('simulate')) {
+            executeSelectedTask();
         }
+
+        saveTasksToStorage();
+    } catch (error) {
+        console.error('Error processing commands:', error);
+        addMessage('assistant', 'Sorry, I had trouble creating that sequence. Could you try describing it differently?');
     }
-    
-    // If the message suggests execution
-    if (message.toLowerCase().includes('execute') || message.toLowerCase().includes('run') || message.toLowerCase().includes('simulate')) {
-        executeSelectedTask();
-    }
-    
-    saveTasksToStorage();
 }
