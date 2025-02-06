@@ -105,7 +105,6 @@ function updateDeletedTaskList() {
     const deletedList = document.getElementById('deletedTaskList');
     deletedList.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0">Recently Deleted</h5>
             ${deletedTasks.length > 0 ? `
                 <button class="btn btn-sm btn-outline-danger clear-all-btn">
                     Clear All
@@ -120,10 +119,10 @@ function updateDeletedTaskList() {
         taskItem.innerHTML = `
             <span>${task.name}</span>
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-success restore-btn">
+                <button class="btn btn-sm btn-outline-success restore-btn" title="Restore task">
                     <i data-feather="refresh-cw"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger remove-btn">
+                <button class="btn btn-sm btn-outline-danger remove-btn" title="Delete permanently">
                     <i data-feather="x"></i>
                 </button>
             </div>
@@ -394,7 +393,7 @@ function logLiveConsole(message, type = 'info') {
 
 
 function loadTask(task) {
-    currentTask = JSON.parse(JSON.stringify(task)); // Deep copy to preserve blocks
+    currentTask = task; // Don't deep copy to maintain references
     const currentTaskElement = document.getElementById('currentTask');
     currentTaskElement.innerHTML = '';
 
@@ -416,7 +415,7 @@ function loadTask(task) {
     // Add event listeners
     const nameElement = taskDiv.querySelector('.task-name');
     nameElement.addEventListener('blur', () => {
-        currentTask.name = nameElement.textContent;
+        task.name = nameElement.textContent;
         saveTasksToStorage();
         updateTaskList();
     });
@@ -443,28 +442,30 @@ function loadTask(task) {
 
     currentTaskElement.appendChild(taskDiv);
 
-    // Clear existing blocks array and rebuild from saved data
-    currentTask.blocks = [];
+    // Clear existing visual elements
+    document.querySelectorAll('.active-selection-box').forEach(box => box.remove());
 
-    // Rebuild blocks from saved data
+    // Rebuild blocks from task data
     if (task.blocks && task.blocks.length > 0) {
         task.blocks.forEach(blockData => {
             let blockDiv;
             if (blockData.type === 'tap') {
-                // Store the region data temporarily
-                const region = blockData.region;
+                blockDiv = addTapBlock(task);
 
-                // Add new tap block
-                blockDiv = addTapBlock(currentTask);
+                // Restore the region if it exists
+                if (blockData.region) {
+                    const lastBlock = task.blocks[task.blocks.length - 1];
+                    lastBlock.region = blockData.region;
 
-                // Restore the region to the last added block
-                if (region) {
-                    const newBlock = currentTask.blocks[currentTask.blocks.length - 1];
-                    newBlock.region = region;
-                    showSelectionBox(newBlock);
+                    // Create and show selection box
+                    const selectionBoxElement = document.createElement('div');
+                    selectionBoxElement.className = 'active-selection-box';
+                    document.getElementById('simulator').appendChild(selectionBoxElement);
+                    lastBlock.selectionBoxElement = selectionBoxElement;
+                    showSelectionBox(lastBlock);
                 }
             } else if (blockData.type === 'loop') {
-                blockDiv = addLoopBlock(currentTask);
+                blockDiv = addLoopBlock(task);
             }
 
             if (blockDiv) {
