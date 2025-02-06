@@ -121,7 +121,8 @@ function addPrintBlock(parent) {
 
     setupDragAndDrop(blockDiv);
 
-    blockDiv.querySelector('.message-input').addEventListener('input', (e) => {
+    const messageInput = blockDiv.querySelector('.message-input');
+    messageInput.addEventListener('input', (e) => {
         printBlock.message = e.target.value;
     });
 
@@ -134,8 +135,10 @@ function addPrintBlock(parent) {
         }
     });
 
-    blockDiv.addEventListener('click', () => {
-        setBlockFocus(printBlock, blockDiv);
+    blockDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.delete-dot')) {
+            setBlockFocus(printBlock, blockDiv);
+        }
     });
 
     return blockDiv;

@@ -397,10 +397,10 @@ function executeSelectedTask() {
                     }
                     break;
                 case 'print':
-                    if (block.message) {
-                        logLiveConsole(`Print: ${block.message}`, 'info');
+                    if (block.message && block.message.trim()) {
+                        logLiveConsole(`Print message: "${block.message}"`, 'success');
                     } else {
-                        logLiveConsole('Warning: Print block has no message', 'warning');
+                        logLiveConsole('Warning: Print block has empty message', 'warning');
                     }
                     break;
             }

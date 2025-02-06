@@ -276,6 +276,7 @@ dependencies = [
     { name = "flask-sqlalchemy" },
     { name = "gunicorn" },
     { name = "psycopg2-binary" },
+    { name = "slack-sdk" },
 ]
 
 [package.metadata]
@@ -285,6 +286,16 @@ requires-dist = [
     { name = "flask-sqlalchemy", specifier = ">=3.1.1" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "slack-sdk", specifier = ">=3.34.0" },
+]
+
+[[package]]
+name = "slack-sdk"
+version = "3.34.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/ff/6eb67fd5bd179fa804dbd859d88d872d3ae343955e63a319a73a132d406f/slack_sdk-3.34.0.tar.gz", hash = "sha256:ff61db7012160eed742285ea91f11c72b7a38a6500a7f6c5335662b4bc6b853d", size = 233629 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/2d/8724ef191cb64907de1e4e4436462955501e00f859a53d0aa794d0d060ff/slack_sdk-3.34.0-py2.py3-none-any.whl", hash = "sha256:c61f57f310d85be83466db5a98ab6ae3bb2e5587437b54fa0daa8fae6a0feffa", size = 292480 },
 ]
 
 [[package]]
