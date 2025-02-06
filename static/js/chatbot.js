@@ -1,4 +1,9 @@
+// Initialize task-related variables
+let tasks = [];
+let deletedTasks = [];
+let currentTask = null;
 let chatHistory = [];
+
 const systemPrompt = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
 For task-related commands, respond in this JSON format:
 {
@@ -25,10 +30,17 @@ function addMessage(role, content) {
     chatHistory.push({ role, content });
 }
 
-// Simplify back to the original initialization
+// Initialize chatbot
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
+
+    // Load saved tasks
+    const savedTasks = localStorage.getItem('savedTasks');
+    if (savedTasks) {
+        tasks = JSON.parse(savedTasks);
+        updateTaskList();
+    }
 
     sendChatBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => {
@@ -67,8 +79,6 @@ async function sendMessage() {
         // Add the latest user message
         messages.push({ role: 'user', content: message });
 
-        console.log('Sending chat request:', messages);
-
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
@@ -78,7 +88,6 @@ async function sendMessage() {
         });
 
         const data = await response.json();
-        console.log('Received chat response:', data);
 
         // Hide thinking indicator
         hideThinking();
@@ -93,14 +102,11 @@ async function sendMessage() {
 
         // Process the response
         const assistantMessage = data.choices[0].message.content;
-        console.log('Processing assistant message:', assistantMessage);
 
         let response_data;
         try {
             response_data = JSON.parse(assistantMessage);
-            console.log('Parsed response data:', response_data);
         } catch (e) {
-            console.error('Failed to parse JSON response:', e);
             response_data = {
                 command: 'chat',
                 params: {},
@@ -111,9 +117,8 @@ async function sendMessage() {
         // Add the assistant's message to chat
         addMessage('assistant', response_data.message);
 
-        // Only process command if it's not a chat command
+        // Process command if not chat
         if (response_data.command !== 'chat') {
-            console.log('Processing command:', response_data.command);
             await processCommand(response_data);
         }
 
@@ -143,6 +148,82 @@ function hideThinking() {
     if (thinkingDiv) {
         thinkingDiv.remove();
     }
+}
+
+function createNewTask() {
+    const task = {
+        id: `task-${Date.now()}`,
+        name: 'New Task',
+        blocks: [],
+        minimized: false,
+        created: new Date().toISOString()
+    };
+    tasks.push(task);
+    currentTask = task;
+
+    // Update the current task display
+    const currentTaskElement = document.getElementById('currentTask');
+    currentTaskElement.innerHTML = '';
+    addTaskBlock(task);
+
+    // Auto-save
+    saveTasksToStorage();
+    updateTaskList();
+
+    return task;
+}
+
+function saveTasksToStorage() {
+    localStorage.setItem('savedTasks', JSON.stringify(tasks));
+    localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks));
+}
+
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
+
+    taskList.innerHTML = '';
+
+    tasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (currentTask && currentTask.id === task.id) {
+            taskItem.classList.add('active');
+        }
+
+        taskItem.innerHTML = `
+            <span>${task.name}</span>
+            <div>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `;
+
+        // Make the entire task item clickable
+        taskItem.addEventListener('click', (e) => {
+            if (!e.target.closest('.delete-task-btn')) {
+                loadTask(task);
+                // Update active state
+                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
+                taskItem.classList.add('active');
+            }
+        });
+
+        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTask(task);
+        });
+
+        taskList.appendChild(taskItem);
+    });
+}
+
+function addTaskBlock(task) {
+    const taskContainer = document.getElementById('currentTask');
+    const blocksContainer = document.createElement('div');
+    blocksContainer.className = 'blocks-container';
+    taskContainer.appendChild(blocksContainer);
 }
 
 async function processCommand(response_data) {
@@ -236,7 +317,6 @@ async function processCommand(response_data) {
                 break;
         }
 
-        saveTasksToStorage();
     } catch (error) {
         console.error('Error processing command:', error);
         addMessage('assistant', 'I had trouble with that. Could you try describing what you want differently?');
@@ -416,88 +496,7 @@ function getRegionForLocation(location) {
     return regions[regionKey] || regions['middle'];
 }
 
-function createNewTask() {
-    const task = {
-        id: `task-${Date.now()}`,
-        name: 'New Task',
-        blocks: [],
-        minimized: false,
-        created: new Date().toISOString()
-    };
-    tasks.push(task);
-    currentTask = task;
-
-    // Update the current task display
-    const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = '';
-    addTaskBlock(task);
-
-    // Auto-save
-    saveTasksToStorage();
-    updateTaskList();
-
-    return task;
-}
-
 function addTapBlock(parent) {
-    //This function is not fully defined in the original code.  Leaving as is.
-}
-
-function saveTasksToStorage() {
-    localStorage.setItem('savedTasks', JSON.stringify(tasks));
-    localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks));
-}
-
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    if (!taskList) return;
-
-    taskList.innerHTML = '';
-
-    tasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        if (currentTask && currentTask.id === task.id) {
-            taskItem.classList.add('active');
-        }
-
-        taskItem.innerHTML = `
-            <span>${task.name}</span>
-            <div>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">
-                    <i data-feather="trash-2"></i>
-                </button>
-            </div>
-        `;
-
-        // Make the entire task item clickable
-        taskItem.addEventListener('click', (e) => {
-            if (!e.target.closest('.delete-task-btn')) {
-                loadTask(task);
-                // Update active state
-                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-                taskItem.classList.add('active');
-            }
-        });
-
-        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteTask(task);
-        });
-
-        taskList.appendChild(taskItem);
-    });
-}
-
-function loadTask(taskToLoad){
-    //This function is not fully defined in the original code.  Leaving as is.
-}
-
-function executeSelectedTask(){
-    //This function is not fully defined in the original code.  Leaving as is.
-}
-
-function showSelectionBox(tapBlock){
     //This function is not fully defined in the original code.  Leaving as is.
 }
 
@@ -510,13 +509,14 @@ function deleteTask(task) {
     updateTaskList();
 }
 
-let tasks = JSON.parse(localStorage.getItem('savedTasks')) || [];
-let deletedTasks = JSON.parse(localStorage.getItem('deletedTasks')) || [];
-let currentTask = null;
+function loadTask(taskToLoad){
+    //This function is not fully defined in the original code.  Leaving as is.
+}
 
-function addTaskBlock(task) {
-    const taskContainer = document.getElementById('currentTask');
-    const blocksContainer = document.createElement('div');
-    blocksContainer.className = 'blocks-container';
-    taskContainer.appendChild(blocksContainer);
+function executeSelectedTask(){
+    //This function is not fully defined in the original code.  Leaving as is.
+}
+
+function showSelectionBox(tapBlock){
+    //This function is not fully defined in the original code.  Leaving as is.
 }
