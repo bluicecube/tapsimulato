@@ -11,38 +11,48 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <h4>Device Simulator</h4>
-                    </div>
-                    <div class="card-body">
-                        <div id="simulator" class="simulator">
-                            <div id="selectionBox" class="selection-box d-none"></div>
-                        </div>
-                    </div>
-                </div>
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar">
+                <h4 class="mb-3">Saved Tasks</h4>
+                <div id="taskList" class="task-list"></div>
             </div>
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <h4>Task Management</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <button id="newTaskBtn" class="btn btn-primary">New Task</button>
-                            <button id="executeBtn" class="btn btn-success ms-2">Execute Selected</button>
-                            <button id="generateGCodeBtn" class="btn btn-info ms-2">Generate G-code</button>
+
+            <!-- Main Content -->
+            <div class="col">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h4>Device Simulator</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="simulator" class="simulator">
+                                    <div id="selectionBox" class="selection-box d-none"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div id="taskLog" class="task-log"></div>
                     </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h4>Live Console</h4>
-                    </div>
-                    <div class="card-body">
-                        <div id="liveConsole" class="live-console"></div>
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h4>Task Management</h4>
+                                <div>
+                                    <button id="newTaskBtn" class="btn btn-primary">New Task</button>
+                                    <button id="saveTaskBtn" class="btn btn-success ms-2">Save Task</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="currentTask" class="current-task"></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h4>Live Console</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="liveConsole" class="live-console"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

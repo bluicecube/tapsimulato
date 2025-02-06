@@ -8,6 +8,7 @@ function addTapBlock(parent) {
 
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block tap-block';
+    blockDiv.draggable = true;
     blockDiv.innerHTML = `
         <div class="delete-dot"></div>
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -15,6 +16,8 @@ function addTapBlock(parent) {
             <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
         </div>
     `;
+
+    setupDragAndDrop(blockDiv);
 
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
         const index = parent.blocks.indexOf(tapBlock);
@@ -29,20 +32,11 @@ function addTapBlock(parent) {
         enableDrawingMode(tapBlock, blockDiv);
     });
 
-    // Add click handler for the whole block to show region
+    // Add click handler for focus
     blockDiv.addEventListener('click', (e) => {
         if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
-            if (tapBlock.region) {
-                // showSelectionBox(tapBlock);  Removed the call to the old function.
-                logLiveConsole('Showing tap region', 'info');
-            }
+            setBlockFocus(tapBlock, blockDiv);
         }
-    });
-
-    // Add name editing functionality
-    const nameElement = blockDiv.querySelector('.block-name');
-    nameElement.addEventListener('blur', () => {
-        tapBlock.name = nameElement.textContent;
     });
 
     return blockDiv;
@@ -117,6 +111,7 @@ function addPrintBlock(parent) {
 
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block print-block';
+    blockDiv.draggable = true;
     blockDiv.innerHTML = `
         <div class="delete-dot"></div>
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -128,26 +123,60 @@ function addPrintBlock(parent) {
         </div>
     `;
 
-    blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-        const index = parent.blocks.indexOf(printBlock);
-        if (index > -1) {
-            parent.blocks.splice(index, 1);
-            blockDiv.remove();
-            logLiveConsole('Print block removed', 'info');
-        }
-    });
+    setupDragAndDrop(blockDiv);
 
     blockDiv.querySelector('.message-input').addEventListener('input', (e) => {
         printBlock.message = e.target.value;
+        // Log message to console when changed
+        logLiveConsole(`Print: ${e.target.value}`, 'print');
     });
 
-    // Add name editing functionality
-    const nameElement = blockDiv.querySelector('.block-name');
-    nameElement.addEventListener('blur', () => {
-        printBlock.name = nameElement.textContent;
+    // Add click handler for focus
+    blockDiv.addEventListener('click', () => {
+        setBlockFocus(printBlock, blockDiv);
     });
 
     return blockDiv;
+}
+
+function setupDragAndDrop(element) {
+    element.addEventListener('dragstart', (e) => {
+        e.target.classList.add('dragging');
+    });
+
+    element.addEventListener('dragend', (e) => {
+        e.target.classList.remove('dragging');
+    });
+
+    element.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggable = document.querySelector('.dragging');
+        const container = e.target.closest('.blocks-container');
+
+        if (container && draggable) {
+            const afterElement = getDragAfterElement(container, e.clientY);
+            if (afterElement) {
+                container.insertBefore(draggable, afterElement);
+            } else {
+                container.appendChild(draggable);
+            }
+        }
+    });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.block:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 function enableDrawingMode(tapBlock, tapDiv) {

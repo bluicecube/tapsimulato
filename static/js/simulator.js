@@ -1,15 +1,17 @@
 let tasks = [];
 let currentTask = null;
+let savedTasks = [];
 let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
 let selectionRectangle = null;
 let currentTapBlock = null;
-
+let focusedBlock = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+    document.getElementById('saveTaskBtn').addEventListener('click', saveCurrentTask);
     document.getElementById('executeBtn').addEventListener('click', executeSelectedTask);
     document.getElementById('generateGCodeBtn').addEventListener('click', generateGCode);
 
@@ -17,9 +19,18 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.addEventListener('mousedown', startSelection);
     simulator.addEventListener('mousemove', updateSelection);
     simulator.addEventListener('mouseup', stopSelection);
+
+    // Load saved tasks from localStorage
+    loadSavedTasks();
 });
 
 function createNewTask() {
+    // Hide current task if exists
+    if (currentTask) {
+        const currentTaskElement = document.getElementById('currentTask');
+        currentTaskElement.innerHTML = '';
+    }
+
     const task = {
         id: `task-${Date.now()}`,
         name: `Task ${tasks.length + 1}`,
@@ -27,8 +38,8 @@ function createNewTask() {
         minimized: false
     };
     tasks.push(task);
-    addTaskBlock(task);
     currentTask = task;
+    addTaskBlock(task);
     logLiveConsole('New task created', 'info');
 }
 
@@ -142,6 +153,75 @@ function stopSelection(event) {
     currentTapBlock = null;
 }
 
+
+function saveCurrentTask() {
+    if (!currentTask) return;
+
+    const taskIndex = savedTasks.findIndex(t => t.id === currentTask.id);
+    if (taskIndex === -1) {
+        savedTasks.push({...currentTask});
+    } else {
+        savedTasks[taskIndex] = {...currentTask};
+    }
+
+    // Save to localStorage
+    localStorage.setItem('savedTasks', JSON.stringify(savedTasks));
+    updateTaskList();
+    logLiveConsole('Task saved successfully', 'success');
+}
+
+function loadSavedTasks() {
+    const saved = localStorage.getItem('savedTasks');
+    if (saved) {
+        savedTasks = JSON.parse(saved);
+        updateTaskList();
+    }
+}
+
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    taskList.innerHTML = '';
+
+    savedTasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (currentTask && currentTask.id === task.id) {
+            taskItem.classList.add('active');
+        }
+        taskItem.textContent = task.name;
+        taskItem.addEventListener('click', () => loadTask(task));
+        taskList.appendChild(taskItem);
+    });
+}
+
+function loadTask(task) {
+    currentTask = {...task};
+    const currentTaskElement = document.getElementById('currentTask');
+    currentTaskElement.innerHTML = '';
+    addTaskBlock(currentTask);
+    updateTaskList();
+    logLiveConsole(`Loaded task: ${task.name}`, 'info');
+}
+
+function setBlockFocus(block, element) {
+    // Remove focus from previous block
+    if (focusedBlock) {
+        focusedBlock.element.classList.remove('focused');
+        if (focusedBlock.block.type === 'tap' && focusedBlock.block.selectionBoxElement) {
+            focusedBlock.block.selectionBoxElement.classList.add('d-none');
+        }
+    }
+
+    // Set focus on new block
+    focusedBlock = { block, element };
+    element.classList.add('focused');
+
+    // Show region for tap blocks
+    if (block.type === 'tap' && block.region) {
+        showSelectionBox(block);
+    }
+}
+
 function showSelectionBox(tapBlock) {
     if (!tapBlock.region) return;
 
@@ -182,6 +262,7 @@ function addTapBlock(task) {
     tapDiv.innerHTML = `<p contenteditable="true">Tap Block</p>`;
     tapDiv.addEventListener('click', () => {
         currentTapBlock = tapDiv;
+        setBlockFocus({type: 'tap'}, tapDiv);
     });
     return tapDiv;
 }
