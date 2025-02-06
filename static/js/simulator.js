@@ -25,12 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function createNewTask() {
-    // Hide current task if exists
-    if (currentTask) {
-        const currentTaskElement = document.getElementById('currentTask');
-        currentTaskElement.innerHTML = '';
-    }
-
     const task = {
         id: `task-${Date.now()}`,
         name: `Task ${tasks.length + 1}`,
@@ -39,12 +33,17 @@ function createNewTask() {
     };
     tasks.push(task);
     currentTask = task;
+
+    // Update the current task display
+    const currentTaskElement = document.getElementById('currentTask');
+    currentTaskElement.innerHTML = ''; // Clear current content
     addTaskBlock(task);
+
     logLiveConsole('New task created', 'info');
 }
 
 function addTaskBlock(task) {
-    const taskLog = document.getElementById('taskLog');
+    const currentTaskElement = document.getElementById('currentTask');
     const taskDiv = document.createElement('div');
     taskDiv.className = 'task-block';
     taskDiv.innerHTML = `
@@ -86,7 +85,7 @@ function addTaskBlock(task) {
         taskDiv.remove();
     });
 
-    taskLog.appendChild(taskDiv);
+    currentTaskElement.appendChild(taskDiv);
 }
 
 function removeTask(taskId) {
