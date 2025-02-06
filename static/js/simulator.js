@@ -1,30 +1,8 @@
-// Device configurations
-const DEVICE_CONFIGS = {
-    galaxy_a11: {
-        name: 'Samsung Galaxy A11',
-        width: 720,
-        height: 1600,
-        physicalWidth: 76.3,
-        physicalHeight: 161.4
-    },
-    pixel_4: {
-        name: 'Google Pixel 4',
-        width: 1080,
-        height: 2280,
-        physicalWidth: 68.8,
-        physicalHeight: 147.1
-    },
-    iphone_12: {
-        name: 'iPhone 12',
-        width: 1170,
-        height: 2532,
-        physicalWidth: 71.5,
-        physicalHeight: 146.7
-    }
-};
-
-// Current device configuration
-let currentDevice = DEVICE_CONFIGS.galaxy_a11;
+// Galaxy A11 dimensions
+const DEVICE_WIDTH = 720;
+const DEVICE_HEIGHT = 1600;
+const PHYSICAL_WIDTH = 76.3; // mm
+const PHYSICAL_HEIGHT = 161.4; // mm
 
 let tasks = [];
 let currentTask = null;
@@ -37,15 +15,6 @@ let currentTapBlock = null;
 let focusedBlock = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize device selector
-    const deviceSelect = document.getElementById('deviceSelect');
-    if (deviceSelect) {
-        deviceSelect.addEventListener('change', (e) => {
-            currentDevice = DEVICE_CONFIGS[e.target.value];
-            updateSimulatorSize();
-        });
-    }
-
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('executeBtn').addEventListener('click', () => {
@@ -62,8 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.addEventListener('mousemove', updateSelection);
     simulator.addEventListener('mouseup', stopSelection);
 
-    // Initial size update
-    updateSimulatorSize();
+    // Set simulator size
+    simulator.style.width = `${DEVICE_WIDTH}px`;
+    simulator.style.height = `${DEVICE_HEIGHT}px`;
+
+    // Set CSS variables for other components
+    document.documentElement.style.setProperty('--device-width', `${DEVICE_WIDTH}px`);
+    document.documentElement.style.setProperty('--device-height', `${DEVICE_HEIGHT}px`);
 
     // Load saved tasks
     loadSavedTasks();
@@ -732,32 +706,18 @@ function addLoopBlock(parent) {
 
 
 
-function updateSimulatorSize() {
-    const simulator = document.getElementById('simulator');
-    if (simulator) {
-        simulator.style.width = `${currentDevice.width}px`;
-        simulator.style.height = `${currentDevice.height}px`;
-
-        // Update CSS variables for other components that depend on device size
-        document.documentElement.style.setProperty('--device-width', `${currentDevice.width}px`);
-        document.documentElement.style.setProperty('--device-height', `${currentDevice.height}px`);
-
-        logLiveConsole(`Switched to ${currentDevice.name}`, 'info');
-    }
-}
-
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
         return;
     }
 
-    let gcode = `; G-code for ${currentDevice.name}\n`;
-    gcode += `; Physical dimensions: ${currentDevice.physicalWidth}mm x ${currentDevice.physicalHeight}mm\n\n`;
+    let gcode = `; G-code for Samsung Galaxy A11\n`;
+    gcode += `; Physical dimensions: ${PHYSICAL_WIDTH}mm x ${PHYSICAL_HEIGHT}mm\n\n`;
 
     function convertToPhysical(pixelX, pixelY) {
-        const physicalX = (pixelX / currentDevice.width) * currentDevice.physicalWidth;
-        const physicalY = (pixelY / currentDevice.height) * currentDevice.physicalHeight;
+        const physicalX = (pixelX / DEVICE_WIDTH) * PHYSICAL_WIDTH;
+        const physicalY = (pixelY / DEVICE_HEIGHT) * PHYSICAL_HEIGHT;
         return { x: physicalX, y: physicalY };
     }
 
