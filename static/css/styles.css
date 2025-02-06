@@ -17,6 +17,7 @@ body {
     background-color: var(--bs-dark);
     margin: 0 auto;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    cursor: crosshair;
 }
 
 .selection-box {
@@ -24,6 +25,7 @@ body {
     border: 2px solid var(--bs-purple);
     background-color: rgba(111, 66, 193, 0.2);
     pointer-events: none;
+    z-index: 100;
 }
 
 .active-selection-box {
@@ -45,6 +47,7 @@ body {
 
 .block.dragging {
     opacity: 0.5;
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .block:hover {
@@ -64,6 +67,121 @@ body {
 .block.focused {
     border-color: var(--bs-warning);
     box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
+}
+
+.undefined-region {
+    border-color: var(--bs-warning) !important;
+}
+
+.blink-warning {
+    color: var(--bs-warning);
+    animation: blink 1s ease-in-out infinite;
+    margin-left: 0.5rem;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.nested-blocks {
+    margin-left: 20px;
+    padding-left: 10px;
+    border-left: 2px solid var(--bs-secondary);
+}
+
+/* Chat related styles */
+.chat-messages {
+    height: 250px;
+    overflow-y: auto;
+    padding: 1rem;
+    background-color: var(--bs-dark);
+    border: 1px solid var(--bs-secondary);
+    border-radius: 4px;
+}
+
+.chat-message {
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    max-width: 80%;
+}
+
+.chat-message.user {
+    background-color: var(--bs-primary);
+    color: var(--bs-light);
+    margin-left: auto;
+    border-bottom-right-radius: 0.25rem;
+}
+
+.chat-message.assistant {
+    background-color: var(--bs-secondary);
+    color: var(--bs-light);
+    margin-right: auto;
+    border-bottom-left-radius: 0.25rem;
+}
+
+.chat-message .timestamp {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.chat-thinking {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.7;
+    padding: 0.5rem;
+}
+
+.chat-thinking .dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--bs-light);
+    border-radius: 50%;
+    animation: chatThinking 1.4s infinite ease-in-out;
+}
+
+.chat-thinking .dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.chat-thinking .dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes chatThinking {
+    0%, 80%, 100% { 
+        transform: scale(0);
+    } 
+    40% { 
+        transform: scale(1);
+    }
+}
+
+/* Tap feedback animation */
+.tap-feedback {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: rgba(255, 193, 7, 0.5);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: tapPulse 0.5s ease-out;
+}
+
+@keyframes tapPulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+    }
 }
 
 .task-container {
@@ -144,11 +262,6 @@ body {
     margin-bottom: 10px;
 }
 
-.nested-blocks {
-    margin-left: 20px;
-    padding-left: 10px;
-    border-left: 2px solid var(--bs-secondary);
-}
 
 .delete-dot {
     position: absolute;
@@ -210,132 +323,4 @@ body {
 .form-control:focus {
     background-color: var(--bs-dark);
     color: var(--bs-light);
-}
-
-/* Add to the end of the existing CSS file */
-
-.chat-messages {
-    height: 250px;
-    overflow-y: auto;
-    padding: 1rem;
-    background-color: var(--bs-dark);
-    border: 1px solid var(--bs-secondary);
-    border-radius: 4px;
-}
-
-.chat-message {
-    margin-bottom: 1rem;
-    padding: 0.5rem 1rem;
-    border-radius: 1rem;
-    max-width: 80%;
-}
-
-.chat-message.user {
-    background-color: var(--bs-primary);
-    color: var(--bs-light);
-    margin-left: auto;
-    border-bottom-right-radius: 0.25rem;
-}
-
-.chat-message.assistant {
-    background-color: var(--bs-secondary);
-    color: var(--bs-light);
-    margin-right: auto;
-    border-bottom-left-radius: 0.25rem;
-}
-
-.chat-message .timestamp {
-    font-size: 0.75rem;
-    opacity: 0.7;
-    display: block;
-    margin-top: 0.25rem;
-}
-
-.chat-input-container {
-    position: relative;
-}
-
-#chatInput {
-    padding-right: 4rem;
-}
-
-#sendChatBtn {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 4;
-}
-
-.chat-thinking {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    opacity: 0.7;
-    padding: 0.5rem;
-}
-
-.chat-thinking .dot {
-    width: 8px;
-    height: 8px;
-    background-color: var(--bs-light);
-    border-radius: 50%;
-    animation: chatThinking 1.4s infinite ease-in-out;
-}
-
-.chat-thinking .dot:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.chat-thinking .dot:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
-@keyframes chatThinking {
-    0%, 80%, 100% { 
-        transform: scale(0);
-    } 
-    40% { 
-        transform: scale(1);
-    }
-}
-
-/* Add after the existing .tap-block styles */
-
-.undefined-region {
-    border-color: var(--bs-warning) !important;
-}
-
-.blink-warning {
-    color: var(--bs-warning);
-    animation: blink 1s ease-in-out infinite;
-    margin-left: 0.5rem;
-}
-
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
-/* Make sure these tap feedback styles are at the end */
-.tap-feedback {
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    background-color: rgba(255, 193, 7, 0.5);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    animation: tapPulse 0.5s ease-out;
-}
-
-@keyframes tapPulse {
-    0% {
-        transform: translate(-50%, -50%) scale(0.5);
-        opacity: 1;
-    }
-    100% {
-        transform: translate(-50%, -50%) scale(2);
-        opacity: 0;
-    }
 }

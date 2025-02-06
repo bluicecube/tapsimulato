@@ -6,30 +6,132 @@ const state = {
     chatHistory: []
 };
 
+// Device dimensions from CSS variables
+const DEVICE = {
+    width: 320,
+    height: 720
+};
+
 // System prompt for the AI assistant
-const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
-Your responses should help interpret user intent for creating tap and loop sequences. 
+const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
+
+1. Tap Block: Defines a single tap action in a specific region of the screen
+2. Loop Block: Repeats its nested blocks a specified number of times
+
+Interpret natural language to create these sequences. For example:
+- "tap the screen 3 times" → Create a loop block with iterations=3 containing a tap block
+- "tap top of screen" → Create a tap block with region set to the top portion
+- "tap each corner twice" → Create a loop with iterations=2 containing tap blocks for corners
 
 Your responses should be in JSON format:
 {
-    "command": "create_task|add_tap_sequence|execute|chat",
+    "command": "create_task|add_blocks|execute|chat",
     "params": {
         "taskName": "string",           // for create_task
-        "iterations": number,           // number of times to repeat the sequence
-        "locations": [                  // array of tap locations (optional)
+        "blocks": [                     // array of block definitions
             {
-                "description": "string", // natural language description of where to tap
-                "region": {             // optional, if user specified exact coordinates
-                    "x1": number,
-                    "y1": number,
-                    "x2": number,
-                    "y2": number
-                }
+                "type": "loop",
+                "iterations": number,
+                "blocks": []            // nested blocks
+            },
+            {
+                "type": "tap",
+                "location": "string"    // natural language location description
             }
         ]
     },
     "message": "human readable response"
 }`;
+
+// Functions to convert natural language positions to screen regions
+function calculateRegionFromDescription(description) {
+    const normalized = description.toLowerCase().trim();
+
+    // Screen divisions (quarters)
+    const regions = {
+        'top': {
+            x1: 0,
+            y1: 0,
+            x2: DEVICE.width,
+            y2: DEVICE.height * 0.25
+        },
+        'bottom': {
+            x1: 0,
+            y1: DEVICE.height * 0.75,
+            x2: DEVICE.width,
+            y2: DEVICE.height
+        },
+        'left': {
+            x1: 0,
+            y1: 0,
+            x2: DEVICE.width * 0.25,
+            y2: DEVICE.height
+        },
+        'right': {
+            x1: DEVICE.width * 0.75,
+            y1: 0,
+            x2: DEVICE.width,
+            y2: DEVICE.height
+        },
+        'center': {
+            x1: DEVICE.width * 0.25,
+            y1: DEVICE.height * 0.25,
+            x2: DEVICE.width * 0.75,
+            y2: DEVICE.height * 0.75
+        },
+        'top-left': {
+            x1: 0,
+            y1: 0,
+            x2: DEVICE.width * 0.25,
+            y2: DEVICE.height * 0.25
+        },
+        'top-right': {
+            x1: DEVICE.width * 0.75,
+            y1: 0,
+            x2: DEVICE.width,
+            y2: DEVICE.height * 0.25
+        },
+        'bottom-left': {
+            x1: 0,
+            y1: DEVICE.height * 0.75,
+            x2: DEVICE.width * 0.25,
+            y2: DEVICE.height
+        },
+        'bottom-right': {
+            x1: DEVICE.width * 0.75,
+            y1: DEVICE.height * 0.75,
+            x2: DEVICE.width,
+            y2: DEVICE.height
+        }
+    };
+
+    // Handle various descriptions
+    const locationMap = {
+        'upper': 'top',
+        'lower': 'bottom',
+        'middle': 'center',
+        'centre': 'center',
+        'left side': 'left',
+        'right side': 'right'
+    };
+
+    // Try to match the description to a region
+    for (const [key, value] of Object.entries(locationMap)) {
+        if (normalized.includes(key)) {
+            normalized = normalized.replace(key, value);
+        }
+    }
+
+    // Check for compound locations (e.g., "top left")
+    for (const location of Object.keys(regions)) {
+        if (normalized.includes(location)) {
+            return regions[location];
+        }
+    }
+
+    // Default to center if no match
+    return regions['center'];
+}
 
 // Chat UI functions
 function addMessage(role, content) {
@@ -70,76 +172,294 @@ function hideThinking() {
     }
 }
 
-// Task management functions
-function createNewTask(taskName = 'New Task') {
-    const task = {
-        id: `task-${Date.now()}`,
-        name: taskName,
-        blocks: [],
-        created: new Date().toISOString()
-    };
-    state.tasks.push(task);
-    state.currentTask = task;
+// Command processing
+async function processCommand(response_data) {
+    const { command, params } = response_data;
 
-    updateTaskDisplay();
-    saveState();
-    return task;
-}
+    try {
+        switch (command) {
+            case 'create_task':
+                const task = createNewTask(params.taskName || 'New Task');
+                updateTaskDisplay();
+                break;
 
-function updateTaskDisplay() {
-    const taskList = document.getElementById('taskList');
-    if (!taskList) return;
+            case 'add_blocks':
+                if (!state.currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
 
-    taskList.innerHTML = '';
-    state.tasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        if (state.currentTask?.id === task.id) {
-            taskItem.classList.add('active');
+                // Process the block definitions recursively
+                function createBlocks(blockDefs) {
+                    return blockDefs.map(def => {
+                        if (def.type === 'loop') {
+                            return {
+                                type: 'loop',
+                                iterations: def.iterations || 1,
+                                blocks: createBlocks(def.blocks || []),
+                                name: 'Loop'
+                            };
+                        } else if (def.type === 'tap') {
+                            return {
+                                type: 'tap',
+                                name: 'Tap',
+                                region: def.location ? calculateRegionFromDescription(def.location) : null,
+                                description: def.location || 'Tap location to be defined'
+                            };
+                        }
+                    });
+                }
+
+                // Add the new blocks to the current task
+                const newBlocks = createBlocks(params.blocks || []);
+                state.currentTask.blocks.push(...newBlocks);
+                updateTaskBlocks();
+                break;
+
+            case 'execute':
+                if (!state.currentTask) {
+                    addMessage('assistant', 'Please select a task to execute.');
+                    return;
+                }
+                executeTask(state.currentTask);
+                break;
+            default:
+                console.log("Unknown command:", command);
         }
-
-        taskItem.innerHTML = `
-            <span>${task.name}</span>
-            <div>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">
-                    <i data-feather="trash-2"></i>
-                </button>
-            </div>
-        `;
-
-        taskItem.addEventListener('click', (e) => {
-            if (!e.target.closest('.delete-task-btn')) {
-                loadTask(task);
-            }
-        });
-
-        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteTask(task);
-        });
-
-        taskList.appendChild(taskItem);
-    });
-}
-
-// State management
-function saveState() {
-    localStorage.setItem('appState', JSON.stringify({
-        tasks: state.tasks,
-        deletedTasks: state.deletedTasks,
-        currentTask: state.currentTask
-    }));
-}
-
-function loadState() {
-    const savedState = localStorage.getItem('appState');
-    if (savedState) {
-        const parsed = JSON.parse(savedState);
-        state.tasks = parsed.tasks || [];
-        state.deletedTasks = parsed.deletedTasks || [];
-        state.currentTask = parsed.currentTask;
+    } catch (error) {
+        console.error('Error in processCommand:', error);
+        addMessage('assistant', `Error: ${error.message}`);
     }
 }
+
+// Task display and update functions
+function updateTaskBlocks() {
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement || !state.currentTask) return;
+
+    currentTaskElement.innerHTML = '';
+    const blocksContainer = document.createElement('div');
+    blocksContainer.className = 'blocks-container';
+
+    function renderBlocks(blocks, container) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                const loopDiv = document.createElement('div');
+                loopDiv.className = 'block loop-block';
+                loopDiv.draggable = true;
+                loopDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="block-name">Loop</h6>
+                        <div class="d-flex align-items-center">
+                            <input type="number" class="form-control form-control-sm iterations-input" 
+                                value="${block.iterations}" min="1" style="width: 70px">
+                            <span class="ms-2">times</span>
+                        </div>
+                    </div>
+                    <div class="nested-blocks"></div>
+                `;
+
+                // Setup iteration change handler
+                const iterationsInput = loopDiv.querySelector('.iterations-input');
+                iterationsInput.addEventListener('change', (e) => {
+                    block.iterations = parseInt(e.target.value) || 1;
+                    saveState();
+                });
+
+                container.appendChild(loopDiv);
+                setupDragAndDrop(loopDiv);
+                renderBlocks(block.blocks, loopDiv.querySelector('.nested-blocks'));
+            } else if (block.type === 'tap') {
+                const tapDiv = document.createElement('div');
+                tapDiv.className = `block tap-block${!block.region ? ' undefined-region' : ''}`;
+                tapDiv.draggable = true;
+                tapDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="block-name">
+                            Tap
+                            ${!block.region ? '<span class="blink-warning">⚠</span>' : ''}
+                        </h6>
+                        <button class="btn btn-sm btn-outline-primary select-region-btn">
+                            ${block.region ? 'Change Region' : 'Set Region'}
+                        </button>
+                    </div>
+                    <small class="text-muted">${block.description}</small>
+                `;
+
+                // Setup region selection
+                const selectRegionBtn = tapDiv.querySelector('.select-region-btn');
+                selectRegionBtn.addEventListener('click', () => {
+                    enableDrawingMode(block, tapDiv);
+                });
+
+                setupDragAndDrop(tapDiv);
+                tapDiv.addEventListener('click', (e) => {
+                    if (!e.target.closest('.select-region-btn')) {
+                        setBlockFocus(block, tapDiv);
+                    }
+                });
+
+                container.appendChild(tapDiv);
+            }
+        });
+    }
+
+    renderBlocks(state.currentTask.blocks, blocksContainer);
+    currentTaskElement.appendChild(blocksContainer);
+    saveState();
+}
+
+
+// Region selection handling
+function enableDrawingMode(block, tapDiv) {
+    // Remove focus from other blocks
+    document.querySelectorAll('.block').forEach(b => b.classList.remove('focused'));
+    tapDiv.classList.add('focused');
+
+    const simulator = document.getElementById('simulator');
+    const selectionBox = document.getElementById('selectionBox');
+
+    let isSelecting = false;
+    let startX, startY;
+
+    function startSelection(e) {
+        isSelecting = true;
+        const rect = simulator.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+
+        selectionBox.style.left = `${startX}px`;
+        selectionBox.style.top = `${startY}px`;
+        selectionBox.style.width = '0';
+        selectionBox.style.height = '0';
+        selectionBox.classList.remove('d-none');
+    }
+
+    function updateSelection(e) {
+        if (!isSelecting) return;
+
+        const rect = simulator.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+
+        const width = currentX - startX;
+        const height = currentY - startY;
+
+        selectionBox.style.width = `${Math.abs(width)}px`;
+        selectionBox.style.height = `${Math.abs(height)}px`;
+        selectionBox.style.left = `${width < 0 ? currentX : startX}px`;
+        selectionBox.style.top = `${height < 0 ? currentY : startY}px`;
+    }
+
+    function stopSelection(e) {
+        if (!isSelecting) return;
+
+        isSelecting = false;
+        const rect = simulator.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+
+        block.region = {
+            x1: Math.min(startX, endX),
+            y1: Math.min(startY, endY),
+            x2: Math.max(startX, endX),
+            y2: Math.max(startY, endY)
+        };
+
+        selectionBox.classList.add('d-none');
+        tapDiv.classList.remove('undefined-region');
+        updateTaskBlocks();
+    }
+
+    simulator.addEventListener('mousedown', startSelection);
+    simulator.addEventListener('mousemove', updateSelection);
+    simulator.addEventListener('mouseup', stopSelection);
+
+    // Cleanup
+    setTimeout(() => {
+        simulator.removeEventListener('mousedown', startSelection);
+        simulator.removeEventListener('mousemove', updateSelection);
+        simulator.removeEventListener('mouseup', stopSelection);
+    }, 0);
+}
+
+// Task execution
+function executeTask(task) {
+    if (!task || !task.blocks || task.blocks.length === 0) {
+        addMessage('assistant', 'This task has no blocks to execute.');
+        return;
+    }
+
+    let hasUndefinedRegions = false;
+
+    function checkBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'tap' && !block.region) {
+                hasUndefinedRegions = true;
+            } else if (block.type === 'loop') {
+                checkBlocks(block.blocks);
+            }
+        });
+    }
+
+    checkBlocks(task.blocks);
+
+    if (hasUndefinedRegions) {
+        addMessage('assistant', 'Some tap regions are not defined. Please define all tap regions before executing the task.');
+        return;
+    }
+
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                const { x1, y1, x2, y2 } = block.region;
+                const x = x1 + (x2 - x1) / 2;
+                const y = y1 + (y2 - y1) / 2;
+                simulateTap(x, y);
+            }
+        });
+    }
+
+    executeBlocks(task.blocks);
+    addMessage('assistant', 'Task executed successfully.');
+}
+
+// Tap simulation
+function simulateTap(x, y) {
+    const tapFeedback = document.createElement('div');
+    tapFeedback.className = 'tap-feedback';
+    tapFeedback.style.left = `${x}px`;
+    tapFeedback.style.top = `${y}px`;
+
+    const simulator = document.getElementById('simulator');
+    if (simulator) {
+        simulator.appendChild(tapFeedback);
+        setTimeout(() => tapFeedback.remove(), 500);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadState();
+    updateTaskDisplay();
+
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendChatBtn');
+
+    if (chatInput && sendButton) {
+        sendButton.addEventListener('click', handleMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleMessage(e);
+        });
+    }
+
+    // Show initial greeting
+    addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
+});
 
 // Message handling
 async function handleMessage(event) {
@@ -207,296 +527,123 @@ async function handleMessage(event) {
     }
 }
 
-// Command processing
-async function processCommand(response_data) {
-    const { command, params } = response_data;
+// State management
+function saveState() {
+    localStorage.setItem('appState', JSON.stringify({
+        tasks: state.tasks,
+        deletedTasks: state.deletedTasks,
+        currentTask: state.currentTask
+    }));
+}
 
-    try {
-        switch (command) {
-            case 'create_task':
-                const task = createNewTask(params.taskName || 'New Task');
-                updateTaskDisplay();
-                break;
-
-            case 'add_tap_sequence':
-                if (!state.currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-
-                // Create a loop block if iterations > 1
-                const iterations = params.iterations || 1;
-                let targetBlocks = state.currentTask.blocks;
-
-                if (iterations > 1) {
-                    const loopBlock = {
-                        type: 'loop',
-                        iterations: iterations,
-                        blocks: [],
-                        name: 'Loop'
-                    };
-                    state.currentTask.blocks.push(loopBlock);
-                    targetBlocks = loopBlock.blocks;
-                }
-
-                // Add tap blocks based on locations
-                if (params.locations && params.locations.length > 0) {
-                    params.locations.forEach(location => {
-                        const tapBlock = {
-                            type: 'tap',
-                            name: 'Tap',
-                            region: location.region || null,
-                            description: location.description
-                        };
-                        targetBlocks.push(tapBlock);
-                    });
-                } else {
-                    // If no locations specified, add a single tap block
-                    const tapBlock = {
-                        type: 'tap',
-                        name: 'Tap',
-                        region: null,
-                        description: 'Tap location to be defined'
-                    };
-                    targetBlocks.push(tapBlock);
-                }
-
-                updateTaskBlocks();
-                break;
-
-            case 'execute':
-                if (!state.currentTask) {
-                    addMessage('assistant', 'Please select a task to execute.');
-                    return;
-                }
-                executeTask(state.currentTask);
-                break;
-            default:
-                console.log("Unknown command:", command);
-        }
-    } catch (error) {
-        console.error('Error in processCommand:', error);
-        addMessage('assistant', `Error: ${error.message}`);
+function loadState() {
+    const savedState = localStorage.getItem('appState');
+    if (savedState) {
+        const parsed = JSON.parse(savedState);
+        state.tasks = parsed.tasks || [];
+        state.deletedTasks = parsed.deletedTasks || [];
+        state.currentTask = parsed.currentTask;
     }
 }
 
-function updateTaskBlocks() {
-    const currentTaskElement = document.getElementById('currentTask');
-    if (!currentTaskElement || !state.currentTask) return;
-
-    currentTaskElement.innerHTML = '';
-    const blocksContainer = document.createElement('div');
-    blocksContainer.className = 'blocks-container';
-
-    function renderBlocks(blocks, container) {
-        blocks.forEach(block => {
-            if (block.type === 'loop') {
-                const loopDiv = document.createElement('div');
-                loopDiv.className = 'block loop-block';
-                loopDiv.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="block-name">${block.name}</h6>
-                        <span class="badge bg-secondary">${block.iterations}x</span>
-                    </div>
-                    <div class="nested-blocks"></div>
-                `;
-                container.appendChild(loopDiv);
-                renderBlocks(block.blocks, loopDiv.querySelector('.nested-blocks'));
-            } else if (block.type === 'tap') {
-                const tapDiv = document.createElement('div');
-                tapDiv.className = `block tap-block${!block.region ? ' undefined-region' : ''}`;
-                tapDiv.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="block-name">
-                            ${block.name}
-                            ${!block.region ? '<span class="blink-warning">⚠</span>' : ''}
-                        </h6>
-                        <button class="btn btn-sm btn-outline-primary select-region-btn">
-                            ${block.region ? 'Change Region' : 'Set Region'}
-                        </button>
-                    </div>
-                    ${block.description ? `<small class="text-muted">${block.description}</small>` : ''}
-                `;
-
-                // Add region selection functionality
-                const selectRegionBtn = tapDiv.querySelector('.select-region-btn');
-                selectRegionBtn.addEventListener('click', () => {
-                    enableDrawingMode(block, tapDiv);
-                });
-
-                container.appendChild(tapDiv);
-            }
-        });
-    }
-
-    renderBlocks(state.currentTask.blocks, blocksContainer);
-    currentTaskElement.appendChild(blocksContainer);
-    saveState();
-}
-
-function executeTask(task) {
-    if (!task || !task.blocks || task.blocks.length === 0) {
-        addMessage('assistant', 'This task has no blocks to execute.');
-        return;
-    }
-
-    let hasUndefinedRegions = false;
-
-    function checkBlocks(blocks) {
-        blocks.forEach(block => {
-            if (block.type === 'tap' && !block.region) {
-                hasUndefinedRegions = true;
-            } else if (block.type === 'loop') {
-                checkBlocks(block.blocks);
-            }
-        });
-    }
-
-    checkBlocks(task.blocks);
-
-    if (hasUndefinedRegions) {
-        addMessage('assistant', 'Some tap regions are not defined. Please define all tap regions before executing the task.');
-        return;
-    }
-
-    // Execute each block in sequence
-    function executeBlocks(blocks) {
-        blocks.forEach(block => {
-            if (block.type === 'loop') {
-                for (let i = 0; i < block.iterations; i++) {
-                    executeBlocks(block.blocks);
-                }
-            } else if (block.type === 'tap' && block.region) {
-                const { x1, y1, x2, y2 } = block.region;
-                const x = x1 + (x2 - x1) / 2;
-                const y = y1 + (y2 - y1) / 2;
-                simulateTap(x, y);
-            }
-        });
-    }
-
-    executeBlocks(task.blocks);
-    addMessage('assistant', 'Task executed successfully.');
-}
-
-function simulateTap(x, y) {
-    const tapFeedback = document.createElement('div');
-    tapFeedback.className = 'tap-feedback';
-    tapFeedback.style.left = `${x}px`;
-    tapFeedback.style.top = `${y}px`;
-
-    const simulator = document.getElementById('simulator');
-    if (simulator) {
-        simulator.appendChild(tapFeedback);
-        setTimeout(() => tapFeedback.remove(), 500);
-    }
-}
-
-// Placeholder for region selection (needs implementation)
-function enableDrawingMode(block, tapDiv) {
-    // Implement region selection logic here using a drawing library or similar
-    // Update block.region with the selected region coordinates
-    // Update the UI to reflect the change
-    console.log("Region selection needs implementation", block, tapDiv);
-    alert("Region selection is not yet implemented.  Please manually specify coordinates in your commands.");
-}
-
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    loadState();
-    updateTaskDisplay();
-
-    const chatInput = document.getElementById('chatInput');
-    const sendButton = document.getElementById('sendChatBtn');
-
-    if (chatInput && sendButton) {
-        sendButton.addEventListener('click', handleMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleMessage(e);
-        });
-    }
-
-    // Show initial greeting
-    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task?');
-});
-
-// Export necessary functions
-window.addMessage = addMessage;
-window.handleMessage = handleMessage;
-window.createNewTask = createNewTask;
-window.processCommand = processCommand;
-
-//Functions below this line were in the original code and are kept as is.
-
-function addLoopBlock(parent, iterations = 1) {
-    const loopBlock = {
-        type: 'loop',
-        iterations: iterations,
+// Task management functions
+function createNewTask(taskName = 'New Task') {
+    const task = {
+        id: `task-${Date.now()}`,
+        name: taskName,
         blocks: [],
-        name: 'Loop Block'
+        created: new Date().toISOString()
     };
-    parent.blocks.push(loopBlock);
+    state.tasks.push(task);
+    state.currentTask = task;
 
-    const blockDiv = document.createElement('div');
-    blockDiv.className = 'block loop-block';
-    blockDiv.draggable = true;
-    blockDiv.innerHTML = `
-        <div class="delete-dot"></div>
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="block-name" contenteditable="true">${loopBlock.name}</h6>
-        </div>
-        <div class="input-group mb-2">
-            <span class="input-group-text">Iterations</span>
-            <input type="number" class="form-control iterations-input" value="${iterations}" min="1">
-        </div>
-        <div class="nested-blocks"></div>
-        <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-            <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
-        </div>
-    `;
-
-    setupDragAndDrop(blockDiv);
-
-    const iterationsInput = blockDiv.querySelector('.iterations-input');
-    iterationsInput.value = iterations;
-    iterationsInput.addEventListener('change', (e) => {
-        loopBlock.iterations = parseInt(e.target.value) || 1;
-        saveState();
-    });
-
-    blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-        const tapDiv = addTapBlock(loopBlock);
-        blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
-        saveState();
-    });
-
-    return blockDiv;
+    updateTaskDisplay();
+    saveState();
+    return task;
 }
 
-function setupDragAndDrop(blockDiv) {
-    blockDiv.addEventListener('dragstart', (e) => {
+function updateTaskDisplay() {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
+
+    taskList.innerHTML = '';
+    state.tasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (state.currentTask?.id === task.id) {
+            taskItem.classList.add('active');
+        }
+
+        taskItem.innerHTML = `
+            <span>${task.name}</span>
+            <div>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `;
+
+        taskItem.addEventListener('click', (e) => {
+            if (!e.target.closest('.delete-task-btn')) {
+                loadTask(task);
+                document.querySelectorAll('.task-list-item').forEach(item => 
+                    item.classList.remove('active'));
+                taskItem.classList.add('active');
+            }
+        });
+
+        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTask(task);
+        });
+
+        taskList.appendChild(taskItem);
+    });
+}
+
+function deleteTask(task) {
+    const index = state.tasks.indexOf(task);
+    if (index > -1) {
+        state.deletedTasks.push(state.tasks.splice(index, 1)[0]);
+    }
+    if (state.currentTask?.id === task.id) {
+        state.currentTask = state.tasks[0] || null;
+        if (state.currentTask) {
+            loadTask(state.currentTask);
+        }
+    }
+    saveState();
+    updateTaskDisplay();
+}
+
+function loadTask(taskToLoad) {
+    state.currentTask = taskToLoad;
+    updateTaskBlocks();
+}
+
+// Setup drag and drop functionality
+function setupDragAndDrop(element) {
+    element.addEventListener('dragstart', (e) => {
+        element.classList.add('dragging');
         e.dataTransfer.setData('text/plain', '');
-        blockDiv.classList.add('dragging');
     });
 
-    blockDiv.addEventListener('dragend', () => {
-        blockDiv.classList.remove('dragging');
+    element.addEventListener('dragend', () => {
+        element.classList.remove('dragging');
     });
 
-    blockDiv.addEventListener('dragover', (e) => {
+    element.addEventListener('dragover', (e) => {
         e.preventDefault();
-        const draggingBlock = document.querySelector('.dragging');
-        if (!draggingBlock) return;
+        const draggable = document.querySelector('.dragging');
+        if (!draggable) return;
 
-        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
-        if (nestedBlocks && blockDiv.classList.contains('loop-block')) {
-            const afterElement = getDragAfterElement(nestedBlocks, e.clientY);
+        const container = element.closest('.blocks-container, .nested-blocks');
+        if (container) {
+            const afterElement = getDragAfterElement(container, e.clientY);
             if (afterElement) {
-                nestedBlocks.insertBefore(draggingBlock, afterElement);
+                container.insertBefore(draggable, afterElement);
             } else {
-                nestedBlocks.appendChild(draggingBlock);
+                container.appendChild(draggable);
             }
         }
     });
@@ -517,135 +664,14 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-function getRegionForLocation(location) {
-    const screen = {
-        width: 320,  // Device width from CSS
-        height: 720  // Device height from CSS
-    };
-
-    // Define regions based on screen dimensions
-    const regions = {
-        'top-left': {
-            x1: 0,
-            y1: 0,
-            x2: screen.width / 2,
-            y2: screen.height / 3
-        },
-        'top-right': {
-            x1: screen.width / 2,
-            y1: 0,
-            x2: screen.width,
-            y2: screen.height / 3
-        },
-        'bottom-left': {
-            x1: 0,
-            y1: 2 * screen.height / 3,
-            x2: screen.width / 2,
-            y2: screen.height
-        },
-        'bottom-right': {
-            x1: screen.width / 2,
-            y1: 2 * screen.height / 3,
-            x2: screen.width,
-            y2: screen.height
-        },
-        'middle': {
-            x1: screen.width / 4,
-            y1: screen.height / 3,
-            x2: 3 * screen.width / 4,
-            y2: 2 * screen.height / 3
-        },
-        'top': {
-            x1: screen.width / 4,
-            y1: 0,
-            x2: 3 * screen.width / 4,
-            y2: screen.height / 3
-        },
-        'bottom': {
-            x1: screen.width / 4,
-            y1: 2 * screen.height / 3,
-            x2: 3 * screen.width / 4,
-            y2: screen.height
-        },
-        'left': {
-            x1: 0,
-            y1: screen.height / 3,
-            x2: screen.width / 3,
-            y2: 2 * screen.height / 3
-        },
-        'right': {
-            x1: 2 * screen.width / 3,
-            y1: screen.height / 3,
-            x2: screen.width,
-            y2: 2 * screen.height / 3
-        }
-    };
-
-    // Normalize location input
-    const normalized = location.toLowerCase().replace(/\s+/g, '-');
-
-    // Map various natural language inputs to region keys
-    const locationMap = {
-        'upper-left': 'top-left',
-        'upper-right': 'top-right',
-        'lower-left': 'bottom-left',
-        'lower-right': 'bottom-right',
-        'center': 'middle',
-        'centre': 'middle',
-        'top-center': 'top',
-        'bottom-center': 'bottom',
-        'left-center': 'left',
-        'right-center': 'right'
-    };
-
-    const regionKey = locationMap[normalized] || normalized;
-    return regions[regionKey] || regions['middle'];
+function setBlockFocus(block, blockDiv) {
+    // Remove focus from other blocks
+    document.querySelectorAll('.block').forEach(b => b.classList.remove('focused'));
+    blockDiv.classList.add('focused');
 }
 
-function addTapBlock(parent) {
-    const tapBlock = {
-        type: 'tap',
-        name: 'Tap',
-        region: null,
-        description: 'Tap location to be defined'
-    };
-    parent.blocks.push(tapBlock);
-
-    const tapDiv = document.createElement('div');
-    tapDiv.className = 'block tap-block undefined-region';
-    tapDiv.draggable = true;
-    tapDiv.innerHTML = `
-        <div class="delete-dot"></div>
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="block-name">Tap<span class="blink-warning">⚠</span></h6>
-            <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
-        </div>
-        <small class="text-muted">Tap location to be defined</small>
-    `;
-
-    const selectRegionBtn = tapDiv.querySelector('.select-region-btn');
-    selectRegionBtn.addEventListener('click', () => {
-        enableDrawingMode(tapBlock, tapDiv);
-    });
-    setupDragAndDrop(tapDiv);
-
-    return tapDiv;
-}
-
-function deleteTask(task) {
-    const index = state.tasks.indexOf(task);
-    if (index > -1) {
-        state.deletedTasks.push(state.tasks.splice(index, 1)[0]);
-    }
-    saveState();
-    updateTaskDisplay();
-}
-
-function loadTask(taskToLoad){
-    state.currentTask = taskToLoad;
-    updateTaskBlocks();
-}
-
-function showSelectionBox(tapBlock){
-    //This function is not fully defined in the original code.  Leaving as is.
-}
+// Export necessary functions
+window.addMessage = addMessage;
+window.handleMessage = handleMessage;
+window.createNewTask = createNewTask;
+window.processCommand = processCommand;
