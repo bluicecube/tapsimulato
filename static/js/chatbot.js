@@ -200,10 +200,12 @@ async function processCommand(response_data) {
                                 name: 'Loop'
                             };
                         } else if (def.type === 'tap') {
+                            // Directly calculate region from location description
+                            const region = def.location ? calculateRegionFromDescription(def.location) : null;
                             return {
                                 type: 'tap',
                                 name: 'Tap',
-                                region: def.location ? calculateRegionFromDescription(def.location) : null,
+                                region: region,
                                 description: def.location || 'Tap location to be defined'
                             };
                         }
@@ -214,6 +216,27 @@ async function processCommand(response_data) {
                 const newBlocks = createBlocks(params.blocks || []);
                 state.currentTask.blocks.push(...newBlocks);
                 updateTaskBlocks();
+
+                // Show visual feedback for added blocks
+                if (newBlocks.length > 0) {
+                    newBlocks.forEach(block => {
+                        if (block.type === 'tap' && block.region) {
+                            // Create a temporary visual feedback
+                            const feedback = document.createElement('div');
+                            feedback.className = 'tap-feedback';
+                            const x = block.region.x1 + (block.region.x2 - block.region.x1) / 2;
+                            const y = block.region.y1 + (block.region.y2 - block.region.y1) / 2;
+                            feedback.style.left = `${x}px`;
+                            feedback.style.top = `${y}px`;
+
+                            const simulator = document.getElementById('simulator');
+                            if (simulator) {
+                                simulator.appendChild(feedback);
+                                setTimeout(() => feedback.remove(), 500);
+                            }
+                        }
+                    });
+                }
                 break;
 
             case 'execute':
