@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('saveTaskBtn').addEventListener('click', saveCurrentTask);
     document.getElementById('executeBtn').addEventListener('click', executeSelectedTask);
-    document.getElementById('generateGCodeBtn').addEventListener('click', generateGCode);
 
     const simulator = document.getElementById('simulator');
     simulator.addEventListener('mousedown', startSelection);
@@ -153,56 +152,6 @@ function stopSelection(event) {
     disableDrawingMode();
 }
 
-
-function saveCurrentTask() {
-    if (!currentTask) return;
-
-    const taskIndex = savedTasks.findIndex(t => t.id === currentTask.id);
-    if (taskIndex === -1) {
-        savedTasks.push(JSON.parse(JSON.stringify(currentTask))); // Deep copy to preserve blocks
-    } else {
-        savedTasks[taskIndex] = JSON.parse(JSON.stringify(currentTask));
-    }
-
-    // Save to localStorage
-    localStorage.setItem('savedTasks', JSON.stringify(savedTasks));
-    updateTaskList();
-    logLiveConsole('Task saved successfully', 'success');
-}
-
-function loadSavedTasks() {
-    const saved = localStorage.getItem('savedTasks');
-    if (saved) {
-        savedTasks = JSON.parse(saved);
-        updateTaskList();
-    }
-}
-
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = '';
-
-    savedTasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        if (currentTask && currentTask.id === task.id) {
-            taskItem.classList.add('active');
-        }
-        taskItem.textContent = task.name;
-        taskItem.addEventListener('click', () => loadTask(task));
-        taskList.appendChild(taskItem);
-    });
-}
-
-function loadTask(task) {
-    currentTask = JSON.parse(JSON.stringify(task)); // Deep copy to preserve blocks
-    const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = '';
-    addTaskBlock(currentTask);
-    updateTaskList();
-    logLiveConsole(`Loaded task: ${task.name}`, 'info');
-}
-
 function setBlockFocus(block, element) {
     // Remove focus from all blocks
     if (focusedBlock) {
@@ -257,6 +206,88 @@ function logLiveConsole(message, type = 'info') {
     console.appendChild(messageDiv);
     console.scrollTop = console.scrollHeight;
 }
+
+function saveCurrentTask() {
+    if (!currentTask) return;
+
+    const taskIndex = savedTasks.findIndex(t => t.id === currentTask.id);
+    if (taskIndex === -1) {
+        savedTasks.push(JSON.parse(JSON.stringify(currentTask))); // Deep copy to preserve blocks
+    } else {
+        savedTasks[taskIndex] = JSON.parse(JSON.stringify(currentTask));
+    }
+
+    // Save to localStorage
+    localStorage.setItem('savedTasks', JSON.stringify(savedTasks));
+    updateTaskList();
+    logLiveConsole('Task saved successfully', 'success');
+}
+
+function loadSavedTasks() {
+    const saved = localStorage.getItem('savedTasks');
+    if (saved) {
+        savedTasks = JSON.parse(saved);
+        updateTaskList();
+    }
+}
+
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    taskList.innerHTML = '';
+
+    savedTasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (currentTask && currentTask.id === task.id) {
+            taskItem.classList.add('active');
+        }
+        taskItem.textContent = task.name;
+        taskItem.addEventListener('click', () => loadTask(task));
+        taskList.appendChild(taskItem);
+    });
+}
+
+function loadTask(task) {
+    currentTask = JSON.parse(JSON.stringify(task)); // Deep copy to preserve blocks
+    const currentTaskElement = document.getElementById('currentTask');
+    currentTaskElement.innerHTML = '';
+    addTaskBlock(currentTask);
+    updateTaskList();
+    logLiveConsole(`Loaded task: ${task.name}`, 'info');
+}
+
+function enableDrawingMode(tapBlock, tapDiv) {
+    // Hide all other selection boxes first
+    document.querySelectorAll('.active-selection-box').forEach(box => {
+        box.classList.add('d-none');
+    });
+
+    currentTapBlock = tapBlock;
+    tapDiv.classList.add('active-block');
+    logLiveConsole('Drawing mode enabled - Select tap region', 'info');
+}
+
+function disableDrawingMode() {
+    const activeBlock = document.querySelector('.active-block');
+    if (activeBlock) {
+        activeBlock.classList.remove('active-block');
+    }
+    currentTapBlock = null;
+}
+
+// Event listeners for drawing mode
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.block') && currentTapBlock) {
+        disableDrawingMode();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && currentTapBlock) {
+        disableDrawingMode();
+    }
+});
+
 
 function addTapBlock(parent) {
     const tapBlock = {
@@ -331,22 +362,3 @@ function generateGCode() {
 
 // Placeholder functions -  These need actual implementations
 function setupDragAndDrop(blockDiv) {}
-
-function enableDrawingMode(tapBlock, tapDiv) {
-    // Hide all other selection boxes first
-    document.querySelectorAll('.active-selection-box').forEach(box => {
-        box.classList.add('d-none');
-    });
-
-    currentTapBlock = tapBlock;
-    tapDiv.classList.add('active-block');
-    logLiveConsole('Drawing mode enabled - Select tap region', 'info');
-}
-
-function disableDrawingMode() {
-    const activeBlock = document.querySelector('.active-block');
-    if (activeBlock) {
-        activeBlock.classList.remove('active-block');
-    }
-    currentTapBlock = null;
-}

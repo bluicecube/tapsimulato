@@ -193,9 +193,3 @@ document.addEventListener('keydown', (e) => {
         disableDrawingMode();
     }
 });
-
-function hideSelectionBox(tapBlock) {
-    if (tapBlock.selectionBoxElement) {
-        tapBlock.selectionBoxElement.classList.add('d-none');
-    }
-}
