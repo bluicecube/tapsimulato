@@ -91,6 +91,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendChatBtn = document.getElementById('sendChatBtn');
     const chatMessages = document.getElementById('chatMessages');
 
+    // Clear existing messages
+    chatMessages.innerHTML = '';
+
+    // Initialize chat history
+    chatHistory = [];
+
     sendChatBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -99,7 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Add initial greeting
-    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task?');
+    addMessage('assistant', 'Hi! I can help you create tap sequences. Would you like to create a new task? You can say things like:\n\n' + 
+        '- "create a new task called [name]"\n' +
+        '- "create a loop that taps [location] [N] times"\n' +
+        '- "tap [location]" (e.g., top left, middle, bottom right)\n' +
+        '- "load task [name]"\n' +
+        '- "execute task"');
 });
 
 async function sendMessage() {
