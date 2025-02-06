@@ -36,6 +36,10 @@ Your responses should be in JSON format:
     "message": "human readable response"
 }`;
 
+// Constants for device dimensions
+const DEVICE_WIDTH = 320;  // Match simulator width
+const DEVICE_HEIGHT = 720; // Match simulator height
+
 // Chat UI functions
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
@@ -252,7 +256,7 @@ async function processCommand(responseData) {
                             };
                         } else if (def.type === 'tap') {
                             // Calculate region based on location description
-                            const region = def.location ? calculateRegionFromDescription(def.location) : null;
+                            const region = calculateRegionFromDescription(def.location);
                             return {
                                 type: 'tap',
                                 name: 'Tap Block',
@@ -292,29 +296,41 @@ async function processCommand(responseData) {
 function calculateRegionFromDescription(description) {
     const normalized = description.toLowerCase().trim();
 
-    // Define screen regions
+    // Define screen regions with actual coordinates
     const regions = {
         'middle': {
-            x1: DEVICE_WIDTH * 0.25,
-            y1: DEVICE_HEIGHT * 0.25,
-            x2: DEVICE_WIDTH * 0.75,
-            y2: DEVICE_HEIGHT * 0.75
+            x1: Math.round(DEVICE_WIDTH * 0.25),
+            y1: Math.round(DEVICE_HEIGHT * 0.25),
+            x2: Math.round(DEVICE_WIDTH * 0.75),
+            y2: Math.round(DEVICE_HEIGHT * 0.75)
         },
         'center': {
-            x1: DEVICE_WIDTH * 0.25,
-            y1: DEVICE_HEIGHT * 0.25,
-            x2: DEVICE_WIDTH * 0.75,
-            y2: DEVICE_HEIGHT * 0.75
+            x1: Math.round(DEVICE_WIDTH * 0.25),
+            y1: Math.round(DEVICE_HEIGHT * 0.25),
+            x2: Math.round(DEVICE_WIDTH * 0.75),
+            y2: Math.round(DEVICE_HEIGHT * 0.75)
         },
         'top': {
             x1: 0,
             y1: 0,
             x2: DEVICE_WIDTH,
-            y2: DEVICE_HEIGHT * 0.25
+            y2: Math.round(DEVICE_HEIGHT * 0.25)
         },
         'bottom': {
             x1: 0,
-            y1: DEVICE_HEIGHT * 0.75,
+            y1: Math.round(DEVICE_HEIGHT * 0.75),
+            x2: DEVICE_WIDTH,
+            y2: DEVICE_HEIGHT
+        },
+        'left': {
+            x1: 0,
+            y1: 0,
+            x2: Math.round(DEVICE_WIDTH * 0.25),
+            y2: DEVICE_HEIGHT
+        },
+        'right': {
+            x1: Math.round(DEVICE_WIDTH * 0.75),
+            y1: 0,
             x2: DEVICE_WIDTH,
             y2: DEVICE_HEIGHT
         }
@@ -331,9 +347,6 @@ function calculateRegionFromDescription(description) {
     return regions.center;
 }
 
-const DEVICE_WIDTH = 320;  // Match simulator width
-const DEVICE_HEIGHT = 720; // Match simulator height
-
 function updateTaskBlocks() {
     const currentTaskElement = document.getElementById('currentTask');
     if (!currentTaskElement || !state.currentTask) return;
@@ -348,6 +361,10 @@ function updateTaskBlocks() {
         blockDiv.className = `block ${block.type}-block`;
 
         if (block.type === 'tap') {
+            const regionText = block.region ? 
+                `(${block.region.x1},${block.region.y1}) to (${block.region.x2},${block.region.y2})` : 
+                'No region set';
+
             blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
                     <h6 class="block-name mb-0">Tap Block</h6>
@@ -355,7 +372,7 @@ function updateTaskBlocks() {
                         ${block.region ? 'Change Region' : 'Set Region'}
                     </button>
                 </div>
-                <small class="text-muted">${block.description}</small>
+                <small class="text-muted">Region: ${regionText}</small>
             `;
         } else if (block.type === 'loop') {
             blockDiv.innerHTML = `
@@ -369,6 +386,12 @@ function updateTaskBlocks() {
                 </div>
                 <div class="nested-blocks mt-2"></div>
             `;
+
+            // Set up iterations input handler
+            const iterationsInput = blockDiv.querySelector('.iterations-input');
+            iterationsInput.addEventListener('change', (e) => {
+                block.iterations = parseInt(e.target.value) || 1;
+            });
 
             // Render nested blocks
             const nestedContainer = blockDiv.querySelector('.nested-blocks');
@@ -387,8 +410,38 @@ function updateTaskBlocks() {
 }
 
 function executeTask(task) {
-    // Implementation will be added later
-    console.log('Executing task:', task);
+    let delay = 0;
+    const simulator = document.getElementById('simulator');
+
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += Math.random() * 500 + 200; // Random delay between 200-700ms
+                setTimeout(() => {
+                    // Calculate random point within region
+                    const x = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
+                    const y = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
+
+                    // Create visual feedback
+                    const feedback = document.createElement('div');
+                    feedback.className = 'tap-feedback';
+                    feedback.style.left = `${x}px`;
+                    feedback.style.top = `${y}px`;
+
+                    simulator.appendChild(feedback);
+                    setTimeout(() => feedback.remove(), 500);
+
+                    console.log(`Tapped at (${Math.round(x)}, ${Math.round(y)})`);
+                }, delay);
+            }
+        });
+    }
+
+    executeBlocks(task.blocks);
 }
 
 // Export necessary functions for external use
