@@ -407,14 +407,14 @@ function executeSelectedTask() {
     // Execute each block in sequence
     let delay = 0;
     currentTask.blocks.forEach((block, index) => {
-        const waitTime = Math.random() * 1.5 + 0.5; // Random delay between 0.5 and 2 seconds
-        delay += waitTime * 1000;
+        switch (block.type) {
+            case 'tap':
+                const waitTime = Math.random() * 1.5 + 0.5; // Random delay between 0.5 and 2 seconds
+                delay += waitTime * 1000;
 
-        setTimeout(() => {
-            logLiveConsole(`Waiting: ${waitTime.toFixed(1)} seconds`, 'info');
+                setTimeout(() => {
+                    logLiveConsole(`Waiting: ${waitTime.toFixed(1)} seconds`, 'info');
 
-            switch (block.type) {
-                case 'tap':
                     if (block.region) {
                         const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
                         const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
@@ -423,17 +423,22 @@ function executeSelectedTask() {
                     } else {
                         logLiveConsole('Warning: Tap block has no region defined', 'warning');
                     }
-                    break;
-                case 'print':
-                    // Execute print block by displaying the user-entered message
+                }, delay);
+                break;
+
+            case 'print':
+                // Execute print blocks immediately without delay
+                setTimeout(() => {
                     if (block.message && block.message.trim()) {
-                        logLiveConsole(`Print Block Output: "${block.message}"`, 'info');
+                        logLiveConsole(`Print Block: ${block.message}`, 'info');
                     } else {
                         logLiveConsole('Warning: Print block has empty message', 'warning');
                     }
-                    break;
-            }
-        }, delay);
+                }, delay);
+                // Add a small delay after print for readability
+                delay += 500;
+                break;
+        }
     });
 
     setTimeout(() => {
