@@ -153,7 +153,7 @@ function stopSelection(event) {
 }
 
 function setBlockFocus(block, element) {
-    // Remove focus from all blocks
+    // Remove focus from previous block if exists
     if (focusedBlock) {
         focusedBlock.element.classList.remove('focused');
     }
@@ -344,15 +344,60 @@ function addLoopBlock(task) {
 }
 
 function addPrintBlock(task) {
+    const printBlock = {
+        type: 'print',
+        message: 'Print Block'
+    };
+    task.blocks.push(printBlock);
+
     const printDiv = document.createElement('div');
     printDiv.className = 'print-block';
-    printDiv.innerHTML = `<p contenteditable="true">Print Block</p>`;
+    const p = document.createElement('p');
+    p.contentEditable = true;
+    p.textContent = printBlock.message;
+    p.addEventListener('blur', () => {
+        printBlock.message = p.textContent;
+    });
+    printDiv.appendChild(p);
     return printDiv;
 }
 
 function executeSelectedTask() {
-    //Implementation for executing selected task
-    logLiveConsole("Executing selected task", "info");
+    if (!currentTask) {
+        logLiveConsole('No task selected', 'error');
+        return;
+    }
+
+    // Clear any existing focus
+    if (focusedBlock) {
+        focusedBlock.element.classList.remove('focused');
+        focusedBlock = null;
+    }
+
+    // Execute each block in sequence
+    let delay = 0;
+    currentTask.blocks.forEach((block, index) => {
+        const waitTime = Math.random() * 1.5 + 0.5; // Random delay between 0.5 and 2 seconds
+        delay += waitTime * 1000;
+
+        setTimeout(() => {
+            logLiveConsole(`Waiting: ${waitTime.toFixed(1)} seconds`, 'info');
+
+            switch (block.type) {
+                case 'tap':
+                    if (block.region) {
+                        const randomX = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
+                        const randomY = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
+                        simulateTap(randomX, randomY);
+                        logLiveConsole(`Tapping at (${Math.round(randomX)}, ${Math.round(randomY)})`, 'success');
+                    }
+                    break;
+                case 'print':
+                    logLiveConsole(`Print: ${block.message}`, 'print');
+                    break;
+            }
+        }, delay);
+    });
 }
 
 function generateGCode() {
@@ -362,3 +407,4 @@ function generateGCode() {
 
 // Placeholder functions -  These need actual implementations
 function setupDragAndDrop(blockDiv) {}
+function simulateTap(x, y) {}

@@ -123,7 +123,15 @@ function addPrintBlock(parent) {
 
     blockDiv.querySelector('.message-input').addEventListener('input', (e) => {
         printBlock.message = e.target.value;
-        logLiveConsole(`Print: ${e.target.value}`, 'print');
+    });
+
+    blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
+        const index = parent.blocks.indexOf(printBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Print block removed', 'info');
+        }
     });
 
     blockDiv.addEventListener('click', () => {
