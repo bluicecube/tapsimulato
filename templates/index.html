@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Touchscreen Simulator for Samsung Galaxy A11</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h4>Device Simulator</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="simulator" class="simulator">
+                            <div id="selectionBox" class="selection-box d-none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h4>Task Management</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <button id="newTaskBtn" class="btn btn-primary">New Task</button>
+                            <button id="executeBtn" class="btn btn-success ms-2">Execute Selected</button>
+                            <button id="generateGCodeBtn" class="btn btn-info ms-2">Generate G-code</button>
+                        </div>
+                        <div id="taskLog" class="task-log"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Live Console</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveConsole" class="live-console"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/gcode.js') }}"></script>
+</body>
+</html>
