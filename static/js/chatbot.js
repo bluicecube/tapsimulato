@@ -84,18 +84,16 @@ function initializeChat() {
 
     // Show initial greeting with a slight delay to ensure DOM is ready
     setTimeout(() => {
-        if (state.chatHistory.length === 0) {
+        if (chatMessages && state.chatHistory.length === 0) {
             addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
         }
-    }, 100);
+    }, 500);
 }
 
 // Start initialization when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeChat);
-} else {
+document.addEventListener('DOMContentLoaded', () => {
     initializeChat();
-}
+});
 
 // Message handling
 async function handleMessage(event) {
