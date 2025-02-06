@@ -135,26 +135,25 @@ async function processCommands(userMessage, assistantMessage) {
     const lowerAssistantMessage = assistantMessage.toLowerCase();
 
     try {
-        // Handle task creation/modification
-        if (lowerAssistantMessage.includes('new task') && lowerAssistantMessage.includes('call it')) {
+        // Check if this is a task name response
+        if (lowerAssistantMessage.includes('what would you like to call it')) {
             // Create new task with provided name
-            const taskName = userMessage.trim();
             createNewTask();
             if (currentTask) {
-                currentTask.name = taskName;
+                currentTask.name = userMessage.trim();
                 saveTasksToStorage();
                 updateTaskList();
             }
             return;
         }
 
-        // Create a new task if none exists
+        // Handle task creation request
         if (!currentTask && (lowerUserMessage.includes('create') || lowerUserMessage.includes('new'))) {
-            createNewTask();
+            return; // Don't create task yet, wait for name
         }
 
-        // Process tap and loop commands
-        if (lowerUserMessage.includes('create') || lowerUserMessage.includes('add') || lowerUserMessage.includes('tap')) {
+        // Only process tap/loop commands if we have a current task
+        if (currentTask && (lowerUserMessage.includes('create') || lowerUserMessage.includes('add') || lowerUserMessage.includes('tap'))) {
             if (lowerUserMessage.includes('loop') || lowerUserMessage.includes('repeat')) {
                 // Extract iteration count
                 const iterationMatch = userMessage.match(/(\d+)\s*times/);
