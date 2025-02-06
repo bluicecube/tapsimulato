@@ -1,6 +1,30 @@
-// Constants for device dimensions
-const DEVICE_WIDTH = 720;   // Galaxy A11 width
-const DEVICE_HEIGHT = 1600; // Galaxy A11 height
+// Device configurations
+const DEVICE_CONFIGS = {
+    galaxy_a11: {
+        name: 'Samsung Galaxy A11',
+        width: 720,
+        height: 1600,
+        physicalWidth: 76.3,
+        physicalHeight: 161.4
+    },
+    pixel_4: {
+        name: 'Google Pixel 4',
+        width: 1080,
+        height: 2280,
+        physicalWidth: 68.8,
+        physicalHeight: 147.1
+    },
+    iphone_12: {
+        name: 'iPhone 12',
+        width: 1170,
+        height: 2532,
+        physicalWidth: 71.5,
+        physicalHeight: 146.7
+    }
+};
+
+// Current device configuration
+let currentDevice = DEVICE_CONFIGS.galaxy_a11;
 
 let tasks = [];
 let currentTask = null;
@@ -13,6 +37,15 @@ let currentTapBlock = null;
 let focusedBlock = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize device selector
+    const deviceSelect = document.getElementById('deviceSelect');
+    if (deviceSelect) {
+        deviceSelect.addEventListener('change', (e) => {
+            currentDevice = DEVICE_CONFIGS[e.target.value];
+            updateSimulatorSize();
+        });
+    }
+
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('executeBtn').addEventListener('click', () => {
@@ -29,7 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.addEventListener('mousemove', updateSelection);
     simulator.addEventListener('mouseup', stopSelection);
 
-    // Load saved tasks from localStorage
+    // Initial size update
+    updateSimulatorSize();
+
+    // Load saved tasks
     loadSavedTasks();
 });
 
@@ -696,9 +732,65 @@ function addLoopBlock(parent) {
 
 
 
+function updateSimulatorSize() {
+    const simulator = document.getElementById('simulator');
+    if (simulator) {
+        simulator.style.width = `${currentDevice.width}px`;
+        simulator.style.height = `${currentDevice.height}px`;
+
+        // Update CSS variables for other components that depend on device size
+        document.documentElement.style.setProperty('--device-width', `${currentDevice.width}px`);
+        document.documentElement.style.setProperty('--device-height', `${currentDevice.height}px`);
+
+        logLiveConsole(`Switched to ${currentDevice.name}`, 'info');
+    }
+}
+
 function generateGCode() {
-    //Implementation for generating G-Code
-    logLiveConsole("Generating G-Code", "info");
+    if (!currentTask) {
+        logLiveConsole("No task selected", "error");
+        return;
+    }
+
+    let gcode = `; G-code for ${currentDevice.name}\n`;
+    gcode += `; Physical dimensions: ${currentDevice.physicalWidth}mm x ${currentDevice.physicalHeight}mm\n\n`;
+
+    function convertToPhysical(pixelX, pixelY) {
+        const physicalX = (pixelX / currentDevice.width) * currentDevice.physicalWidth;
+        const physicalY = (pixelY / currentDevice.height) * currentDevice.physicalHeight;
+        return { x: physicalX, y: physicalY };
+    }
+
+    function processBlocks(blocks, indent = 0) {
+        let code = '';
+        const indentation = '  '.repeat(indent);
+
+        blocks.forEach(block => {
+            if (block.type === 'tap' && block.region) {
+                const center = {
+                    x: (block.region.x1 + block.region.x2) / 2,
+                    y: (block.region.y1 + block.region.y2) / 2
+                };
+                const physical = convertToPhysical(center.x, center.y);
+                code += `${indentation}G1 X${physical.x.toFixed(2)} Y${physical.y.toFixed(2)} F1000 ; Move to tap position\n`;
+                code += `${indentation}G1 Z0 ; Tap down\n`;
+                code += `${indentation}G4 P100 ; Wait 100ms\n`;
+                code += `${indentation}G1 Z5 ; Tap up\n`;
+            } else if (block.type === 'loop') {
+                code += `${indentation}; Start loop (${block.iterations} iterations)\n`;
+                for (let i = 0; i < block.iterations; i++) {
+                    code += `${indentation}; Iteration ${i + 1}\n`;
+                    code += processBlocks(block.blocks, indent + 1);
+                }
+                code += `${indentation}; End loop\n`;
+            }
+        });
+        return code;
+    }
+
+    gcode += processBlocks(currentTask.blocks);
+    logLiveConsole("G-code generated successfully", "success");
+    return gcode;
 }
 
 // Placeholder functions -  These need actual implementations
