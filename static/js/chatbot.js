@@ -187,7 +187,8 @@ async function processCommand(response_data) {
         const { command, params } = response_data;
 
         // Get the blocks container for the current task
-        const blocksContainer = document.querySelector('.blocks-container');
+        const currentTaskElement = document.getElementById('currentTask');
+        const blocksContainer = currentTaskElement?.querySelector('.blocks-container');
         if (!blocksContainer && command !== 'create_task') {
             addMessage('assistant', 'Please create a task first.');
             return;
@@ -199,9 +200,12 @@ async function processCommand(response_data) {
                 createNewTask();
                 if (currentTask && params.taskName) {
                     currentTask.name = params.taskName;
+                    const taskNameElement = document.querySelector('.task-name');
+                    if (taskNameElement) {
+                        taskNameElement.textContent = params.taskName;
+                    }
                     saveTasksToStorage();
                     updateTaskList();
-                    loadTask(currentTask);
                 }
                 break;
 
@@ -210,14 +214,9 @@ async function processCommand(response_data) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                const tapBlock = {
-                    type: 'tap',
-                    region: null,
-                    name: 'Tap Block'
-                };
-                currentTask.blocks.push(tapBlock);
-                const tapDiv = addTapBlock(tapBlock);
+                const tapDiv = addTapBlock(currentTask);
                 blocksContainer.appendChild(tapDiv);
+                saveTasksToStorage();
                 break;
 
             case 'add_loop':
@@ -225,15 +224,9 @@ async function processCommand(response_data) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                const loopBlock = {
-                    type: 'loop',
-                    iterations: params.iterations || 1,
-                    blocks: [],
-                    name: 'Loop Block'
-                };
-                currentTask.blocks.push(loopBlock);
-                const loopDiv = addLoopBlock(loopBlock);
+                const loopDiv = addLoopBlock(currentTask);
                 blocksContainer.appendChild(loopDiv);
+                saveTasksToStorage();
                 break;
 
             case 'add_corner_taps':
@@ -291,6 +284,6 @@ async function processCommand(response_data) {
         saveTasksToStorage();
     } catch (error) {
         console.error('Error processing command:', error);
-        addMessage('assistant', 'I had trouble with that. Could you try again?');
+        addMessage('assistant', 'I had trouble with that. Could you try describing what you want differently?');
     }
 }
