@@ -1,24 +1,32 @@
 let chatHistory = [];
-const systemPrompt = `You are a touchscreen task automation assistant. Respond in JSON format with these fields:
+const systemPrompt = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
+Respond in this JSON format:
 {
-    "command": "create_task" | "add_corner_taps" | "add_tap" | "execute",
+    "command": "create_task",
     "params": {
-        "taskName": string,
-        "iterations": number,
-        "tapLocation": string
+        "taskName": "given name",
+        "iterations": 1
     },
-    "message": string
+    "message": "human readable response"
 }
 
-Example:
-User: "tap each corner four times"
-Response: {
-    "command": "add_corner_taps",
-    "params": {
-        "iterations": 4
-    },
-    "message": "Creating corner taps with 4 iterations."
-}`;
+Available commands:
+1. For new task:
+   Input: "create a new task called <name>"
+   Command: "create_task"
+   Params: {"taskName": "<name>"}
+
+2. For corner taps:
+   Input: "tap each corner <N> times"
+   Command: "add_corner_taps"
+   Params: {"iterations": N}
+
+3. For execution:
+   Input: "run the task" or "execute"
+   Command: "execute"
+   Params: {}
+
+Keep messages short and clear. Always respond with valid JSON.`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');

@@ -26,7 +26,7 @@ def chat():
         logger.debug(f"Received chat request with data: {data}")
 
         response = openai.chat.completions.create(
-            model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+            model="gpt-4",  # Using stable GPT-4 model
             messages=data['messages'],
             temperature=0.7,
             max_tokens=150,
