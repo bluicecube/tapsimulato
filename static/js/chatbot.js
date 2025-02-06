@@ -586,7 +586,7 @@ function updateTaskDisplay() {
         taskItem.addEventListener('click', (e) => {
             if (!e.target.closest('.delete-task-btn')) {
                 loadTask(task);
-                document.querySelectorAll('.task-list-item').forEach(item => 
+                document.querySelectorAll('.task-list-item').forEach(item =>
                     item.classList.remove('active'));
                 taskItem.classList.add('active');
             }
@@ -601,15 +601,23 @@ function updateTaskDisplay() {
     });
 }
 
+// Update the deleteTask function to properly clear blocks
 function deleteTask(task) {
     const index = state.tasks.indexOf(task);
     if (index > -1) {
         state.deletedTasks.push(state.tasks.splice(index, 1)[0]);
-    }
-    if (state.currentTask?.id === task.id) {
-        state.currentTask = state.tasks[0] || null;
-        if (state.currentTask) {
-            loadTask(state.currentTask);
+
+        // Clear blocks if deleting current task
+        if (state.currentTask?.id === task.id) {
+            state.currentTask = state.tasks[0] || null;
+            const currentTaskElement = document.getElementById('currentTask');
+            if (currentTaskElement) {
+                currentTaskElement.innerHTML = '';
+            }
+            // If there's another task, load it
+            if (state.currentTask) {
+                loadTask(state.currentTask);
+            }
         }
     }
     saveState();
