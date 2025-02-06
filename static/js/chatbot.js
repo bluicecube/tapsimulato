@@ -15,36 +15,45 @@ Available commands:
    Command: "create_task"
    Params: {"taskName": "<name>"}
 
-2. Add tap:
-   Input: "add a tap" or "tap <location>" (e.g., "tap top left", "tap middle", "tap bottom right")
-   Command: "add_tap"
+2. Create loop with taps:
+   Input: "create a loop that taps <location> <N> times"
+   Command: "create_loop_with_taps"
    Params: {
        "location": "<location>",  // "top-left", "top-right", "bottom-left", "bottom-right", "middle"
+       "iterations": <number>,
        "custom_name": "<optional name>"
    }
 
-3. Add loop:
-   Input: "add a loop" or "create a loop"
+3. Add tap:
+   Input: "add a tap" or "tap <location>"
+   Command: "add_tap"
+   Params: {
+       "location": "<location>",
+       "custom_name": "<optional name>"
+   }
+
+4. Add loop:
+   Input: "add a loop" or "loop <N> times"
    Command: "add_loop"
    Params: {"iterations": <number>}
 
-4. Corner taps:
-   Input: "tap each corner <N> times" or "tap corners <N> times"
+5. Corner taps:
+   Input: "tap each corner <N> times"
    Command: "add_corner_taps"
    Params: {"iterations": <number>}
 
-5. Remove blocks:
-   Input: "remove all blocks" or "remove last block" or "clear blocks"
+6. Remove blocks:
+   Input: "remove all blocks" or "remove last block"
    Command: "remove_blocks"
    Params: {"target": "all" | "last"}
 
-6. Load task:
-   Input: "load task <name>" or "switch to task <name>"
+7. Load task:
+   Input: "load task <name>"
    Command: "load_task"
    Params: {"taskName": "<name>"}
 
-7. Execute task:
-   Input: "run the task" or "execute" or "start task"
+8. Execute task:
+   Input: "run the task" or "execute"
    Command: "execute"
    Params: {}
 
@@ -57,18 +66,25 @@ For general conversation (like "hi", "thanks"), use:
 }
 
 For tap locations, understand these natural language inputs:
-- "top left", "upper left" → top-left quadrant
-- "top right", "upper right" → top-right quadrant
-- "bottom left", "lower left" → bottom-left quadrant
-- "bottom right", "lower right" → bottom-right quadrant
-- "middle", "center" → center region
-- "top", "top center" → top middle region
-- "bottom", "bottom center" → bottom middle region
-- "left", "left center" → left middle region
-- "right", "right center" → right middle region
+- "top left", "upper left" → top-left
+- "top right", "upper right" → top-right
+- "bottom left", "lower left" → bottom-left
+- "bottom right", "lower right" → bottom-right
+- "middle", "center", "centre" → middle
+- "top", "top center" → top
+- "bottom", "bottom center" → bottom
+- "left", "left center" → left
+- "right", "right center" → right
 
-If user asks to add/create something but the command is unclear,
-respond with a chat message asking for clarification.`;
+For combined commands like "create a loop with 3 taps", respond with:
+{
+    "command": "create_loop_with_taps",
+    "params": {
+        "iterations": 3,
+        "location": "middle"
+    },
+    "message": "Created a loop that taps 3 times"
+}`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -279,6 +295,7 @@ function getRegionForLocation(location) {
         'lower-left': 'bottom-left',
         'lower-right': 'bottom-right',
         'center': 'middle',
+        'centre': 'middle',
         'top-center': 'top',
         'bottom-center': 'bottom',
         'left-center': 'left',
@@ -315,6 +332,47 @@ async function processCommand(response_data) {
                     saveTasksToStorage();
                     updateTaskList();
                 }
+                break;
+
+            case 'create_loop_with_taps':
+                if (!currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+
+                // Create the loop block
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: params.iterations || 1,
+                    blocks: [],
+                    name: `${params.iterations}x ${params.location} Taps`
+                };
+                currentTask.blocks.push(loopBlock);
+
+                // Create and add the loop div
+                const loopDiv = addLoopBlock(currentTask, params.iterations);
+                blocksContainer.appendChild(loopDiv);
+
+                // Add the tap block inside the loop
+                const region = getRegionForLocation(params.location);
+                const tapBlock = {
+                    type: 'tap',
+                    region: region,
+                    name: params.custom_name || `Tap ${params.location}`
+                };
+                loopBlock.blocks.push(tapBlock);
+
+                // Add tap div to the nested blocks container
+                const nestedBlocks = loopDiv.querySelector('.nested-blocks');
+                if (nestedBlocks) {
+                    const tapDiv = addTapBlock(loopBlock);
+                    nestedBlocks.appendChild(tapDiv);
+                    if (region) {
+                        showSelectionBox(tapBlock);
+                    }
+                }
+
+                saveTasksToStorage();
                 break;
 
             case 'add_tap':
