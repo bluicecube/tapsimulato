@@ -1,6 +1,6 @@
 // Galaxy A11 dimensions
-const DEVICE_WIDTH = 720;
-const DEVICE_HEIGHT = 1600;
+const DEVICE_WIDTH = 320;
+const DEVICE_HEIGHT = 720;
 const PHYSICAL_WIDTH = 76.3; // mm
 const PHYSICAL_HEIGHT = 161.4; // mm
 

@@ -1,6 +1,6 @@
 :root {
-    --device-width: 720px;
-    --device-height: 1600px;
+    --device-width: 320px;
+    --device-height: 720px;
 }
 
 body {
@@ -20,13 +20,12 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
     max-height: 90vh;
-    transform-origin: top left;
-    transform: scale(0.5);
+    /* Removed transform: scale(0.5); */
 }
 
 @media (min-width: 1200px) {
     .simulator {
-        transform: scale(0.7);
+        /* Removed transform: scale(0.7); */
     }
 }
 
