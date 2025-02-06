@@ -16,9 +16,12 @@ Available commands:
    Params: {"taskName": "<name>"}
 
 2. Add tap:
-   Input: "add a tap" or "create a tap block"
+   Input: "add a tap" or "tap <location>" (e.g., "tap top left", "tap middle", "tap bottom right")
    Command: "add_tap"
-   Params: {}
+   Params: {
+       "location": "<location>",  // "top-left", "top-right", "bottom-left", "bottom-right", "middle"
+       "custom_name": "<optional name>"
+   }
 
 3. Add loop:
    Input: "add a loop" or "create a loop"
@@ -30,8 +33,18 @@ Available commands:
    Command: "add_corner_taps"
    Params: {"iterations": <number>}
 
-5. Execute task:
-   Input: "run the task" or "execute"
+5. Remove blocks:
+   Input: "remove all blocks" or "remove last block" or "clear blocks"
+   Command: "remove_blocks"
+   Params: {"target": "all" | "last"}
+
+6. Load task:
+   Input: "load task <name>" or "switch to task <name>"
+   Command: "load_task"
+   Params: {"taskName": "<name>"}
+
+7. Execute task:
+   Input: "run the task" or "execute" or "start task"
    Command: "execute"
    Params: {}
 
@@ -42,6 +55,17 @@ For general conversation (like "hi", "thanks"), use:
     "params": {},
     "message": "your response"
 }
+
+For tap locations, understand these natural language inputs:
+- "top left", "upper left" → top-left quadrant
+- "top right", "upper right" → top-right quadrant
+- "bottom left", "lower left" → bottom-left quadrant
+- "bottom right", "lower right" → bottom-right quadrant
+- "middle", "center" → center region
+- "top", "top center" → top middle region
+- "bottom", "bottom center" → bottom middle region
+- "left", "left center" → left middle region
+- "right", "right center" → right middle region
 
 If user asks to add/create something but the command is unclear,
 respond with a chat message asking for clarification.`;
@@ -181,6 +205,90 @@ function hideThinking() {
     }
 }
 
+function getRegionForLocation(location) {
+    const screen = {
+        width: 320,  // Device width from CSS
+        height: 720  // Device height from CSS
+    };
+
+    // Define regions based on screen dimensions
+    const regions = {
+        'top-left': {
+            x1: 0,
+            y1: 0,
+            x2: screen.width / 2,
+            y2: screen.height / 3
+        },
+        'top-right': {
+            x1: screen.width / 2,
+            y1: 0,
+            x2: screen.width,
+            y2: screen.height / 3
+        },
+        'bottom-left': {
+            x1: 0,
+            y1: 2 * screen.height / 3,
+            x2: screen.width / 2,
+            y2: screen.height
+        },
+        'bottom-right': {
+            x1: screen.width / 2,
+            y1: 2 * screen.height / 3,
+            x2: screen.width,
+            y2: screen.height
+        },
+        'middle': {
+            x1: screen.width / 4,
+            y1: screen.height / 3,
+            x2: 3 * screen.width / 4,
+            y2: 2 * screen.height / 3
+        },
+        'top': {
+            x1: screen.width / 4,
+            y1: 0,
+            x2: 3 * screen.width / 4,
+            y2: screen.height / 3
+        },
+        'bottom': {
+            x1: screen.width / 4,
+            y1: 2 * screen.height / 3,
+            x2: 3 * screen.width / 4,
+            y2: screen.height
+        },
+        'left': {
+            x1: 0,
+            y1: screen.height / 3,
+            x2: screen.width / 3,
+            y2: 2 * screen.height / 3
+        },
+        'right': {
+            x1: 2 * screen.width / 3,
+            y1: screen.height / 3,
+            x2: screen.width,
+            y2: 2 * screen.height / 3
+        }
+    };
+
+    // Normalize location input
+    const normalized = location.toLowerCase().replace(/\s+/g, '-');
+
+    // Map various natural language inputs to region keys
+    const locationMap = {
+        'upper-left': 'top-left',
+        'upper-right': 'top-right',
+        'lower-left': 'bottom-left',
+        'lower-right': 'bottom-right',
+        'center': 'middle',
+        'top-center': 'top',
+        'bottom-center': 'bottom',
+        'left-center': 'left',
+        'right-center': 'right'
+    };
+
+    const regionKey = locationMap[normalized] || normalized;
+    return regions[regionKey] || regions['middle'];
+}
+
 async function processCommand(response_data) {
     try {
         console.log('Processing command:', response_data);
@@ -189,8 +297,8 @@ async function processCommand(response_data) {
         // Get the blocks container for the current task
         const currentTaskElement = document.getElementById('currentTask');
         const blocksContainer = currentTaskElement?.querySelector('.blocks-container');
-        if (!blocksContainer && command !== 'create_task') {
-            addMessage('assistant', 'Please create a task first.');
+        if (!blocksContainer && command !== 'create_task' && command !== 'load_task') {
+            addMessage('assistant', 'Please create or load a task first.');
             return;
         }
 
@@ -216,6 +324,16 @@ async function processCommand(response_data) {
                 }
                 const tapDiv = addTapBlock(currentTask);
                 blocksContainer.appendChild(tapDiv);
+
+                // If location is specified, set the tap region
+                if (params.location) {
+                    const region = getRegionForLocation(params.location);
+                    const tapBlock = currentTask.blocks[currentTask.blocks.length - 1];
+                    tapBlock.region = region;
+                    tapBlock.name = params.custom_name || `Tap ${params.location}`;
+                    showSelectionBox(tapBlock);
+                }
+
                 saveTasksToStorage();
                 break;
 
@@ -227,6 +345,36 @@ async function processCommand(response_data) {
                 const loopDiv = addLoopBlock(currentTask);
                 blocksContainer.appendChild(loopDiv);
                 saveTasksToStorage();
+                break;
+
+            case 'remove_blocks':
+                if (!currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+
+                if (params.target === 'all') {
+                    currentTask.blocks = [];
+                    blocksContainer.innerHTML = '';
+                } else if (params.target === 'last') {
+                    if (currentTask.blocks.length > 0) {
+                        currentTask.blocks.pop();
+                        const lastBlock = blocksContainer.lastChild;
+                        if (lastBlock) {
+                            lastBlock.remove();
+                        }
+                    }
+                }
+                saveTasksToStorage();
+                break;
+
+            case 'load_task':
+                const taskToLoad = tasks.find(t => t.name.toLowerCase() === params.taskName.toLowerCase());
+                if (taskToLoad) {
+                    loadTask(taskToLoad);
+                } else {
+                    addMessage('assistant', `Could not find task named "${params.taskName}"`);
+                }
                 break;
 
             case 'add_corner_taps':
@@ -244,7 +392,7 @@ async function processCommand(response_data) {
                 };
                 currentTask.blocks.push(cornerLoopBlock);
 
-                const cornerLoopDiv = addLoopBlock(cornerLoopBlock);
+                const cornerLoopDiv = addLoopBlock(currentTask);
                 blocksContainer.appendChild(cornerLoopDiv);
 
                 const corners = [
