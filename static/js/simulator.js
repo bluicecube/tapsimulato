@@ -369,6 +369,28 @@ function loadTask(task) {
     const currentTaskElement = document.getElementById('currentTask');
     currentTaskElement.innerHTML = '';
     addTaskBlock(currentTask);
+
+    // Recreate all blocks
+    const blocksContainer = currentTaskElement.querySelector('.blocks-container');
+    if (currentTask.blocks && blocksContainer) {
+        currentTask.blocks.forEach(block => {
+            let blockDiv;
+            if (block.type === 'tap') {
+                blockDiv = addTapBlock(currentTask);
+                // Restore the region if it exists
+                if (block.region) {
+                    blockDiv.querySelector('.select-region-btn').classList.add('active');
+                    showSelectionBox(block);
+                }
+            } else if (block.type === 'loop') {
+                blockDiv = addLoopBlock(currentTask);
+            }
+            if (blockDiv) {
+                blocksContainer.appendChild(blockDiv);
+            }
+        });
+    }
+
     updateTaskList();
     logLiveConsole(`Loaded task: ${task.name}`, 'info');
 }
