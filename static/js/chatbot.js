@@ -2,42 +2,49 @@ let chatHistory = [];
 const systemPrompt = `You are a touchscreen task automation assistant. Help users create and manage tap sequences.
 For task-related commands, respond in this JSON format:
 {
-    "command": "create_task",
+    "command": "<command_type>",
     "params": {
-        "taskName": "given name",
-        "iterations": 1
+        // command specific parameters
     },
     "message": "human readable response"
 }
 
-For conversational responses where no specific command is needed, respond in this format:
-{
-    "command": "chat",
-    "params": {},
-    "message": "your response here"
-}
-
 Available commands:
-1. For new task:
-   Input: "create a new task called <name>"
+1. Create task:
+   Input: "create a new task called <name>" or similar
    Command: "create_task"
    Params: {"taskName": "<name>"}
 
-   If user just says "yes" or agrees to create a task, ask them for a name first.
+2. Add tap:
+   Input: "add a tap" or "create a tap block"
+   Command: "add_tap"
+   Params: {}
 
-2. For corner taps:
-   Input: "tap each corner <N> times"
+3. Add loop:
+   Input: "add a loop" or "create a loop"
+   Command: "add_loop"
+   Params: {"iterations": <number>}
+
+4. Corner taps:
+   Input: "tap each corner <N> times" or "tap corners <N> times"
    Command: "add_corner_taps"
-   Params: {"iterations": N}
+   Params: {"iterations": <number>}
 
-3. For execution:
+5. Execute task:
    Input: "run the task" or "execute"
    Command: "execute"
    Params: {}
 
 Keep messages short and clear. Always respond with valid JSON.
-For general conversation (like "yes", "no", "hello"), use the "chat" command with a friendly response.
-If user says "yes" without providing a name, respond with a chat message asking for the task name.`;
+For general conversation (like "hi", "thanks"), use:
+{
+    "command": "chat",
+    "params": {},
+    "message": "your response"
+}
+
+If user asks to add/create something but the command is unclear,
+respond with a chat message asking for clarification.`;
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
@@ -179,6 +186,13 @@ async function processCommand(response_data) {
         console.log('Processing command:', response_data);
         const { command, params } = response_data;
 
+        // Get the blocks container for the current task
+        const blocksContainer = document.querySelector('.blocks-container');
+        if (!blocksContainer && command !== 'create_task') {
+            addMessage('assistant', 'Please create a task first.');
+            return;
+        }
+
         switch (command) {
             case 'create_task':
                 console.log('Creating new task with params:', params);
@@ -191,6 +205,37 @@ async function processCommand(response_data) {
                 }
                 break;
 
+            case 'add_tap':
+                if (!currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+                const tapBlock = {
+                    type: 'tap',
+                    region: null,
+                    name: 'Tap Block'
+                };
+                currentTask.blocks.push(tapBlock);
+                const tapDiv = addTapBlock(tapBlock);
+                blocksContainer.appendChild(tapDiv);
+                break;
+
+            case 'add_loop':
+                if (!currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: params.iterations || 1,
+                    blocks: [],
+                    name: 'Loop Block'
+                };
+                currentTask.blocks.push(loopBlock);
+                const loopDiv = addLoopBlock(loopBlock);
+                blocksContainer.appendChild(loopDiv);
+                break;
+
             case 'add_corner_taps':
                 if (!currentTask) {
                     addMessage('assistant', 'Please create a task first.');
@@ -198,19 +243,16 @@ async function processCommand(response_data) {
                 }
 
                 const iterations = params.iterations || 2;
-                const loopBlock = {
+                const cornerLoopBlock = {
                     type: 'loop',
                     iterations: iterations,
                     blocks: [],
                     name: `${iterations}x Corner Taps`
                 };
-                currentTask.blocks.push(loopBlock);
+                currentTask.blocks.push(cornerLoopBlock);
 
-                const loopDiv = addLoopBlock(loopBlock);
-                const blocksContainer = document.querySelector('.blocks-container');
-                if (blocksContainer) {
-                    blocksContainer.appendChild(loopDiv);
-                }
+                const cornerLoopDiv = addLoopBlock(cornerLoopBlock);
+                blocksContainer.appendChild(cornerLoopDiv);
 
                 const corners = [
                     { x: 20, y: 20, name: 'Top Left' },
@@ -230,10 +272,10 @@ async function processCommand(response_data) {
                         },
                         name: `${corner.name} Corner`
                     };
-                    loopBlock.blocks.push(tapBlock);
+                    cornerLoopBlock.blocks.push(tapBlock);
 
                     const tapDiv = addTapBlock(tapBlock);
-                    const nestedBlocks = loopDiv.querySelector('.nested-blocks');
+                    const nestedBlocks = cornerLoopDiv.querySelector('.nested-blocks');
                     if (nestedBlocks) {
                         nestedBlocks.appendChild(tapDiv);
                     }
