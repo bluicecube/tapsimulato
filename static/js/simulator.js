@@ -24,18 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskTitle = document.getElementById('taskTitle');
 
     // Set up event listeners
-    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
-    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
-    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
-    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
-    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
-    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
-    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
+    document.getElementById('executeTaskBtn')?.addEventListener('click', executeTask);
+    document.getElementById('addTapBtn')?.addEventListener('click', () => addTapBlock());
+    document.getElementById('addLoopBtn')?.addEventListener('click', () => addLoopBlock());
+    document.getElementById('addConditionalBtn')?.addEventListener('click', addConditionalBlock);
+    document.getElementById('newTaskBtn')?.addEventListener('click', async () => { await createNewTask(); });
+    document.getElementById('addFunctionTapBtn')?.addEventListener('click', () => addBlockToFunction('tap'));
+    document.getElementById('addFunctionLoopBtn')?.addEventListener('click', () => addBlockToFunction('loop'));
+    document.getElementById('saveFunctionBtn')?.addEventListener('click', saveFunction);
 
 
     // Add task title change handler
-    taskTitle.addEventListener('change', async () => {
+    taskTitle?.addEventListener('change', async () => {
         if (state.currentTask) {
             try {
                 const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
@@ -63,10 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Selection events
-    simulator.addEventListener('mousedown', startSelection);
-    simulator.addEventListener('mousemove', updateSelection);
-    simulator.addEventListener('mouseup', stopSelection);
-    simulator.addEventListener('mouseleave', () => {
+    simulator?.addEventListener('mousedown', startSelection);
+    simulator?.addEventListener('mousemove', updateSelection);
+    simulator?.addEventListener('mouseup', stopSelection);
+    simulator?.addEventListener('mouseleave', () => {
         if (isSelecting) {
             const rect = simulator.getBoundingClientRect();
             const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
@@ -75,10 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Setup video sharing
+    // Setup video sharing and load initial data
     setupVideoSharing();
-
-    // Load functions and tasks
     loadFunctions();
     loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
@@ -920,7 +918,7 @@ function showTapFeedback(region) {
     const coordinates = getRandomCoordinatesInRegion(region);
 
     const feedback = document.createElement('div');
-    feedback.className = ''tap-feedback';
+    feedback.className = 'tap-feedback';
     feedback.style.left = `${coordinates.x}px`;
     feedback.style.top = `${coordinates.y}px`;
 
