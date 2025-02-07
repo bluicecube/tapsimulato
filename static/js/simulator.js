@@ -20,15 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('taskSelect').addEventListener('change', (e) => {
-        const taskId = e.target.value;
-        if (taskId) {
-            loadTask(parseInt(taskId));
-        } else {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-    });
+    document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
 
     // Task title handling
     taskTitle.addEventListener('change', async () => {
@@ -44,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const taskIndex = state.tasks.findIndex(t => t.id === state.currentTask.id);
                     if (taskIndex !== -1) {
                         state.tasks[taskIndex] = updatedTask;
-                        updateTaskSelect();
+                        updateTaskList();
                     }
                     logToConsole('Task renamed successfully', 'success');
                 }
@@ -62,24 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Video setup
     setupVideoSharing();
 
-    // Sidebar toggle
-    const toggleTasksBtn = document.getElementById('toggleTasksBtn');
-    const taskSidebar = document.getElementById('taskSidebar');
-
-    toggleTasksBtn.addEventListener('click', () => {
-        taskSidebar.classList.toggle('show');
-    });
-
-    // Close sidebar when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('#taskSidebar') &&
-            !e.target.closest('#toggleTasksBtn') &&
-            taskSidebar.classList.contains('show')) {
-            taskSidebar.classList.remove('show');
-        }
-    });
-
-
     // Create initial task and load tasks
     createNewTask().then(() => {
         loadTasks();
@@ -93,7 +67,7 @@ async function loadTasks() {
         if (!response.ok) throw new Error('Failed to load tasks');
 
         state.tasks = await response.json();
-        updateTaskSelect();
+        updateTaskList();
 
         if (state.tasks.length > 0) {
             await loadTask(state.tasks[0].id);
@@ -118,7 +92,7 @@ async function createNewTask() {
 
         const task = await response.json();
         state.tasks.push(task);
-        updateTaskSelect();
+        updateTaskList();
         await loadTask(task.id);
 
         logToConsole('New task created', 'success');
@@ -139,11 +113,38 @@ async function loadTask(taskId) {
         };
 
         updateTaskDisplay();
-        updateTaskSelect(); //Added to update sidebar on task load
+        updateTaskList();
         logToConsole(`Loaded task ${taskId}`, 'success');
     } catch (error) {
         logToConsole('Error loading task blocks', 'error');
     }
+}
+
+// UI Updates
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    taskList.innerHTML = state.tasks.map(task => `
+        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
+             data-task-id="${task.id}">
+            <span>${task.name}</span>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-danger delete-task-btn" 
+                        onclick="deleteTask(${task.id})" title="Delete task">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add click handlers for task selection
+    taskList.querySelectorAll('.task-list-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn-group')) {
+                const taskId = parseInt(item.dataset.taskId);
+                loadTask(taskId);
+            }
+        });
+    });
 }
 
 // Block Management
@@ -199,14 +200,6 @@ function addLoopBlock() {
 }
 
 // UI Updates
-function updateTaskSelect() {
-    const select = document.getElementById('taskSelect');
-    select.innerHTML = '<option value="">Select a task...</option>' +
-        state.tasks.map(task =>
-            `<option value="${task.id}"${state.currentTask && state.currentTask.id === task.id ? ' selected' : ''}>${task.name}</option>`
-        ).join('');
-}
-
 function updateTaskDisplay() {
     const currentTaskElement = document.getElementById('currentTask');
     const taskTitle = document.getElementById('taskTitle');
@@ -508,7 +501,7 @@ async function deleteTask(taskId) {
 
         // Remove task from state
         state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskSelect();
+        updateTaskList();
 
         // If the deleted task was the current task, clear it
         if (state.currentTask && state.currentTask.id === taskId) {
@@ -527,9 +520,9 @@ async function deleteTask(taskId) {
     }
 }
 
-// Add delete button event listener (moved here from original code)
+// Add delete button event listener 
 document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.getElementById('taskSelect').value;
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
     deleteTask(taskId);
 });
 
