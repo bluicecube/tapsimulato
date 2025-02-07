@@ -23,6 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
 
+    // Selection events
+    simulator.addEventListener('mousedown', startSelection);
+    simulator.addEventListener('mousemove', updateSelection);
+    simulator.addEventListener('mouseup', stopSelection);
+
+    // Setup video sharing
+    setupVideoSharing();
+
     // Create initial task and load tasks
     createNewTask().then(() => {
         loadTasks();
@@ -304,6 +312,7 @@ function startSelection(event) {
     selectionStartX = event.clientX - rect.left;
     selectionStartY = event.clientY - rect.top;
 
+    const selectionBox = document.getElementById('selectionBox');
     selectionBox.style.left = `${selectionStartX}px`;
     selectionBox.style.top = `${selectionStartY}px`;
     selectionBox.style.width = '0';
@@ -312,7 +321,9 @@ function startSelection(event) {
 }
 
 function updateSelection(event) {
-    if (!isSelecting || selectionBox.classList.contains('d-none')) return;
+    if (!isSelecting) return;
+    const selectionBox = document.getElementById('selectionBox');
+    if (selectionBox.classList.contains('d-none')) return;
 
     const rect = event.target.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
@@ -354,13 +365,14 @@ function stopSelection(event) {
     targetBlock.region = region;
     targetBlock.description = `Tap at (${Math.round((region.x1 + region.x2)/2)}, ${Math.round((region.y1 + region.y2)/2)})`;
 
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Region set for tap block', 'success');
-
+    const selectionBox = document.getElementById('selectionBox');
     selectionBox.classList.add('d-none');
     isSelecting = false;
     state.pendingBlockConfiguration = null;
+
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Region set for tap block', 'success');
 }
 
 // Task Execution
