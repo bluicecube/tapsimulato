@@ -106,9 +106,7 @@ function createNewTask() {
     currentTask = task;
 
     // Update the current task display
-    const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = '';
-    addTaskBlock(task);
+    loadTask(task); // Use loadTask function here
 
     // Auto-save
     saveTasksToStorage();
@@ -157,7 +155,7 @@ function updateTaskList() {
             </div>
         `;
 
-        // Make the entire task item clickable
+        // Make the entire task item clickable except for delete button
         taskItem.addEventListener('click', (e) => {
             if (!e.target.closest('.delete-task-btn')) {
                 loadTask(task);
@@ -358,7 +356,7 @@ function addTaskBlock(task) {
     });
 
     taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
-        removeTask(task.id);
+        deleteTask(task);
         taskDiv.remove();
         saveTasksToStorage(); // Auto-save after deleting a task
     });
@@ -758,9 +756,6 @@ function addLoopBlock(parent) {
 }
 
 
-
-
-
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
@@ -868,7 +863,7 @@ function handleMessage(message) {
                             region: null, // Will be set during selection
                             name: 'Tap Block'
                         };
-                        currentTask.blocks.push(tapBlock);
+                        task.blocks.push(tapBlock);
                     } else if (blockData.type === 'loop') {
                         const loopBlock = {
                             type: 'loop',
@@ -876,17 +871,13 @@ function handleMessage(message) {
                             blocks: [],
                             name: 'Loop Block'
                         };
-                        currentTask.blocks.push(loopBlock);
+                        task.blocks.push(loopBlock);
                     }
                 });
             }
 
             // Update UI
-            const currentTaskElement = document.getElementById('currentTask');
-            currentTaskElement.innerHTML = '';
-            addTaskBlock(currentTask);
-
-            // Auto-save and update lists
+            loadTask(task); // Use loadTask instead of manual UI update
             saveTasksToStorage();
             updateTaskList();
             logLiveConsole(`Created new task: ${task.name} with ${task.blocks.length} blocks`, 'success');
@@ -909,7 +900,7 @@ function handleMessage(message) {
                         currentTask.blocks.push(tapBlock);
                     } else if (blockData.type === 'loop') {
                         const loopBlock = {
-                            type: ''loop',
+                            type: 'loop',
                             iterations: blockData.iterations || 1,
                             blocks: [],
                             name: 'Loop Block'
@@ -918,12 +909,8 @@ function handleMessage(message) {
                     }
                 });
 
-                // Refresh the task display
-                const currentTaskElement = document.getElementById('currentTask');
-                currentTaskElement.innerHTML = '';
-                addTaskBlock(currentTask);
-
-                // Auto-save and update
+                // Refresh the task display using`loadTask`
+                loadTask(currentTask);
                 saveTasksToStorage();
                 updateTaskList();
                 logLiveConsole(`Added ${message.params.blocks.length} blocks to task: ${currentTask.name}`, 'success');
@@ -937,5 +924,61 @@ function handleMessage(message) {
                 logLiveConsole('No task selected to execute', 'error');
             }
             break;
+
+        case 'load_task':
+            const taskToLoad = tasks.find(t => t.name.toLowerCase() === message.params.taskName.toLowerCase());
+            if (taskToLoad) {
+                loadTask(taskToLoad);
+                logLiveConsole(`Loaded task: ${taskToLoad.name}`, 'success');
+            } else {
+                logLiveConsole(`Task '${message.params.taskName}' not found`, 'error');
+            }
+            break;
+    }
+}
+
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    taskList.innerHTML = '';
+
+    tasks.forEach(task => {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'task-list-item';
+        if (currentTask && currentTask.id === task.id) {
+            taskItem.classList.add('active');
+        }
+
+        taskItem.innerHTML = `
+            <span>${task.name}</span>
+            <div>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `;
+
+        // Make the entire task item clickable except for delete button
+        taskItem.addEventListener('click', (e) => {
+            if (!e.target.closest('.delete-task-btn')) {
+                loadTask(task);
+                // Update active state
+                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
+                taskItem.classList.add('active');
+            }
+        });
+
+        // Add delete functionality
+        const deleteBtn = taskItem.querySelector('.delete-task-btn');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTask(task);
+        });
+
+        taskList.appendChild(taskItem);
+    });
+
+    // Initialize Feather icons for the new elements
+    if (window.feather) {
+        feather.replace();
     }
 }
