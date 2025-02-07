@@ -38,7 +38,9 @@ body {
 .simulator-header {
     position: relative;
     padding: 1rem;
-    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(var(--device-physical-height) * var(--simulator-scale) + 2rem);
 }
 
 .title-controls {
