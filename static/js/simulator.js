@@ -112,7 +112,7 @@ function startTapRegionSelection(blockElement) {
     state.pendingBlockConfiguration = blockElement;
 }
 
-function addTapBlock() {
+function addTapBlock(parentLoopIndex = null) {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
@@ -123,7 +123,14 @@ function addTapBlock() {
         description: 'Click to set region'
     };
 
-    state.currentTask.blocks.push(block);
+    if (parentLoopIndex !== null) {
+        // Add to loop block
+        state.currentTask.blocks[parentLoopIndex].blocks.push(block);
+    } else {
+        // Add to root level
+        state.currentTask.blocks.push(block);
+    }
+
     updateTaskDisplay();
     logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
 }
@@ -134,12 +141,9 @@ function addLoopBlock() {
         return;
     }
 
-    const iterations = prompt('Enter number of iterations:', '1');
-    if (!iterations) return;
-
     const block = {
         type: 'loop',
-        iterations: parseInt(iterations) || 1,
+        iterations: 1,
         blocks: []
     };
 
@@ -159,69 +163,88 @@ function updateTaskSelect() {
 }
 
 function updateTaskDisplay() {
-    const container = document.getElementById('currentTask');
-    container.innerHTML = '';
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement) return;
 
-    if (!state.currentTask || !state.currentTask.blocks) return;
+    currentTaskElement.innerHTML = '';
 
     function renderBlock(block, index) {
-        const blockEl = document.createElement('div');
-        blockEl.className = `block ${block.type}-block`;
-        blockEl.dataset.index = index;
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `block ${block.type}-block`;
+        blockDiv.dataset.index = index;
 
         if (block.type === 'tap') {
             const regionText = block.region ?
-                `Region: (${Math.round(block.region.x1)}, ${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)}, ${Math.round(block.region.y2)})` :
+                `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
                 'No region set';
 
-            blockEl.innerHTML = `
+            blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <strong>Tap Block</strong>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary set-region-btn">
-                            ${block.region ? 'Change Region' : 'Set Region'}
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-                    </div>
+                    <h6 class="mb-0">Tap Block</h6>
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
                 </div>
-                <small class="text-muted">${regionText}</small>
+                <small class="text-muted">Region: ${regionText}</small>
             `;
 
-            const setRegionBtn = blockEl.querySelector('.set-region-btn');
-            setRegionBtn.addEventListener('click', () => startTapRegionSelection(blockEl));
+            blockDiv.addEventListener('click', (e) => {
+                if (!e.target.closest('.select-region-btn')) {
+                    window.setBlockFocus(block, blockDiv);
+                }
+            });
+
+            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+                startTapRegionSelection(blockDiv);
+            });
         } else if (block.type === 'loop') {
-            blockEl.innerHTML = `
+            blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <strong>Loop Block</strong>
-                    <div class="d-flex align-items-center gap-2">
+                    <h6 class="mb-0">Loop Block</h6>
+                    <div class="d-flex align-items-center">
                         <input type="number" class="form-control form-control-sm iterations-input"
                             value="${block.iterations}" min="1" style="width: 70px">
-                        <span>times</span>
-                        <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                        <span class="ms-2">times</span>
+                        <div class="btn-group ms-2">
+                            <button class="btn btn-sm btn-outline-primary add-nested-tap-btn">Add Tap</button>
+                            <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                        </div>
                     </div>
                 </div>
                 <div class="nested-blocks mt-2"></div>
             `;
 
-            const iterationsInput = blockEl.querySelector('.iterations-input');
+            const iterationsInput = blockDiv.querySelector('.iterations-input');
             iterationsInput.addEventListener('change', (e) => {
                 block.iterations = parseInt(e.target.value) || 1;
                 scheduleAutosave();
             });
 
-            const nestedContainer = blockEl.querySelector('.nested-blocks');
+            const addNestedTapBtn = blockDiv.querySelector('.add-nested-tap-btn');
+            addNestedTapBtn.addEventListener('click', () => {
+                const loopIndex = parseInt(index);
+                addTapBlock(loopIndex);
+            });
+
+            const nestedContainer = blockDiv.querySelector('.nested-blocks');
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
 
-        blockEl.querySelector('.remove-block-btn').addEventListener('click', () => removeBlock(blockEl));
-        return blockEl;
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+        }
+
+        return blockDiv;
     }
 
-    state.currentTask.blocks.forEach((block, index) => {
-        container.appendChild(renderBlock(block, index));
-    });
+    if (state.currentTask && state.currentTask.blocks) {
+        state.currentTask.blocks.forEach((block, index) => {
+            currentTaskElement.appendChild(renderBlock(block, index.toString()));
+        });
+    }
 }
 
 // Selection Handling

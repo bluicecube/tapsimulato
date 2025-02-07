@@ -57,6 +57,36 @@ body {
     margin-left: 20px;
     padding-left: 10px;
     border-left: 2px solid var(--bs-gray);
+    margin-top: 10px;
+}
+
+.block h6 {
+    margin-bottom: 10px;
+    color: var(--bs-light);
+}
+
+.block .btn-group {
+    margin-left: 10px;
+}
+
+.block .iterations-input {
+    width: 70px !important;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.2rem;
+    text-align: center;
+}
+
+.block small.text-muted {
+    display: block;
+    margin-top: 5px;
+}
+
+.remove-block-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
 }
 
 /* Selection box */
@@ -191,7 +221,6 @@ body {
     }
 }
 
-
 /* Card and Form Styles */
 .card {
     background-color: var(--bs-dark);
@@ -289,24 +318,10 @@ body {
     overflow-y: auto;
 }
 
-.active-block {
+/* Active block */
+.block.active {
     border-color: var(--bs-warning);
-    box-shadow: 0 0 5px var(--bs-warning);
-}
-
-.block h6 {
-    margin-bottom: 10px;
-    color: var(--bs-light);
-}
-
-.input-group {
-    margin-bottom: 10px;
-}
-
-.input-group-text {
-    background-color: var(--bs-dark);
-    color: var(--bs-light);
-    border-color: var(--bs-secondary);
+    box-shadow: 0 0 5px rgba(255, 193, 7, 0.3);
 }
 
 .nav-tabs {
