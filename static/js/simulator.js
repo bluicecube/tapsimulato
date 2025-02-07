@@ -450,7 +450,9 @@ function finishSelection(endX, endY) {
 function setBlockFocus(block, blockDiv) {
     // Remove focus from other blocks
     document.querySelectorAll('.block').forEach(el => {
-        el.classList.remove('focused');
+        if (el !== blockDiv) {
+            el.classList.remove('focused');
+        }
     });
 
     // Add focus to current block
@@ -460,11 +462,14 @@ function setBlockFocus(block, blockDiv) {
     window.state.focusedBlock = block;
 
     // Show region if it exists
-    if (block.region) {
-        showSelectionBox(block.region);
-    } else {
-        const selectionBox = document.getElementById('selectionBox');
-        selectionBox.classList.add('d-none');
+    if (block.type === 'tap') {
+        if (block.region) {
+            showSelectionBox(block.region);
+        } else {
+            // If no region is set, hide the selection box
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.classList.add('d-none');
+        }
     }
 }
 
@@ -531,18 +536,18 @@ function renderBlock(block, index) {
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Tap Block</h6>
                 <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-primary select-region-btn">
-                        ${block.region ? 'Change Region' : 'Set Region'}
-                    </button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
             <small class="text-muted">Region: ${regionText}</small>
         `;
 
+        // Make the entire block clickable for region selection
         blockDiv.addEventListener('click', (e) => {
             if (!e.target.closest('.btn')) {
+                e.stopPropagation();
                 setBlockFocus(block, blockDiv);
+                enableDrawingMode(block, blockDiv);
             }
         });
 
@@ -553,11 +558,6 @@ function renderBlock(block, index) {
                 removeBlock(blockDiv);
             });
         }
-
-        blockDiv.querySelector('.select-region-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            enableDrawingMode(block, blockDiv);
-        });
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -630,9 +630,12 @@ function renderBlock(block, index) {
 }
 
 function enableDrawingMode(block, blockDiv) {
-    startTapRegionSelection(blockDiv);
-    if (block.region) {
-        showSelectionBox(block.region);
+    // If it's a tap block, start region selection immediately
+    if (block.type === 'tap') {
+        startTapRegionSelection(blockDiv);
+        if (block.region) {
+            showSelectionBox(block.region);
+        }
     }
 }
 
