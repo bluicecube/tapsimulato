@@ -184,11 +184,32 @@ async function processCommand(responseData) {
         switch (command) {
             case 'create_task_with_blocks':
                 const taskName = params.taskName || 'New Task';
-                // Use the simulator's API to create and manage tasks
-                const newTask = window.simulatorAPI.createNewTask(taskName);
-                // After creating task, add the blocks
+                // Create new task with specified name
+                const newTask = window.simulatorAPI.createNewTask();
+                // Update task name
+                newTask.name = taskName;
+                // Process and add blocks
                 if (params.blocks && params.blocks.length > 0) {
-                    window.simulatorAPI.addBlocksToChatbotTask(newTask, params.blocks);
+                    const processedBlocks = params.blocks.map(block => {
+                        if (block.type === 'tap') {
+                            return {
+                                type: 'tap',
+                                region: calculateRegionFromDescription(block.location),
+                                name: block.name || 'Tap Block'
+                            };
+                        } else if (block.type === 'loop') {
+                            return {
+                                type: 'loop',
+                                iterations: block.iterations || 1,
+                                blocks: block.blocks.map(b => ({
+                                    type: 'tap',
+                                    region: calculateRegionFromDescription(b.location),
+                                    name: b.name || 'Tap Block'
+                                }))
+                            };
+                        }
+                    });
+                    window.simulatorAPI.addBlocksToChatbotTask(newTask, processedBlocks);
                 }
                 addMessage('assistant', `Created new task "${taskName}" with ${params.blocks.length} blocks`);
                 break;
@@ -206,8 +227,27 @@ async function processCommand(responseData) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-                // Use the simulator's API to add blocks
-                window.simulatorAPI.addBlocksToChatbotTask(state.currentTask, params.blocks);
+                // Process blocks before adding them
+                const processedBlocks = params.blocks.map(block => {
+                    if (block.type === 'tap') {
+                        return {
+                            type: 'tap',
+                            region: calculateRegionFromDescription(block.location),
+                            name: block.name || 'Tap Block'
+                        };
+                    } else if (block.type === 'loop') {
+                        return {
+                            type: 'loop',
+                            iterations: block.iterations || 1,
+                            blocks: block.blocks.map(b => ({
+                                type: 'tap',
+                                region: calculateRegionFromDescription(b.location),
+                                name: b.name || 'Tap Block'
+                            }))
+                        };
+                    }
+                });
+                window.simulatorAPI.addBlocksToChatbotTask(state.currentTask, processedBlocks);
                 addMessage('assistant', `Added ${params.blocks.length} blocks to the current task`);
                 break;
 
