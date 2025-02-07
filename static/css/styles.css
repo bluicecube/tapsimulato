@@ -8,7 +8,7 @@
 body {
     background-color: var(--bs-dark);
     color: var(--bs-light);
-    padding: 10px;
+    padding: 20px;
 }
 
 /* Container adjustments */
@@ -41,7 +41,6 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
     overflow: hidden;
-    max-height: 70vh;
 }
 
 #bgVideo {
@@ -105,11 +104,6 @@ body {
 
 .block .btn-group {
     margin-left: 0.5rem;
-}
-
-.block .btn-group .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
 }
 
 .block .iterations-input {
@@ -195,7 +189,7 @@ body {
 
 /* Chat Interface */
 .chat-messages {
-    height: calc(100% - 60px);
+    height: 250px;
     overflow-y: auto;
     padding: 1rem;
     background-color: var(--bs-dark);
@@ -270,14 +264,11 @@ body {
 .card {
     background-color: var(--bs-dark);
     border: 1px solid var(--bs-secondary);
-    height: calc(100vh - 2rem);
-    display: flex;
-    flex-direction: column;
+    margin-bottom: 1rem;
 }
 
 .card-body {
-    flex: 1;
-    overflow-y: auto;
+    padding: 1rem;
 }
 
 .task-block {
@@ -407,4 +398,11 @@ body {
 #taskTitle {
     margin-bottom: 1rem;
     font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .simulator {
+        margin-bottom: 1rem;
+    }
 }
