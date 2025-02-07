@@ -21,8 +21,36 @@ window.state = {
 // Functions state
 let functions = [];
 
+// Add this function near the start of the file, after state initialization
+function addConditionalBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'conditional',
+        name: 'IF / ELSE Block',  // Updated name
+        data: {
+            threshold: 90,
+            referenceImage: null,
+            thenBlocks: [],
+            elseBlocks: []
+        }
+    };
+
+    if (!state.currentTask.blocks) {
+        state.currentTask.blocks = [];
+    }
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Added IF / ELSE block', 'success');  // Updated message
+}
+
 // State management
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     // Initialize UI elements
     const selectionBox = document.getElementById('selectionBox');
     const simulator = document.getElementById('simulator');
@@ -65,13 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (addConditionalBtn) {
-        addConditionalBtn.addEventListener('click', () => {
-            if (!state.currentTask) {
-                logToConsole('Please create or select a task first', 'error');
-                return;
-            }
-            addConditionalBlock();
-        });
+        addConditionalBtn.addEventListener('click', addConditionalBlock);
     }
 
     if (newTaskBtn) {
@@ -497,7 +519,6 @@ function removeBlock(blockElement) {
     logToConsole('Block removed', 'success');
 }
 
-
 // Selection Handling (Updated from edited snippet)
 function startSelection(event) {
     if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
@@ -809,7 +830,7 @@ function renderBlock(block, index) {
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Conditional Block</h6>
+                <h6 class="mb-0">IF / ELSE Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
                         ${block.data?.referenceImage ? 'Update Reference' : 'Capture Reference'}
@@ -822,14 +843,14 @@ function renderBlock(block, index) {
             </div>
             <div class="mt-2">
                 <div class="nested-blocks then-blocks">
-                    <p class="mb-2">If similar enough:</p>
+                    <p class="mb-2">IF similar enough:</p>
                     <div class="btn-group w-100 mb-2">
                         <button class="btn btn-sm btn-outline-primary add-then-tap-btn">Add Tap</button>
                         <button class="btn btn-sm btn-outline-success add-then-loop-btn">Add Loop</button>
                     </div>
                 </div>
                 <div class="nested-blocks else-blocks">
-                    <p class="mb-2">If not similar enough:</p>
+                    <p class="mb-2">ELSE (not similar enough):</p>
                     <div class="btn-group w-100 mb-2">
                         <button class="btn btn-sm btn-outline-primary add-else-tap-btn">Add Tap</button>
                         <button class="btn btn-sm btn-outline-success add-else-loop-btn">Add Loop</button>
@@ -847,7 +868,7 @@ function renderBlock(block, index) {
             });
         }
 
-        // Rest of the conditional block event handlers...
+        // Capture/Update reference image button
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
         captureBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -871,6 +892,7 @@ function renderBlock(block, index) {
             }
         });
 
+        // Threshold input handler
         const thresholdInput = blockDiv.querySelector('.threshold-input');
         thresholdInput.addEventListener('change', (e) => {
             block.data.threshold = parseInt(e.target.value) || 90;
@@ -878,15 +900,68 @@ function renderBlock(block, index) {
         });
 
         // Add buttons for then/else blocks
-        ['then', 'else'].forEach(section => {
-            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
-                addTapBlock(index, `${section}Blocks`);
-            });
+        const addThenTapBtn = blockDiv.querySelector('.add-then-tap-btn');
+        const addThenLoopBtn = blockDiv.querySelector('.add-then-loop-btn');
+        const addElseTapBtn = blockDiv.querySelector('.add-else-tap-btn');
+        const addElseLoopBtn = blockDiv.querySelector('.add-else-loop-btn');
 
-            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
-                addLoopBlock(index, `${section}Blocks`);
+        if (addThenTapBtn) {
+            addThenTapBtn.addEventListener('click', () => {
+                const tapBlock = {
+                    type: 'tap',
+                    region: null,
+                    name: 'Tap Block'
+                };
+                if (!block.data.thenBlocks) block.data.thenBlocks = [];
+                block.data.thenBlocks.push(tapBlock);
+                updateTaskDisplay();
+                scheduleAutosave();
             });
-        });
+        }
+
+        if (addThenLoopBtn) {
+            addThenLoopBtn.addEventListener('click', () => {
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: 1,
+                    blocks: [],
+                    name: 'Loop Block'
+                };
+                if (!block.data.thenBlocks) block.data.thenBlocks = [];
+                block.data.thenBlocks.push(loopBlock);
+                updateTaskDisplay();
+                scheduleAutosave();
+            });
+        }
+
+        if (<addElseTapBtn) {
+            addElseTapBtn.addEventListener('click', () => {
+                const tapBlock = {
+                    type: 'tap',
+                    region: null,
+                    name: 'Tap Block'
+                };
+                if (!block.data.elseBlocks) block.data.elseBlocks = [];
+                block.data.elseBlocks.push(tapBlock);
+                updateTaskDisplay();
+                scheduleAutosave();
+            });
+        }
+
+        if (addElseLoopBtn) {
+            addElseLoopBtn.addEventListener('click', () => {
+                const loopBlock = {
+                    type: 'loop',
+                    iterations: 1,
+                    blocks: [],
+                    name: 'Loop Block'
+                };
+                if (!block.data.elseBlocks) block.data.elseBlocks = [];
+                block.data.elseBlocks.push(loopBlock);
+                updateTaskDisplay();
+                scheduleAutosave();
+            });
+        }
 
         // Render nested blocks
         if (block.data.thenBlocks) {
@@ -1419,31 +1494,7 @@ function captureVideoFrame() {
     return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
 }
 
-// Add new function to add conditional block
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        name: 'Conditional Block',
-        data: {
-            threshold: 90,  // Default similarity threshold
-            referenceImage: null,
-            thenBlocks: [],  // Blocks to execute if similarity >= threshold
-            elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
-// Update executeTask to handle conditional blocks
+// Update the executeTask function to handle conditional blocks
 async function executeTask() {
     if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
         logToConsole('No blocks to execute', 'error');
