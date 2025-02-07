@@ -526,7 +526,6 @@ function removeBlock(blockDiv) {
     logToConsole('Block removed', 'success');
 }
 
-
 function renderBlock(block, index) {
     const blockDiv = document.createElement('div');
     blockDiv.className = `block ${block.type}-block`;
@@ -832,6 +831,19 @@ async function executeTask() {
                     showTapFeedback(block.region);
                     logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
                 }, delay);
+            } else if (block.type === 'conditional' && block.data.referenceImage) {
+                //  Implement conditional logic here (comparison with reference image)
+                delay += delayIncrement;
+                setTimeout(() => {
+                    const similarity = calculateSimilarity(block.data.referenceImage, captureVideoFrame());
+                    logToConsole(`Conditional block executed with similarity score: ${similarity}`, 'info');
+                    if (similarity >= block.data.threshold) {
+                        executeBlocks(block.data.thenBlocks);
+                    } else {
+                        executeBlocks(block.data.elseBlocks);
+                    }
+                }, delay);
+
             }
         }
     }
@@ -947,8 +959,7 @@ document.getElementById('deleteAllTasksBtn').addEventListener('click', async () 
     }
 
     try {
-        const response = await fetch('/api/tasks/all', {
-            method: 'DELETE'
+        const response = await fetch('/api/tasks/all', {            method: 'DELETE'
         });
 
         if (!response.ok) throw new Error('Failed to delete all tasks');
@@ -1325,6 +1336,19 @@ async function executeTask() {
                     showTapFeedback(block.region);
                     logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
                 }, delay);
+            } else if (block.type === 'conditional' && block.data.referenceImage) {
+                //  Implement conditional logic here (comparison with reference image)
+                delay += delayIncrement;
+                setTimeout(() => {
+                    const similarity = calculateSimilarity(block.data.referenceImage, captureVideoFrame());
+                    logToConsole(`Conditional block executed with similarity score: ${similarity}`, 'info');
+                    if (similarity >= block.data.threshold) {
+                        executeBlocks(block.data.thenBlocks);
+                    } else {
+                        executeBlocks(block.data.elseBlocks);
+                    }
+                }, delay);
+
             }
         }
     }
@@ -1362,4 +1386,39 @@ function showTapFeedback(region) {
 
     // Remove the feedback element after animation completes
     feedback.addEventListener('animationend', () => feedback.remove());
+}
+const addConditionalBtn = document.getElementById('addConditionalBtn');
+
+if (addConditionalBtn) {
+    addConditionalBtn.addEventListener('click', () => {
+        if (!state.currentTask) {
+            logToConsole('Please create or select a task first', 'error');
+            return;
+        }
+        const block = {
+            type: 'conditional',
+            data: {
+                threshold: 90,
+                referenceImage: null,
+                thenBlocks: [],
+                elseBlocks: []
+            }
+        };
+        state.currentTask.blocks.push(block);
+        updateTaskDisplay();
+        scheduleAutosave();
+        logToConsole('Conditional block added', 'success');
+    });
+}
+
+// Placeholder for similarity calculation function.  Replace with actual implementation.
+function calculateSimilarity(img1, img2) {
+    //This is a placeholder.  Replace with your actual similarity calculation.
+    return Math.random() * 100;
+}
+
+// Placeholder for startTapRegionSelection. Replace with actual implementation.
+function startTapRegionSelection(blockElement){
+    //This is a placeholder.  Replace with your actual implementation.
+    console.log("Start Tap Region Selection called on ", blockElement);
 }
