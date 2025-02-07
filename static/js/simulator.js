@@ -4,15 +4,9 @@ const DEVICE_HEIGHT = 720;
 const PHYSICAL_WIDTH = 76.3; // mm
 const PHYSICAL_HEIGHT = 161.4; // mm
 
+// Task management state
 let tasks = [];
 let currentTask = null;
-let deletedTasks = [];
-let isSelecting = false;
-let selectionStartX = 0;
-let selectionStartY = 0;
-let selectionRectangle = null;
-let currentTapBlock = null;
-let focusedBlock = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Existing initialization code
@@ -21,11 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('runTaskBtn').addEventListener('click', () => {
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
-
-        // Set the chat input value to "run" instead of "run button"
         chatInput.value = 'run';
-
-        // Trigger the chat send button click
         sendChatBtn.click();
     });
     document.getElementById('toggleTasksBtn').addEventListener('click', toggleTasksSidebar);
@@ -50,29 +40,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add screen capture functionality
     setVideoSourceBtn.addEventListener('click', async () => {
         try {
-            // Stop any existing stream
             if (video.srcObject) {
                 const tracks = video.srcObject.getTracks();
                 tracks.forEach(track => track.stop());
             }
-
-            // Request screen sharing
             const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     cursor: "always"
                 },
                 audio: false
             });
-
             video.srcObject = stream;
             logLiveConsole('Screen sharing started successfully', 'success');
-
-            // Handle stream end
             stream.getVideoTracks()[0].addEventListener('ended', () => {
                 logLiveConsole('Screen sharing ended', 'info');
                 video.srcObject = null;
             });
-
         } catch (error) {
             logLiveConsole(`Screen sharing error: ${error.message}`, 'error');
             video.srcObject = null;
@@ -99,171 +82,145 @@ function createNewTask() {
         id: `task-${Date.now()}`,
         name: 'New Task',
         blocks: [],
-        minimized: false,
         created: new Date().toISOString()
     };
     tasks.push(task);
     currentTask = task;
-
-    // Update the current task display
-    loadTask(task); // Use loadTask function here
-
-    // Auto-save
+    loadTask(task);
     saveTasksToStorage();
     updateTaskList();
-
     logLiveConsole('New task created', 'info');
 }
 
 function saveTasksToStorage() {
     localStorage.setItem('savedTasks', JSON.stringify(tasks));
-    localStorage.setItem('deletedTasks', JSON.stringify(deletedTasks));
 }
 
 function loadSavedTasks() {
     const savedTasks = localStorage.getItem('savedTasks');
-    const savedDeletedTasks = localStorage.getItem('deletedTasks');
-
     if (savedTasks) {
         tasks = JSON.parse(savedTasks);
     }
-    if (savedDeletedTasks) {
-        deletedTasks = JSON.parse(savedDeletedTasks);
-    }
-
     updateTaskList();
-    updateDeletedTaskList();
 }
 
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
-    taskList.innerHTML = '';
+    taskList.innerHTML = ''; // Clear current list
 
     tasks.forEach(task => {
         const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
+        taskItem.className = 'task-list-item d-flex justify-content-between align-items-center';
+
+        // Add active class if this is the current task
         if (currentTask && currentTask.id === task.id) {
             taskItem.classList.add('active');
         }
 
         taskItem.innerHTML = `
-            <span>${task.name}</span>
-            <div>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">
-                    <i data-feather="trash-2"></i>
-                </button>
-            </div>
+            <span class="task-name">${task.name}</span>
+            <button class="btn btn-danger btn-sm delete-task-btn">
+                <i data-feather="trash-2"></i>
+            </button>
         `;
 
-        // Add click handler to the entire task item
-        taskItem.addEventListener('click', (e) => {
-            // Don't trigger if clicking delete button
-            if (!e.target.closest('.delete-task-btn')) {
-                loadTask(task);
-                // Update active state
-                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-                taskItem.classList.add('active');
-                logLiveConsole(`Loaded task: ${task.name}`, 'info');
-            }
+        // Add click handler for task selection
+        taskItem.querySelector('.task-name').addEventListener('click', () => {
+            loadTask(task);
+            // Update active state
+            document.querySelectorAll('.task-list-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            taskItem.classList.add('active');
+            logLiveConsole(`Loaded task: ${task.name}`, 'info');
         });
 
-        // Add delete functionality
-        const deleteBtn = taskItem.querySelector('.delete-task-btn');
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteTask(task);
+        // Add click handler for delete button
+        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent task selection when deleting
+            const index = tasks.findIndex(t => t.id === task.id);
+            if (index > -1) {
+                tasks.splice(index, 1);
+                saveTasksToStorage();
+                updateTaskList();
+
+                // If the current task was deleted, clear the current task area
+                if (currentTask && currentTask.id === task.id) {
+                    currentTask = null;
+                    document.getElementById('currentTask').innerHTML = '';
+                }
+
+                logLiveConsole(`Deleted task: ${task.name}`, 'info');
+            }
         });
 
         taskList.appendChild(taskItem);
     });
 
-    // Initialize Feather icons for the new elements
+    // Initialize icons
     if (window.feather) {
         feather.replace();
     }
 }
 
-function updateDeletedTaskList() {
-    const deletedList = document.getElementById('deletedTaskList');
-    deletedList.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            ${deletedTasks.length > 0 ? `
-                <button class="btn btn-sm btn-outline-danger clear-all-btn">
-                    Clear All
-                </button>
-            ` : ''}
+function loadTask(task) {
+    if (!task) return;
+
+    currentTask = task;
+    const currentTaskElement = document.getElementById('currentTask');
+    currentTaskElement.innerHTML = '';
+
+    // Create task container
+    const taskDiv = document.createElement('div');
+    taskDiv.className = 'task-block';
+    taskDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="task-name mb-0" contenteditable="true">${task.name}</h5>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+            </div>
         </div>
+        <div class="blocks-container"></div>
     `;
 
-    deletedTasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        taskItem.innerHTML = `
-            <span>${task.name}</span>
-            <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-success restore-btn" title="Restore task">
-                    <i data-feather="refresh-cw"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger remove-btn" title="Delete permanently">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-        `;
-
-        taskItem.querySelector('.restore-btn').addEventListener('click', () => restoreTask(task));
-        taskItem.querySelector('.remove-btn').addEventListener('click', () => {
-            if (confirm('Are you sure you want to permanently delete this task?')) {
-                permanentlyDeleteTask(task);
-            }
-        });
-
-        deletedList.appendChild(taskItem);
+    // Add task name editing functionality
+    const nameElement = taskDiv.querySelector('.task-name');
+    nameElement.addEventListener('blur', () => {
+        task.name = nameElement.textContent;
+        saveTasksToStorage();
+        updateTaskList();
     });
 
-    if (deletedTasks.length > 0) {
-        const clearAllBtn = deletedList.querySelector('.clear-all-btn');
-        clearAllBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to permanently delete all tasks in the recently deleted list?')) {
-                clearAllDeletedTasks();
-            }
-        });
-    }
-}
+    // Add tap block functionality
+    taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
+        const tapDiv = addTapBlock(task);
+        taskDiv.querySelector('.blocks-container').appendChild(tapDiv);
+        saveTasksToStorage();
+    });
 
-function deleteTask(task) {
-    const index = tasks.findIndex(t => t.id === task.id);
-    if (index > -1) {
-        const deletedTask = tasks.splice(index, 1)[0];
-        deletedTasks.push(deletedTask);
+    // Add loop block functionality
+    taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
+        const loopDiv = addLoopBlock(task);
+        taskDiv.querySelector('.blocks-container').appendChild(loopDiv);
+        saveTasksToStorage();
+    });
 
-        if (currentTask && currentTask.id === task.id) {
-            currentTask = tasks.length > 0 ? tasks[tasks.length - 1] : null;
-            if (currentTask) {
-                loadTask(currentTask);
-            } else {
-                document.getElementById('currentTask').innerHTML = '';
-            }
+    currentTaskElement.appendChild(taskDiv);
+
+    // Load existing blocks
+    const blocksContainer = taskDiv.querySelector('.blocks-container');
+    task.blocks.forEach(blockData => {
+        if (blockData.type === 'tap') {
+            const tapDiv = addTapBlock(task, blockData);
+            blocksContainer.appendChild(tapDiv);
+        } else if (blockData.type === 'loop') {
+            const loopDiv = addLoopBlock(task, blockData);
+            blocksContainer.appendChild(loopDiv);
         }
-
-        saveTasksToStorage();
-        updateTaskList();
-        updateDeletedTaskList();
-        logLiveConsole('Task moved to recently deleted', 'info');
-    }
+    });
 }
 
-function restoreTask(task) {
-    const index = deletedTasks.findIndex(t => t.id === task.id);
-    if (index > -1) {
-        const restoredTask = deletedTasks.splice(index, 1)[0];
-        tasks.push(restoredTask);
-
-        saveTasksToStorage();
-        updateTaskList();
-        updateDeletedTaskList();
-        logLiveConsole('Task restored', 'success');
-    }
-}
 
 function executeSelectedTask() {
     if (!currentTask) {
@@ -358,24 +315,19 @@ function addTaskBlock(task) {
     });
 
     taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
-        deleteTask(task);
-        taskDiv.remove();
-        saveTasksToStorage(); // Auto-save after deleting a task
+        const index = tasks.findIndex(t => t.id === task.id);
+        if (index > -1) {
+            tasks.splice(index, 1);
+            saveTasksToStorage();
+            updateTaskList();
+            taskDiv.remove();
+            logLiveConsole(`Task deleted: ${task.name}`, 'info');
+        }
     });
 
     currentTaskElement.appendChild(taskDiv);
 }
 
-function removeTask(taskId) {
-    const index = tasks.findIndex(t => t.id === taskId);
-    if (index > -1) {
-        tasks.splice(index, 1);
-        if (currentTask && currentTask.id === taskId) {
-            currentTask = tasks.length > 0 ? tasks[tasks.length - 1] : null;
-        }
-        logLiveConsole('Task removed', 'info');
-    }
-}
 
 function startSelection(event) {
     if (!currentTapBlock) return;
@@ -490,179 +442,6 @@ function logLiveConsole(message, type = 'info') {
 }
 
 
-function loadTask(task) {
-    if (!task) return;
-
-    currentTask = task;
-    const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = '';
-
-    // Create the task container
-    const taskDiv = document.createElement('div');
-    taskDiv.className = 'task-block';
-    taskDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="task-name mb-0" contenteditable="true">${task.name}</h5>
-            <div>
-                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">Delete</button>
-            </div>
-        </div>
-        <div class="blocks-container"></div>
-    `;
-
-    // Add event listeners
-    const nameElement = taskDiv.querySelector('.task-name');
-    nameElement.addEventListener('blur', () => {
-        task.name = nameElement.textContent;
-        saveTasksToStorage();
-        updateTaskList();
-    });
-
-    const blocksContainer = taskDiv.querySelector('.blocks-container');
-
-    taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-        const tapDiv = addTapBlock(task);
-        blocksContainer.appendChild(tapDiv);
-        saveTasksToStorage();
-    });
-
-    taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
-        const loopDiv = addLoopBlock(task);
-        blocksContainer.appendChild(loopDiv);
-        saveTasksToStorage();
-    });
-
-    taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
-        deleteTask(task);
-        taskDiv.remove();
-        saveTasksToStorage();
-    });
-
-    currentTaskElement.appendChild(taskDiv);
-
-    // Clear existing visual elements
-    document.querySelectorAll('.active-selection-box').forEach(box => box.remove());
-
-    // Rebuild blocks from saved data
-    task.blocks.forEach(blockData => {
-        let blockDiv;
-        if (blockData.type === 'tap') {
-            blockDiv = document.createElement('div');
-            blockDiv.className = 'block tap-block';
-            blockDiv.draggable = true;
-            blockDiv.innerHTML = `
-                <div class="delete-dot"></div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="block-name" contenteditable="true">${blockData.name || 'Tap Block'}</h6>
-                    <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
-                </div>
-            `;
-
-            setupDragAndDrop(blockDiv);
-
-            // Setup event listeners
-            blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-                const index = task.blocks.indexOf(blockData);
-                if (index > -1) {
-                    task.blocks.splice(index, 1);
-                    blockDiv.remove();
-                    logLiveConsole('Tap block removed', 'info');
-                    saveTasksToStorage();
-                }
-            });
-
-            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-                enableDrawingMode(blockData, blockDiv);
-            });
-
-            blockDiv.addEventListener('click', (e) => {
-                if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
-                    setBlockFocus(blockData, blockDiv);
-                }
-            });
-
-            // Create and show selection box if region exists
-            if (blockData.region) {
-                const selectionBoxElement = document.createElement('div');
-                selectionBoxElement.className = 'active-selection-box';
-                document.getElementById('simulator').appendChild(selectionBoxElement);
-                blockData.selectionBoxElement = selectionBoxElement;
-                showSelectionBox(blockData);
-            }
-        } else if (blockData.type === 'loop') {
-            blockDiv = document.createElement('div');
-            blockDiv.className = 'block loop-block';
-            blockDiv.innerHTML = `
-                <div class="delete-dot"></div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="block-name" contenteditable="true">${blockData.name || 'Loop Block'}</h6>
-                </div>
-                <div class="input-group mb-2">
-                    <span class="input-group-text">Iterations</span>
-                    <input type="number" class="form-control iterations-input" value="${blockData.iterations || 1}" min="1">
-                </div>
-                <div class="nested-blocks"></div>
-                <div class="d-flex gap-2 mt-2">
-                    <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                    <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-                </div>
-            `;
-
-            const iterationsInput = blockDiv.querySelector('.iterations-input');
-            iterationsInput.addEventListener('change', (e) => {
-                blockData.iterations = parseInt(e.target.value) || 1;
-                saveTasksToStorage();
-            });
-
-            // Setup event listeners for nested blocks
-            blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-                const tapDiv = addTapBlock(blockData);
-                blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
-                saveTasksToStorage();
-            });
-
-            blockDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
-                const nestedLoopDiv = addLoopBlock(blockData);
-                blockDiv.querySelector('.nested-blocks').appendChild(nestedLoopDiv);
-                saveTasksToStorage();
-            });
-
-            blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-                const index = task.blocks.indexOf(blockData);
-                if (index > -1) {
-                    task.blocks.splice(index, 1);
-                    blockDiv.remove();
-                    logLiveConsole('Loop block removed', 'info');
-                    saveTasksToStorage();
-                }
-            });
-
-            // Recursively load nested blocks
-            if (blockData.blocks && blockData.blocks.length > 0) {
-                const nestedBlocksContainer = blockDiv.querySelector('.nested-blocks');
-                blockData.blocks.forEach(nestedBlockData => {
-                    if (nestedBlockData.type === 'tap') {
-                        const nestedTapDiv = addTapBlock(blockData);
-                        nestedBlocksContainer.appendChild(nestedTapDiv);
-                    } else if (nestedBlockData.type === 'loop') {
-                        const nestedLoopDiv = addLoopBlock(blockData);
-                        nestedBlocksContainer.appendChild(nestedLoopDiv);
-                    }
-                });
-            }
-        }
-
-        if (blockDiv) {
-            blocksContainer.appendChild(blockDiv);
-        }
-    });
-
-    updateTaskList();
-    logLiveConsole(`Loaded task: ${task.name}`, 'info');
-}
-
 function enableDrawingMode(tapBlock, tapDiv) {
     // Clear any existing focus first
     if (focusedBlock && focusedBlock.element !== tapDiv) {
@@ -713,9 +492,8 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-
-function addTapBlock(parent) {
-    const tapBlock = {
+function addTapBlock(parent, blockData = null) {
+    const tapBlock = blockData || {
         type: 'tap',
         region: null,
         name: 'Tap Block'
@@ -762,8 +540,8 @@ function addTapBlock(parent) {
     return blockDiv;
 }
 
-function addLoopBlock(parent) {
-    const loopBlock = {
+function addLoopBlock(parent, blockData = null) {
+    const loopBlock = blockData || {
         type: 'loop',
         iterations: 1,
         blocks: [],
@@ -868,22 +646,7 @@ function generateGCode() {
 function setupDragAndDrop(blockDiv) {}
 function simulateTap(x, y) {}
 
-function permanentlyDeleteTask(task) {
-    const index = deletedTasks.findIndex(t => t.id === task.id);
-    if (index > -1) {
-        deletedTasks.splice(index, 1);
-        saveTasksToStorage();
-        updateDeletedTaskList();
-        logLiveConsole('Task permanently deleted', 'info');
-    }
-}
-
-function clearAllDeletedTasks() {
-    deletedTasks = [];
-    saveTasksToStorage();
-    updateDeletedTaskList();
-    logLiveConsole('All deleted tasks cleared', 'info');
-}function handleMessage(message) {
+function handleMessage(message) {
     if (!message || !message.command) return;
 
     switch (message.command) {
@@ -936,54 +699,5 @@ function clearAllDeletedTasks() {
                 logLiveConsole('No task selected to execute', 'error');
             }
             break;
-    }
-}
-
-// Update updateTaskList to ensure click handlers are properly initialized
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = '';
-
-    tasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        if (currentTask && currentTask.id === task.id) {
-            taskItem.classList.add('active');
-        }
-
-        taskItem.innerHTML = `
-            <span>${task.name}</span>
-            <div>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">
-                    <i data-feather="trash-2"></i>
-                </button>
-            </div>
-        `;
-
-        // Add click handler to the entire task item
-        taskItem.addEventListener('click', (e) => {
-            // Don't trigger if clicking delete button
-            if (!e.target.closest('.delete-task-btn')) {
-                loadTask(task);
-                // Update active state
-                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-                taskItem.classList.add('active');
-                logLiveConsole(`Loaded task: ${task.name}`, 'info');
-            }
-        });
-
-        // Add delete functionality
-        const deleteBtn = taskItem.querySelector('.delete-task-btn');
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteTask(task);
-        });
-
-        taskList.appendChild(taskItem);
-    });
-
-    // Initialize Feather icons for the new elements
-    if (window.feather) {
-        feather.replace();
     }
 }
