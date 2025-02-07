@@ -7,7 +7,8 @@ window.state = {
     currentTask: null,
     tasks: [],
     autoSaveTimeout: null,
-    pendingBlockConfiguration: null
+    pendingBlockConfiguration: null,
+    focusedBlock: null  // Track currently focused block
 };
 
 // State management
@@ -264,29 +265,18 @@ function updateTaskDisplay() {
 
             blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <input type="text" class="form-control form-control-sm block-name-input" 
-                           value="${block.name || 'Tap Block'}" style="width: 120px">
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary select-region-btn">
-                            ${block.region ? 'Change Region' : 'Set Region'}
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-                    </div>
+                    <h6 class="mb-0">Tap Block</h6>
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
                 </div>
                 <small class="text-muted">Region: ${regionText}</small>
             `;
 
-            // Add click handler to show region and enable drawing mode
             blockDiv.addEventListener('click', (e) => {
-                if (!e.target.closest('.btn')) {
+                if (!e.target.closest('.select-region-btn')) {
                     setBlockFocus(block, blockDiv);
                 }
-            });
-
-            const nameInput = blockDiv.querySelector('.block-name-input');
-            nameInput.addEventListener('change', () => {
-                block.name = nameInput.value;
-                scheduleAutosave();
             });
 
             blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
@@ -595,6 +585,15 @@ function showSelectionBox(region) {
 
 // Add these utility functions for block interaction
 function setBlockFocus(block, blockDiv) {
+    // Hide previous selection if exists and it's not the same block
+    if (window.state.focusedBlock && window.state.focusedBlock !== block) {
+        const selectionBox = document.getElementById('selectionBox');
+        selectionBox.classList.add('d-none');
+    }
+
+    // Update focused block
+    window.state.focusedBlock = block;
+
     if (block.region) {
         showSelectionBox(block.region);
     }
