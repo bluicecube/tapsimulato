@@ -30,7 +30,7 @@ function addConditionalBlock() {
 
     const block = {
         type: 'conditional',
-        name: 'IF / ELSE Block',  // Updated name
+        name: 'Logic Block',  // Updated name
         data: {
             threshold: 90,
             referenceImage: null,
@@ -46,7 +46,7 @@ function addConditionalBlock() {
     state.currentTask.blocks.push(block);
     updateTaskDisplay();
     scheduleAutosave();
-    logToConsole('Added IF / ELSE block', 'success');  // Updated message
+    logToConsole('Added Logic block', 'success');  // Updated message
 }
 
 // State management
@@ -845,7 +845,7 @@ function renderBlock(block, index) {
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">IF / ELSE Block</h6>
+                <h6 class="mb-0">Logic Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
                         ${block.data?.referenceImage ? 'Update Reference' : 'Capture Reference'}
