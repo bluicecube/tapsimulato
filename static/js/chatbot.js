@@ -23,18 +23,33 @@ Your responses should be in JSON format:
     "message": "human readable response"
 }`;
 
+// Chat interface functionality
+let chatInitialized = false;
+
 // Initialize chat interface
-document.addEventListener('DOMContentLoaded', () => {
+function initializeChat() {
+    if (chatInitialized) return;
+
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
 
-    if (chatInput && sendButton) {
-        sendButton.addEventListener('click', () => handleChatMessage());
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleChatMessage();
-        });
+    if (!chatInput || !sendButton) {
+        console.error('Chat elements not found');
+        return;
     }
-});
+
+    sendButton.addEventListener('click', () => {
+        handleChatMessage();
+    });
+
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleChatMessage();
+        }
+    });
+
+    chatInitialized = true;
+}
 
 // Add message to chat interface
 function addMessage(role, content) {
@@ -66,44 +81,6 @@ function hideThinking() {
     const thinkingEl = document.getElementById('thinkingIndicator');
     if (thinkingEl) {
         thinkingEl.remove();
-    }
-}
-
-// Process blocks from AI response
-function processBlocks(blocks) {
-    if (!window.state || !window.state.currentTask) {
-        console.error('No active task to add blocks to');
-        return;
-    }
-
-    const newBlocks = blocks.map(block => {
-        if (block.type === 'loop') {
-            return {
-                type: 'loop',
-                name: 'Loop Block',
-                iterations: block.iterations || 1,
-                blocks: block.blocks ? block.blocks : []
-            };
-        } else if (block.type === 'tap') {
-            const region = calculateTapRegion(block.location);
-            return {
-                type: 'tap',
-                name: 'Tap Block',
-                region: region,
-                description: block.location || 'Center tap'
-            };
-        }
-        return null;
-    }).filter(block => block !== null);
-
-    window.state.currentTask.blocks.push(...newBlocks);
-
-    // Update display and save
-    if (typeof window.updateTaskDisplay === 'function') {
-        window.updateTaskDisplay();
-    }
-    if (typeof window.scheduleAutosave === 'function') {
-        window.scheduleAutosave();
     }
 }
 
@@ -155,57 +132,100 @@ function calculateTapRegion(description) {
     return locations.middle;
 }
 
+// Process blocks from AI response
+function processBlocks(blocks) {
+    if (!window.state?.currentTask) {
+        console.error('No active task to add blocks to');
+        return;
+    }
+
+    const newBlocks = blocks.map(block => {
+        if (block.type === 'loop') {
+            return {
+                type: 'loop',
+                name: 'Loop Block',
+                iterations: block.iterations || 1,
+                blocks: block.blocks || []
+            };
+        } else if (block.type === 'tap') {
+            const region = calculateTapRegion(block.location);
+            return {
+                type: 'tap',
+                name: 'Tap Block',
+                region: region,
+                description: block.location || 'Center tap'
+            };
+        }
+        return null;
+    }).filter(block => block !== null);
+
+    window.state.currentTask.blocks.push(...newBlocks);
+
+    if (typeof window.updateTaskDisplay === 'function') {
+        window.updateTaskDisplay();
+    }
+    if (typeof window.scheduleAutosave === 'function') {
+        window.scheduleAutosave();
+    }
+}
+
 // Handle chat messages
 async function handleChatMessage() {
+    console.log('Handling chat message');
     const chatInput = document.getElementById('chatInput');
-    if (!chatInput) return;
+    if (!chatInput) {
+        console.error('Chat input not found');
+        return;
+    }
 
     const message = chatInput.value.trim();
-    if (!message) return;
+    if (!message) {
+        console.log('Empty message, ignoring');
+        return;
+    }
 
-    // Clear input
+    console.log('Processing message:', message);
     chatInput.value = '';
-
-    // Add user message
     addMessage('user', message);
-
-    // Show thinking indicator
     showThinking();
 
     try {
-        // Send request to OpenAI API
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
+                    {
+                        role: 'system',
+                        content: 'You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks: 1. Tap Block (single tap action) 2. Loop Block (repeats nested blocks). Respond in JSON format with command, params (containing blocks), and message.'
+                    },
                     { role: 'user', content: message }
                 ]
             })
         });
 
-        if (!response.ok) throw new Error('Failed to get AI response');
+        console.log('Got response from server');
         const data = await response.json();
         hideThinking();
 
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
         try {
             const assistantMessage = data.choices[0].message.content;
+            console.log('Parsing assistant message:', assistantMessage);
             const responseData = JSON.parse(assistantMessage);
 
-            // Add AI response to chat
             addMessage('assistant', responseData.message);
 
-            // Handle commands
             if (responseData.command === 'add_blocks' && responseData.params.blocks) {
                 processBlocks(responseData.params.blocks);
-            } else if (responseData.command === 'execute') {
-                if (typeof window.executeTask === 'function') {
-                    window.executeTask();
-                }
+            } else if (responseData.command === 'execute' && typeof window.executeTask === 'function') {
+                window.executeTask();
             }
         } catch (parseError) {
-            console.error('Error parsing AI response:', parseError);
+            console.error('Error parsing response:', parseError);
             addMessage('assistant', data.choices[0].message.content);
         }
     } catch (error) {
@@ -214,6 +234,12 @@ async function handleChatMessage() {
         addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
     }
 }
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing chat interface');
+    initializeChat();
+});
 
 // Export functions for simulator
 window.addMessage = addMessage;
@@ -459,8 +485,6 @@ function updateTaskDisplay() {
     }
 }
 
-// Initialize when DOM is ready
-
 // Log messages to the console
 function logToConsole(message, type = 'info') {
     const console = document.getElementById('liveConsole');
@@ -472,3 +496,6 @@ function logToConsole(message, type = 'info') {
     console.appendChild(messageEl);
     console.scrollTop = console.scrollHeight;
 }
+
+//Initialise tasks on load
+document.addEventListener('DOMContentLoaded', loadTasks);
