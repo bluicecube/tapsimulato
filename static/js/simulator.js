@@ -374,35 +374,6 @@ function updateTaskList() {
     });
 }
 
-// Add delete all tasks functionality
-document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to delete all tasks?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/tasks/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all tasks');
-
-        // Clear tasks from state
-        state.tasks = [];
-        state.currentTask = null;
-
-        // Create a new task
-        const newTask = await createNewTask();
-        await loadTask(newTask.id);
-
-        updateTaskList();
-        updateTaskDisplay();
-        logToConsole('All tasks deleted and new task created', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all tasks', 'error');
-    }
-});
-
 
 // Block Management
 function startTapRegionSelection(blockElement) {
@@ -503,16 +474,27 @@ function removeBlock(blockElement) {
     const index = blockElement.dataset.index;
     const indices = index.split('.');
 
-    if (indices.length === 1) {
-        state.currentTask.blocks.splice(indices[0], 1);
-    } else {
-        // Handle nested blocks in loops
-        const parentBlock = state.currentTask.blocks[indices[0]];
-        parentBlock.blocks.splice(indices[1], 1);
+    let targetBlocks = state.currentTask.blocks;
+    let targetIndex = parseInt(indices[0]);
+
+    // Handle nested blocks in conditionals
+    if (indices.length > 1) {
+        if (indices[1] === 'then' || indices[1] === 'else') {
+            const parentBlock = targetBlocks[indices[0]];
+            targetBlocks = parentBlock.data[`${indices[1]}Blocks`];
+            targetIndex = parseInt(indices[2]);
+        } else {
+            // Handle nested blocks in loops
+            const parentBlock = targetBlocks[indices[0]];
+            targetBlocks = parentBlock.blocks;
+            targetIndex = parseInt(indices[1]);
+        }
     }
 
+    targetBlocks.splice(targetIndex, 1);
     updateTaskDisplay();
     scheduleAutosave();
+    logToConsole('Block removed', 'success');
 }
 
 
@@ -830,10 +812,10 @@ function renderBlock(block, index) {
                 <h6 class="mb-0">Conditional Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
-                        ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
+                        ${block.data?.referenceImage ? 'Update Reference' : 'Capture Reference'}
                     </button>
                     <input type="number" class="form-control form-control-sm threshold-input" 
-                           value="${block.data.threshold}" min="0" max="100" style="width: 70px">
+                           value="${block.data?.threshold || 90}" min="0" max="100" style="width: 70px">
                     <span class="ms-2 me-2">% similar</span>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
@@ -856,7 +838,16 @@ function renderBlock(block, index) {
             </div>
         `;
 
-        // Add event listeners
+        // Add delete button handler
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Rest of the conditional block event handlers...
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
         captureBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -880,7 +871,6 @@ function renderBlock(block, index) {
             }
         });
 
-        // Add threshold change handler
         const thresholdInput = blockDiv.querySelector('.threshold-input');
         thresholdInput.addEventListener('change', (e) => {
             block.data.threshold = parseInt(e.target.value) || 90;
