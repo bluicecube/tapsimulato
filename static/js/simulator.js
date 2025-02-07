@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); }); // Updated event listener
     document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
     document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
     document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
@@ -79,12 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup video sharing
     setupVideoSharing();
 
-    // Load functions
+    // Load functions and tasks
     loadFunctions();
-
-    // Create initial task and load tasks
-    createNewTask().then(() => {
-        loadTasks();
+    loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
     });
 
@@ -136,7 +133,17 @@ async function loadTasks() {
         updateTaskList();
 
         if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
+            // Load the most recently updated task
+            const mostRecentTask = state.tasks.reduce((latest, current) => {
+                const latestDate = new Date(latest.updated_at);
+                const currentDate = new Date(current.updated_at);
+                return currentDate > latestDate ? current : latest;
+            }, state.tasks[0]);
+
+            await loadTask(mostRecentTask.id);
+        } else {
+            // Only create a new task if there are no existing tasks
+            await createNewTask();
         }
     } catch (error) {
         console.error('Error loading tasks:', error);
@@ -928,8 +935,7 @@ async function addFunctionBlock(functionId) {
             return {
                 type: 'tap',
                 name: block.name || 'Tap Block',
-                description: 'Click to set region',
-                region: null // Region will be set by user
+                description: 'Click to set region',                region: null // Region will be set by user
             };
         } else if (block.type === 'loop') {
             return {
@@ -952,7 +958,8 @@ async function addFunctionBlock(functionId) {
         blocks: blocks
     };
 
-    state.currentTask.blocks.push(block);updateTaskDisplay();
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
     scheduleAutosave();
     logToConsole(`Added function: ${func.name}`, 'success');
 }
