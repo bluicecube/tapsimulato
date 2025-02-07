@@ -796,6 +796,7 @@ function renderBlock(block, index) {
             });
         }
     } else if (block.type === 'conditional') {
+        // New conditional block rendering
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Conditional Block</h6>
@@ -836,7 +837,7 @@ function renderBlock(block, index) {
             });
         }
 
-        // Rest of conditional block event handlers remain unchanged...
+        // Reference image capture
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
         if (captureBtn) {
             captureBtn.addEventListener('click', async (e) => {
@@ -844,6 +845,11 @@ function renderBlock(block, index) {
                 const imageData = captureVideoFrame();
 
                 try {
+                    if (!block.id) {
+                        logToConsole('Block ID not found', 'error');
+                        return;
+                    }
+
                     const response = await fetch(`/api/blocks/${block.id}/reference-image`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -862,6 +868,7 @@ function renderBlock(block, index) {
             });
         }
 
+        // Threshold input
         const thresholdInput = blockDiv.querySelector('.threshold-input');
         if (thresholdInput) {
             thresholdInput.addEventListener('change', (e) => {
@@ -877,13 +884,36 @@ function renderBlock(block, index) {
 
             if (tapBtn) {
                 tapBtn.addEventListener('click', () => {
-                    addTapBlock(index, `${section}Blocks`);
+                    const newBlock = {
+                        type: 'tap',
+                        region: null
+                    };
+
+                    if (!block.data[`${section}Blocks`]) {
+                        block.data[`${section}Blocks`] = [];
+                    }
+
+                    block.data[`${section}Blocks`].push(newBlock);
+                    updateTaskDisplay();
+                    scheduleAutosave();
                 });
             }
 
             if (loopBtn) {
                 loopBtn.addEventListener('click', () => {
-                    addLoopBlock(index, `${section}Blocks`);
+                    const newBlock = {
+                        type: 'loop',
+                        iterations: 1,
+                        blocks: []
+                    };
+
+                    if (!block.data[`${section}Blocks`]) {
+                        block.data[`${section}Blocks`] = [];
+                    }
+
+                    block.data[`${section}Blocks`].push(newBlock);
+                    updateTaskDisplay();
+                    scheduleAutosave();
                 });
             }
         });
@@ -1427,7 +1457,6 @@ function addConditionalBlock() {
 
     const block = {
         type: 'conditional',
-        name: 'Conditional Block',
         data: {
             threshold: 90,  // Default similarity threshold
             referenceImage: null,
