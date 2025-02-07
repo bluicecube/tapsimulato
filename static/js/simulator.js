@@ -155,15 +155,16 @@ function updateTaskList() {
             </div>
         `;
 
-        // Add click handler to the entire task item except delete button
-        const taskSpan = taskItem.querySelector('span');
-        taskSpan.style.cursor = 'pointer';
-        taskSpan.addEventListener('click', () => {
-            loadTask(task);
-            // Update active state
-            document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-            taskItem.classList.add('active');
-            logLiveConsole(`Loaded task: ${task.name}`, 'info');
+        // Add click handler to the entire task item
+        taskItem.addEventListener('click', (e) => {
+            // Don't trigger if clicking delete button
+            if (!e.target.closest('.delete-task-btn')) {
+                loadTask(task);
+                // Update active state
+                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
+                taskItem.classList.add('active');
+                logLiveConsole(`Loaded task: ${task.name}`, 'info');
+            }
         });
 
         // Add delete functionality
@@ -490,6 +491,8 @@ function logLiveConsole(message, type = 'info') {
 
 
 function loadTask(task) {
+    if (!task) return;
+
     currentTask = task;
     const currentTaskElement = document.getElementById('currentTask');
     currentTaskElement.innerHTML = '';
@@ -882,7 +885,7 @@ function clearAllDeletedTasks() {
     logLiveConsole('All deleted tasks cleared', 'info');
 }
 
-// Update handleMessage function to properly manage task creation and block addition
+// UpdatehandleMessage function to properly manage task creation and block addition
 function handleMessage(message) {
     if (!message || !message.command) return;
 
