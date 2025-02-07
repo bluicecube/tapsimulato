@@ -15,7 +15,7 @@ class Block(db.Model):
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
     type = db.Column(db.String(20), nullable=False)  # 'tap', 'loop', 'function', or 'conditional'
     name = db.Column(db.String(100))
-    data = db.Column(JSON)  # Store block-specific data
+    data = db.Column(JSON)  # Store block-specific data like coordinates, iterations, etc.
     reference_image = db.Column(BYTEA, nullable=True)  # Store reference image for conditional blocks
     parent_id = db.Column(db.Integer, db.ForeignKey('block.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

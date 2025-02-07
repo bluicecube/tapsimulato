@@ -337,6 +337,7 @@ function addTapBlock(parentLoopIndex = null, region = null) {
     }
 
     updateTaskDisplay();
+    scheduleAutosave();
     logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
 
     // Auto-enable drawing mode for the new block
