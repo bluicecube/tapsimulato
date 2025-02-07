@@ -733,8 +733,10 @@ function addBlockToFunction(type, parentElement = null) {
         blockElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-primary add-to-loop-btn">Add Block</button>
+                <div class="input-group" style="width: auto;">
+                    <input type="number" class="form-control form-control-sm iterations-input" 
+                           value="1" min="1" style="width: 70px">
+                    <span class="input-group-text">times</span>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
@@ -751,6 +753,12 @@ function addBlockToFunction(type, parentElement = null) {
         });
         blockElement.querySelector('.add-loop-to-loop-btn').addEventListener('click', () => {
             addBlockToFunction('loop', blockElement);
+        });
+
+        // Add event listener for iterations input
+        const iterationsInput = blockElement.querySelector('.iterations-input');
+        iterationsInput.addEventListener('change', (e) => {
+            block.data.iterations = parseInt(e.target.value) || 1;
         });
     } else {
         blockElement.innerHTML = `
@@ -787,11 +795,13 @@ async function saveFunction() {
             const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
             const block = {
                 type,
-                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
-                data: {} // Empty data for now, will be set when added to task
+                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
             };
 
             if (type === 'loop') {
+                const iterationsInput = blockElement.querySelector('.iterations-input');
+                block.iterations = parseInt(iterationsInput.value) || 1;
+
                 const nestedContainer = blockElement.querySelector('.nested-blocks');
                 if (nestedContainer) {
                     block.blocks = collectBlocks(nestedContainer);
