@@ -25,24 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
             logLiveConsole('No task selected', 'error');
         }
     });
-    document.getElementById('executeBtn').addEventListener('click', () => {
-        if (currentTask) {
-            // Simulate user sending an execute command through chat
-            handleMessage({
-                preventDefault: () => {},
-                type: 'click'
-            });
-
-            const chatInput = document.getElementById('chatInput');
-            chatInput.value = 'execute current task';
-            handleMessage({
-                preventDefault: () => {},
-                type: 'click'
-            });
-        } else {
-            logLiveConsole('No task selected', 'error');
-        }
-    });
     document.getElementById('toggleTasksBtn').addEventListener('click', toggleTasksSidebar);
 
     const simulator = document.getElementById('simulator');
@@ -59,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.style.setProperty('--device-height', `${DEVICE_HEIGHT}px`);
 
     // Initialize video stream functionality
-    const videoSource = document.getElementById('videoSource');
     const setVideoSourceBtn = document.getElementById('setVideoSource');
     const video = document.getElementById('bgVideo');
 
@@ -94,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
             video.srcObject = null;
         }
     });
-
 
     // Load saved tasks
     loadSavedTasks();
@@ -766,8 +746,6 @@ function addLoopBlock(parent) {
 
     return blockDiv;
 }
-
-
 
 
 
