@@ -17,4 +17,5 @@ dependencies = [
     "openai>=1.61.1",
     "python-dotenv>=1.0.1",
     "sqlalchemy>=2.0.37",
+    "trafilatura>=2.0.0",
 ]

@@ -48,6 +48,18 @@ body {
     overflow: hidden;
 }
 
+/* Zoom controls */
+#scaleDisplay {
+    min-width: 60px;
+    text-align: center;
+    cursor: default;
+    user-select: none;
+}
+
+.btn-group .btn {
+    padding: 0.25rem 0.75rem;
+}
+
 /* Scale adjustment for different screen sizes */
 @media (max-height: 800px) {
     :root {
@@ -423,4 +435,7 @@ body {
     .simulator {
         margin-bottom: 1rem;
     }
+}
+.simulator {
+    transition: width 0.3s ease, height 0.3s ease;
 }

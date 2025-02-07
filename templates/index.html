@@ -12,10 +12,16 @@
         const REAL_WIDTH = 76.3;  // mm
         const REAL_HEIGHT = 161.4; // mm
         const SIMULATOR_SCALE = 0.6;
+        const MIN_SCALE = 0.3;
+        const MAX_SCALE = 1.0;
+        const SCALE_STEP = 0.1;
+
+        let currentScale = SIMULATOR_SCALE;
 
         // Accurately calculate and maintain physical size
         function setupPhysicalSize() {
             const root = document.documentElement;
+            updateSimulatorScale(currentScale);
 
             // Get device pixel ratio
             const devicePixelRatio = window.devicePixelRatio || 1;
@@ -32,15 +38,20 @@
             // Get actual pixels per mm
             const pixelsPerMm = testElement.offsetWidth;
             document.body.removeChild(testElement);
+        }
 
-            // Set simulator scale
-            root.style.setProperty('--simulator-scale', SIMULATOR_SCALE.toString());
+        function updateSimulatorScale(scale) {
+            const root = document.documentElement;
+            root.style.setProperty('--simulator-scale', scale.toString());
 
-            // Calculate scaled dimensions
-            const scaledWidth = REAL_WIDTH * SIMULATOR_SCALE;
-            const scaledHeight = REAL_HEIGHT * SIMULATOR_SCALE;
+            // Update scale display
+            const scaleDisplay = document.getElementById('scaleDisplay');
+            if (scaleDisplay) {
+                scaleDisplay.textContent = `${Math.round(scale * 100)}%`;
+            }
 
-            // Set dimensions
+            const scaledWidth = REAL_WIDTH * scale;
+            const scaledHeight = REAL_HEIGHT * scale;
             const simulator = document.querySelector('.simulator');
             if (simulator) {
                 simulator.style.width = `${scaledWidth}mm`;
@@ -48,11 +59,25 @@
             }
         }
 
+        function zoomIn() {
+            if (currentScale < MAX_SCALE) {
+                currentScale = Math.min(MAX_SCALE, currentScale + SCALE_STEP);
+                updateSimulatorScale(currentScale);
+            }
+        }
+
+        function zoomOut() {
+            if (currentScale > MIN_SCALE) {
+                currentScale = Math.max(MIN_SCALE, currentScale - SCALE_STEP);
+                updateSimulatorScale(currentScale);
+            }
+        }
+
         // Helper function to convert simulator coordinates to real device coordinates
         window.simulatorToRealCoordinates = function(x, y) {
             return {
-                x: x / SIMULATOR_SCALE,
-                y: y / SIMULATOR_SCALE
+                x: x / currentScale,
+                y: y / currentScale
             };
         }
 
@@ -67,7 +92,14 @@
             <div class="col-md-6">
                 <div class="card mb-3">
                     <div class="card-header">
-                        <h4 class="mb-0">Device Simulator</h4>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Device Simulator</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" onclick="zoomOut()">-</button>
+                                <span class="btn btn-outline-secondary" id="scaleDisplay">60%</span>
+                                <button class="btn btn-outline-secondary" onclick="zoomIn()">+</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="card-body d-flex flex-column align-items-center">
                         <div id="simulator" class="simulator">
