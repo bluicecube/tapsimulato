@@ -57,6 +57,12 @@
                                 Create New Function
                             </button>
                         </div>
+
+                        <!-- Current Task Blocks -->
+                        <div id="currentTask" class="current-task"></div>
+
+                        <!-- Console Output -->
+                        <div id="liveConsole" class="live-console mt-3"></div>
                     </div>
                 </div>
             </div>
@@ -118,5 +124,6 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
 </body>
 </html>
