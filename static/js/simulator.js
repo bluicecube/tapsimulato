@@ -15,8 +15,16 @@ let currentTapBlock = null;
 let focusedBlock = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Existing initialization code
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+    document.getElementById('runTaskBtn').addEventListener('click', () => {
+        if (currentTask) {
+            executeSelectedTask();
+        } else {
+            logLiveConsole('No task selected', 'error');
+        }
+    });
     document.getElementById('executeBtn').addEventListener('click', () => {
         if (currentTask) {
             // Simulate user sending an execute command through chat
@@ -49,6 +57,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set CSS variables for other components
     document.documentElement.style.setProperty('--device-width', `${DEVICE_WIDTH}px`);
     document.documentElement.style.setProperty('--device-height', `${DEVICE_HEIGHT}px`);
+
+    // Initialize video stream functionality
+    const videoSource = document.getElementById('videoSource');
+    const setVideoSourceBtn = document.getElementById('setVideoSource');
+    const video = document.getElementById('bgVideo');
+
+    setVideoSourceBtn.addEventListener('click', () => {
+        const url = videoSource.value.trim();
+        if (url) {
+            // Stop any existing stream
+            if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+
+            try {
+                video.src = url;
+                video.onerror = () => {
+                    logLiveConsole('Error loading video stream. Please check the URL.', 'error');
+                    video.src = ''; // Clear the source on error
+                };
+                video.onloadeddata = () => {
+                    logLiveConsole('Video stream connected successfully', 'success');
+                };
+            } catch (error) {
+                logLiveConsole(`Error setting video source: ${error.message}`, 'error');
+            }
+        } else {
+            logLiveConsole('Please enter a valid video stream URL', 'error');
+        }
+    });
 
     // Load saved tasks
     loadSavedTasks();
@@ -716,6 +755,7 @@ function addLoopBlock(parent) {
 }
 
 
+
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
@@ -793,4 +833,9 @@ function clearAllDeletedTasks() {
     saveTasksToStorage();
     updateDeletedTaskList();
     logLiveConsole('All deleted tasks cleared', 'info');
+}
+
+function handleMessage(message) {
+    // Placeholder for handling messages.  This needs a proper implementation
+    console.log("Message received:", message);
 }

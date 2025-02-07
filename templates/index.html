@@ -19,9 +19,15 @@
                             <div class="card-header">
                                 <h4>Samsung Galaxy A11 Simulator</h4>
                             </div>
-                            <div class="card-body d-flex justify-content-center align-items-center">
+                            <div class="card-body d-flex flex-column align-items-center">
                                 <div id="simulator" class="simulator">
+                                    <video id="bgVideo" autoplay muted></video>
                                     <div id="selectionBox" class="selection-box d-none"></div>
+                                </div>
+                                <!-- Video source input moved to bottom -->
+                                <div class="input-group mt-3">
+                                    <input type="text" id="videoSource" class="form-control" placeholder="Enter video stream URL">
+                                    <button class="btn btn-primary" id="setVideoSource">Set Source</button>
                                 </div>
                             </div>
                         </div>
@@ -32,7 +38,7 @@
                                 <h4>Task Management</h4>
                                 <div>
                                     <button id="newTaskBtn" class="btn btn-primary">New Task</button>
-                                    <button id="executeBtn" class="btn btn-warning ms-2">Execute</button>
+                                    <button id="runTaskBtn" class="btn btn-success ms-2">Run</button>
                                     <button id="toggleTasksBtn" class="btn btn-secondary ms-2 d-md-none">
                                         <i data-feather="menu"></i>
                                     </button>
@@ -86,10 +92,63 @@
         </div>
     </div>
 
+    <!-- Excel-style tab system -->
+    <div class="col-12 mt-4">
+        <div class="card">
+            <div class="card-body p-0">
+                <ul class="nav nav-tabs" id="dataTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="task-tab" data-bs-toggle="tab" href="#taskContent" role="tab">Tasks</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="financials-tab" data-bs-toggle="tab" href="#financialsContent" role="tab">Financials</a>
+                    </li>
+                </ul>
+
+                <div class="tab-content p-3" id="dataTabsContent">
+                    <div class="tab-pane fade show active" id="taskContent" role="tabpanel">
+                        <!-- Existing content will go here -->
+                    </div>
+                    <div class="tab-pane fade" id="financialsContent" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Daily Revenue</h5>
+                                        <div id="dailyChart" class="chart-container"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Weekly Summary</h5>
+                                        <div id="weeklyChart" class="chart-container"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Monthly Overview</h5>
+                                        <div id="monthlyChart" class="chart-container"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Load scripts at the end of body -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
     <script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
     <script src="{{ url_for('static', filename='js/gcode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/financials.js') }}"></script>
 </body>
 </html>
