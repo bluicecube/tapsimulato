@@ -2,17 +2,18 @@
 const DEVICE_WIDTH = 320;
 const DEVICE_HEIGHT = 720;
 
-// State management
-const state = {
+// Initialize state
+window.state = {
     currentTask: null,
     tasks: [],
     autoSaveTimeout: null,
     pendingBlockConfiguration: null
 };
 
+// State management
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
-    selectionBox = document.getElementById('selectionBox');
+    const selectionBox = document.getElementById('selectionBox');
     const simulator = document.getElementById('simulator');
     const taskTitle = document.getElementById('taskTitle');
 
@@ -22,43 +23,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
 
-    // Task title handling
-    taskTitle.addEventListener('change', async () => {
-        if (state.currentTask) {
-            try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: taskTitle.value })
-                });
-                if (response.ok) {
-                    const updatedTask = await response.json();
-                    const taskIndex = state.tasks.findIndex(t => t.id === state.currentTask.id);
-                    if (taskIndex !== -1) {
-                        state.tasks[taskIndex] = updatedTask;
-                        updateTaskList();
-                    }
-                    logToConsole('Task renamed successfully', 'success');
-                }
-            } catch (error) {
-                logToConsole('Failed to rename task', 'error');
-            }
-        }
-    });
-
-    // Selection events
-    simulator.addEventListener('mousedown', startSelection);
-    simulator.addEventListener('mousemove', updateSelection);
-    simulator.addEventListener('mouseup', stopSelection);
-
-    // Video setup
-    setupVideoSharing();
-
     // Create initial task and load tasks
     createNewTask().then(() => {
         loadTasks();
+        console.log('Initial state setup complete:', window.state);
     });
 });
+
+// Make functions available globally
+window.processBlocks = function(blocks) {
+    console.log('Processing blocks in simulator:', blocks);
+    if (!window.state.currentTask) {
+        console.error('No active task available');
+        return false;
+    }
+
+    try {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                addLoopBlock(block.iterations, block.blocks);
+            } else if (block.type === 'tap') {
+                addTapBlock(null, block.region);
+            }
+        });
+        updateTaskDisplay();
+        scheduleAutosave();
+        return true;
+    } catch (error) {
+        console.error('Error processing blocks:', error);
+        return false;
+    }
+};
 
 // Task Management
 async function loadTasks() {
@@ -158,7 +153,7 @@ function startTapRegionSelection(blockElement) {
     state.pendingBlockConfiguration = blockElement;
 }
 
-function addTapBlock(parentLoopIndex = null) {
+function addTapBlock(parentLoopIndex = null, region = null) {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
@@ -166,7 +161,8 @@ function addTapBlock(parentLoopIndex = null) {
 
     const block = {
         type: 'tap',
-        description: 'Click to set region'
+        description: 'Click to set region',
+        region: region
     };
 
     if (parentLoopIndex !== null) {
@@ -181,7 +177,7 @@ function addTapBlock(parentLoopIndex = null) {
     logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
 }
 
-function addLoopBlock() {
+function addLoopBlock(iterations = 1, blocks = []) {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
@@ -189,8 +185,8 @@ function addLoopBlock() {
 
     const block = {
         type: 'loop',
-        iterations: 1,
-        blocks: []
+        iterations: iterations,
+        blocks: blocks
     };
 
     state.currentTask.blocks.push(block);

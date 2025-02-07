@@ -1,4 +1,4 @@
-// System prompt for task automation
+// System prompt defines the response format
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
 
 1. Tap Block: Defines a single tap action in a specific region of the screen
@@ -28,7 +28,7 @@ Your responses should be in JSON format:
     "message": "Created sequence: tap top 2 times, then middle once"
 }`;
 
-// Add message to chat interface
+// Helper function to add messages to chat
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
@@ -39,7 +39,6 @@ function addMessage(role, content) {
     chatMessages.appendChild(messageEl);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
 
 // Calculate tap region based on description
 function calculateTapRegion(description) {
@@ -89,13 +88,14 @@ function calculateTapRegion(description) {
     return locations.middle;
 }
 
+
 // Process blocks from AI response
 function processBlocks(blocks) {
     console.log('Processing blocks:', blocks);
 
     if (!window.state?.currentTask) {
         console.error('No active task to add blocks to');
-        return [];
+        return false; // Indicate failure
     }
 
     const processedBlocks = blocks.map(block => {
@@ -128,53 +128,33 @@ function processBlocks(blocks) {
         }
     }
 
-    return processedBlocks;
+    return processedBlocks.length > 0; // Indicate success
 }
 
-// Simple chat interface implementation
+// Chat interface implementation
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing chat...');
-
-    // Get chat elements
+    console.log('Chat initialization started');
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
 
-    console.log('Chat elements:', {
-        messages: chatMessages,
-        input: chatInput,
-        button: sendButton
-    });
-
     if (!chatMessages || !chatInput || !sendButton) {
-        console.error('Missing chat elements!');
+        console.error('Required chat elements not found!');
         return;
     }
 
-    // Clear any existing messages
+    // Clear messages and add greeting
     chatMessages.innerHTML = '';
+    addMessage('assistant', 'Hello! I can help you create tap sequences. What would you like to do?');
 
-    // Add greeting message
-    const greeting = document.createElement('div');
-    greeting.className = 'chat-message assistant';
-    greeting.textContent = 'Hello! I can help you create tap sequences. What would you like to do?';
-    chatMessages.appendChild(greeting);
-
-    // Send message handler
+    // Message handler
     async function handleSendMessage() {
         const message = chatInput.value.trim();
         if (!message) return;
 
-        console.log('Sending message:', message);
-
-        // Add user message
-        const userMessage = document.createElement('div');
-        userMessage.className = 'chat-message user';
-        userMessage.textContent = message;
-        chatMessages.appendChild(userMessage);
-
-        // Clear input
+        console.log('Processing message:', message);
         chatInput.value = '';
+        addMessage('user', message);
 
         // Show thinking message
         const thinkingMessage = document.createElement('div');
@@ -188,10 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: [
-                        {
-                            role: 'system',
-                            content: SYSTEM_PROMPT
-                        },
+                        { role: 'system', content: SYSTEM_PROMPT },
                         { role: 'user', content: message }
                     ]
                 })
@@ -200,38 +177,35 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             chatMessages.removeChild(thinkingMessage);
 
-            const responseMessage = document.createElement('div');
-            responseMessage.className = 'chat-message assistant';
-
             try {
+                console.log('Processing AI response:', data);
                 const aiResponse = data.choices[0].message.content;
-                console.log('AI Response:', aiResponse);
-
                 const parsedResponse = JSON.parse(aiResponse);
-                responseMessage.textContent = parsedResponse.message;
-                chatMessages.appendChild(responseMessage);
 
+                // Add the assistant's message
+                addMessage('assistant', parsedResponse.message);
+
+                // Process blocks if present
                 if (parsedResponse.command === 'add_blocks' && parsedResponse.params?.blocks) {
                     console.log('Creating blocks:', parsedResponse.params.blocks);
-                    if (window.processBlocks) {
-                        window.processBlocks(parsedResponse.params.blocks);
+                    if (window.processBlocks && window.state?.currentTask) {
+                        const success = window.processBlocks(parsedResponse.params.blocks);
+                        if (!success) {
+                            addMessage('assistant', 'Sorry, I had trouble creating the blocks. Please try again.');
+                        }
                     } else {
-                        console.error('processBlocks function not found');
+                        console.error('Missing required functions or state');
+                        addMessage('assistant', 'Sorry, the simulator is not ready. Please refresh the page and try again.');
                     }
                 }
             } catch (parseError) {
                 console.error('Failed to parse AI response:', parseError);
-                responseMessage.textContent = aiResponse;
-                chatMessages.appendChild(responseMessage);
+                addMessage('assistant', 'I had trouble understanding that. Could you please try again?');
             }
         } catch (error) {
             console.error('Chat error:', error);
             chatMessages.removeChild(thinkingMessage);
-
-            const errorMessage = document.createElement('div');
-            errorMessage.className = 'chat-message assistant error';
-            errorMessage.textContent = 'Sorry, I encountered an error. Please try again.';
-            chatMessages.appendChild(errorMessage);
+            addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
         }
 
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -245,8 +219,6 @@ document.addEventListener('DOMContentLoaded', function() {
             handleSendMessage();
         }
     });
-
-    console.log('Chat initialization complete');
 });
 
 // Make add message available to other modules
