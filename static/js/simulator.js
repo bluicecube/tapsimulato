@@ -11,6 +11,11 @@ window.state = {
     focusedBlock: null  // Track currently focused block
 };
 
+// Selection state
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+
 // State management
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
@@ -23,6 +28,34 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+
+    // Add task title change handler
+    taskTitle.addEventListener('change', async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: taskTitle.value
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to update task name');
+
+                const updatedTask = await response.json();
+                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                if (taskIndex !== -1) {
+                    state.tasks[taskIndex] = updatedTask;
+                    updateTaskList();
+                }
+
+                logToConsole('Task name updated', 'success');
+            } catch (error) {
+                logToConsole('Failed to update task name', 'error');
+            }
+        }
+    });
 
     // Selection events
     simulator.addEventListener('mousedown', startSelection);
@@ -366,9 +399,8 @@ function startSelection(event) {
 
 function updateSelection(event) {
     if (!isSelecting) return;
-    const selectionBox = document.getElementById('selectionBox');
-    if (selectionBox.classList.contains('d-none')) return;
 
+    const selectionBox = document.getElementById('selectionBox');
     const rect = event.target.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
     const currentY = event.clientY - rect.top;
@@ -407,17 +439,52 @@ function stopSelection(event) {
     }
 
     targetBlock.region = region;
-    targetBlock.description = `Tap at (${Math.round((region.x1 + region.x2)/2)}, ${Math.round((region.y1 + region.y2)/2)})`;
+    state.pendingBlockConfiguration = null;
+    isSelecting = false;
 
+    // Hide selection box
     const selectionBox = document.getElementById('selectionBox');
     selectionBox.classList.add('d-none');
-    isSelecting = false;
-    state.pendingBlockConfiguration = null;
 
     updateTaskDisplay();
     scheduleAutosave();
-    logToConsole('Region set for tap block', 'success');
+    logToConsole('Region updated', 'success');
 }
+
+// Click handlers for simulator
+document.getElementById('simulator').addEventListener('mousedown', startSelection);
+document.getElementById('simulator').addEventListener('mousemove', updateSelection);
+document.getElementById('simulator').addEventListener('mouseup', stopSelection);
+
+
+// Add these utility functions for block interaction
+function setBlockFocus(block, blockDiv) {
+    // Hide previous selection if exists and it's not the same block
+    if (window.state.focusedBlock && window.state.focusedBlock !== block) {
+        const selectionBox = document.getElementById('selectionBox');
+        selectionBox.classList.add('d-none');
+    }
+
+    // Update focused block
+    window.state.focusedBlock = block;
+
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+    enableDrawingMode(block, blockDiv);
+}
+
+function enableDrawingMode(block, blockDiv) {
+    startTapRegionSelection(blockDiv);
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+}
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
 
 // Task Execution
 function executeTask() {
@@ -562,8 +629,6 @@ document.getElementById('deleteTaskBtn').addEventListener('click', () => {
     deleteTask(taskId);
 });
 
-let isSelecting = false;
-let selectionStartX, selectionStartY;
 
 // Add new function to show selection box for existing region
 function showSelectionBox(region) {
@@ -576,32 +641,3 @@ function showSelectionBox(region) {
     selectionBox.style.height = `${region.y2 - region.y1}px`;
     selectionBox.classList.remove('d-none');
 }
-
-// Add these utility functions for block interaction
-function setBlockFocus(block, blockDiv) {
-    // Hide previous selection if exists and it's not the same block
-    if (window.state.focusedBlock && window.state.focusedBlock !== block) {
-        const selectionBox = document.getElementById('selectionBox');
-        selectionBox.classList.add('d-none');
-    }
-
-    // Update focused block
-    window.state.focusedBlock = block;
-
-    if (block.region) {
-        showSelectionBox(block.region);
-    }
-    enableDrawingMode(block, blockDiv);
-}
-
-function enableDrawingMode(block, blockDiv) {
-    startTapRegionSelection(blockDiv);
-    if (block.region) {
-        showSelectionBox(block.region);
-    }
-}
-
-// Make the simulator's functions available to chatbot.js
-window.setBlockFocus = setBlockFocus;
-window.showSelectionBox = showSelectionBox;
-window.enableDrawingMode = enableDrawingMode;
