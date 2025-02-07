@@ -39,7 +39,7 @@ def chat():
             model="gpt-4",
             messages=messages,
             temperature=0.7,
-            max_tokens=150
+            max_tokens=500  # Increased from 150 to handle longer responses
         )
 
         logger.debug(f"OpenAI API response: {response}")
