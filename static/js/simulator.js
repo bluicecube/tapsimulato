@@ -762,7 +762,6 @@ function addLoopBlock(parent) {
 
 
 
-
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
