@@ -319,6 +319,10 @@ async function processCommand(responseData) {
 function calculateRegionFromDescription(description) {
     const normalized = description.toLowerCase().trim();
 
+    // Screen dimensions must match the CSS variables
+    const DEVICE_WIDTH = 320;
+    const DEVICE_HEIGHT = 720;
+
     // Define screen regions with actual coordinates
     const regions = {
         'middle': {
@@ -337,25 +341,25 @@ function calculateRegionFromDescription(description) {
             x1: 0,
             y1: 0,
             x2: DEVICE_WIDTH,
-            y2: Math.round(DEVICE_HEIGHT * 0.15)   // Top region
+            y2: Math.round(DEVICE_HEIGHT * 0.15)   // Top 15% of screen
         },
         'bottom': {
             x1: 0,
-            y1: Math.round(DEVICE_HEIGHT * 0.85),  // Bottom region
+            y1: Math.round(DEVICE_HEIGHT * 0.85),  // Bottom 15% of screen
             x2: DEVICE_WIDTH,
             y2: DEVICE_HEIGHT
         },
         'left': {
             x1: 0,
-            y1: 0,
+            y1: Math.round(DEVICE_HEIGHT * 0.25),  // Center vertically
             x2: Math.round(DEVICE_WIDTH * 0.25),
-            y2: DEVICE_HEIGHT
+            y2: Math.round(DEVICE_HEIGHT * 0.75)
         },
         'right': {
             x1: Math.round(DEVICE_WIDTH * 0.75),
-            y1: 0,
+            y1: Math.round(DEVICE_HEIGHT * 0.25),  // Center vertically
             x2: DEVICE_WIDTH,
-            y2: DEVICE_HEIGHT
+            y2: Math.round(DEVICE_HEIGHT * 0.75)
         }
     };
 

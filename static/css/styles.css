@@ -19,13 +19,19 @@ body {
     margin: 0 auto;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
-    max-height: 90vh;
-    /* Removed transform: scale(0.5); */
+    /* Remove any scaling */
+    transform: none !important;
+    /* Ensure exact dimensions */
+    max-width: var(--device-width);
+    max-height: var(--device-height);
+    /* Prevent content overflow */
+    overflow: hidden;
 }
 
+/* Remove media query that was affecting simulator size */
 @media (min-width: 1200px) {
     .simulator {
-        /* Removed transform: scale(0.7); */
+        /* All scaling removed */
     }
 }
 
