@@ -19,11 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
     selectionRectangle = document.getElementById('selectionBox');
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('runTaskBtn').addEventListener('click', () => {
-        if (currentTask) {
-            executeSelectedTask();
-        } else {
-            logLiveConsole('No task selected', 'error');
-        }
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+
+        // Set the chat input value
+        chatInput.value = 'run button';
+
+        // Trigger the chat send button click
+        sendChatBtn.click();
     });
     document.getElementById('toggleTasksBtn').addEventListener('click', toggleTasksSidebar);
 
@@ -913,7 +916,7 @@ function handleMessage(message) {
 
                 // Auto-save and update
                 saveTasksToStorage();
-updateTaskList();
+                updateTaskList();
                 logLiveConsole(`Added ${message.params.blocks.length} blocks to task: ${currentTask.name}`, 'success');
             }
             break;
