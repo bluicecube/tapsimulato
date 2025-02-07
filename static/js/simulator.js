@@ -91,7 +91,6 @@ function toggleTasksSidebar() {
     sidebar.classList.toggle('show');
 }
 
-// Update the createNewTask function
 function createNewTask() {
     const task = {
         id: `task-${Date.now()}`,
@@ -102,7 +101,6 @@ function createNewTask() {
     };
     tasks.push(task);
     currentTask = task;
-    logLiveConsole('Created new task', 'info');
 
     // Update the current task display
     const currentTaskElement = document.getElementById('currentTask');
@@ -113,8 +111,7 @@ function createNewTask() {
     saveTasksToStorage();
     updateTaskList();
 
-    // Return the created task for chaining
-    return task;
+    logLiveConsole('New task created', 'info');
 }
 
 function saveTasksToStorage() {
@@ -258,15 +255,9 @@ function restoreTask(task) {
     }
 }
 
-// Update the executeSelectedTask function
 function executeSelectedTask() {
     if (!currentTask) {
         logLiveConsole('No task selected', 'error');
-        return;
-    }
-
-    if (!currentTask.blocks || currentTask.blocks.length === 0) {
-        logLiveConsole('Task has no blocks to execute', 'error');
         return;
     }
 
@@ -284,8 +275,6 @@ function executeSelectedTask() {
     function executeBlocks(blocks) {
         blocks.forEach(block => {
             if (block.type === 'loop') {
-                // Log the start of loop execution
-                logLiveConsole(`Executing loop ${block.iterations} times`, 'info');
                 for (let i = 0; i < block.iterations; i++) {
                     executeBlocks(block.blocks);
                 }
@@ -666,6 +655,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+
 function addTapBlock(parent) {
     const tapBlock = {
         type: 'tap',
@@ -758,6 +748,7 @@ function addLoopBlock(parent) {
 }
 
 
+
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
@@ -841,52 +832,3 @@ function handleMessage(message) {
     // Placeholder for handling messages.  This needs a proper implementation
     console.log("Message received:", message);
 }
-
-// Add new function to handle adding blocks from chatbot
-function addBlocksToChatbotTask(taskToUpdate, blocks) {
-    if (!taskToUpdate) {
-        logLiveConsole('No task selected for adding blocks', 'error');
-        return;
-    }
-
-    logLiveConsole('Adding blocks to task from chatbot', 'info');
-
-    blocks.forEach(blockData => {
-        if (blockData.type === 'tap') {
-            const tapBlock = {
-                type: 'tap',
-                region: blockData.region || null,
-                name: blockData.name || 'Tap Block'
-            };
-            taskToUpdate.blocks.push(tapBlock);
-            logLiveConsole(`Added tap block: ${tapBlock.name}`, 'info');
-        } else if (blockData.type === 'loop') {
-            const loopBlock = {
-                type: 'loop',
-                iterations: blockData.iterations || 1,
-                blocks: [],
-                name: blockData.name || 'Loop Block'
-            };
-            if (blockData.blocks) {
-                addBlocksToChatbotTask(loopBlock, blockData.blocks);
-            }
-            taskToUpdate.blocks.push(loopBlock);
-            logLiveConsole(`Added loop block with ${loopBlock.blocks.length} nested blocks`, 'info');
-        }
-    });
-
-    // Save after adding blocks
-    saveTasksToStorage();
-
-    // Refresh the task display
-    loadTask(taskToUpdate);
-}
-
-// Export functions for chatbot integration
-window.simulatorAPI = {
-    createNewTask,
-    addBlocksToChatbotTask,
-    executeSelectedTask,
-    saveTasksToStorage,
-    loadTask
-};

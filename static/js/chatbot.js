@@ -176,6 +176,52 @@ function hideThinking() {
     }
 }
 
+// Task management
+function createNewTask(taskName = 'New Task') {
+    const task = {
+        id: `task-${Date.now()}`,
+        name: taskName,
+        blocks: [],
+        created: new Date().toISOString()
+    };
+    state.tasks.push(task);
+    state.currentTask = task;
+    updateTaskDisplay();
+    return task;
+}
+
+function updateTaskDisplay() {
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement || !state.currentTask) return;
+
+    currentTaskElement.innerHTML = `
+        <div class="task-block">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="task-name mb-0" contenteditable="true">${state.currentTask.name}</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                    <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+                </div>
+            </div>
+            <div class="blocks-container"></div>
+        </div>
+    `;
+
+    // Update task list
+    const taskList = document.getElementById('taskList');
+    if (taskList) {
+        taskList.innerHTML = state.tasks.map(task => `
+            <div class="task-list-item ${state.currentTask.id === task.id ? 'active' : ''}" 
+                 data-task-id="${task.id}">
+                <span>${task.name}</span>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+}
+
 // Update the command processing to handle combined creation and block addition
 async function processCommand(responseData) {
     try {
@@ -184,13 +230,72 @@ async function processCommand(responseData) {
         switch (command) {
             case 'create_task_with_blocks':
                 const taskName = params.taskName || 'New Task';
-                // Use the simulator's API to create and manage tasks
-                const newTask = window.simulatorAPI.createNewTask(taskName);
+                createNewTask(taskName);
                 // After creating task, add the blocks
                 if (params.blocks && params.blocks.length > 0) {
-                    window.simulatorAPI.addBlocksToChatbotTask(newTask, params.blocks);
+                    function createBlocks(blockDefs) {
+                        return blockDefs.map(def => {
+                            if (def.type === 'loop') {
+                                return {
+                                    type: 'loop',
+                                    iterations: def.iterations || 1,
+                                    blocks: createBlocks(def.blocks || []),
+                                    name: 'Loop Block'
+                                };
+                            } else if (def.type === 'tap') {
+                                const region = calculateRegionFromDescription(def.location);
+                                return {
+                                    type: 'tap',
+                                    name: 'Tap Block',
+                                    region: region,
+                                    description: def.location || 'Center of screen'
+                                };
+                            }
+                        });
+                    }
+
+                    const newBlocks = createBlocks(params.blocks || []);
+                    state.currentTask.blocks.push(...newBlocks);
+                    updateTaskBlocks();
                 }
                 addMessage('assistant', `Created new task "${taskName}" with ${params.blocks.length} blocks`);
+                break;
+
+            // Rest of the cases remain unchanged
+            case 'add_blocks':
+                if (!state.currentTask) {
+                    addMessage('assistant', 'Please create a task first.');
+                    return;
+                }
+                // Process the block definitions recursively
+                function createBlocks(blockDefs) {
+                    return blockDefs.map(def => {
+                        if (def.type === 'loop') {
+                            return {
+                                type: 'loop',
+                                iterations: def.iterations || 1,
+                                blocks: createBlocks(def.blocks || []),
+                                name: 'Loop Block'
+                            };
+                        } else if (def.type === 'tap') {
+                            // Calculate region based on location description
+                            const region = calculateRegionFromDescription(def.location);
+                            return {
+                                type: 'tap',
+                                name: 'Tap Block',
+                                region: region,
+                                description: def.location || 'Center of screen'
+                            };
+                        }
+                    });
+                }
+
+                // Add the new blocks to the current task
+                const newBlocks = createBlocks(params.blocks || []);
+                state.currentTask.blocks.push(...newBlocks);
+
+                // Update the display
+                updateTaskBlocks();
                 break;
 
             case 'execute':
@@ -198,17 +303,7 @@ async function processCommand(responseData) {
                     addMessage('assistant', 'Please select a task to execute.');
                     return;
                 }
-                window.simulatorAPI.executeSelectedTask();
-                break;
-
-            case 'add_blocks':
-                if (!state.currentTask) {
-                    addMessage('assistant', 'Please create a task first.');
-                    return;
-                }
-                // Use the simulator's API to add blocks
-                window.simulatorAPI.addBlocksToChatbotTask(state.currentTask, params.blocks);
-                addMessage('assistant', `Added ${params.blocks.length} blocks to the current task`);
+                executeTask(state.currentTask);
                 break;
 
             default:
@@ -219,7 +314,6 @@ async function processCommand(responseData) {
         addMessage('assistant', 'Error processing command. Please try again.');
     }
 }
-
 
 // Helper function to calculate region from description
 function calculateRegionFromDescription(description) {
@@ -394,7 +488,6 @@ function executeTask(task) {
 window.addMessage = addMessage;
 window.handleMessage = handleMessage;
 window.processCommand = processCommand;
-window.updateTaskBlocks = updateTaskBlocks;
 
 // Make the simulator's functions available to chatbot.js
 window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
