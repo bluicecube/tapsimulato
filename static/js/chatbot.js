@@ -5,20 +5,22 @@ const state = {
     currentTask: null
 };
 
-// System prompt for the AI assistant
+// Update the system prompt to include combined task creation and block addition
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
 
 1. Tap Block: Defines a single tap action in a specific region of the screen
 2. Loop Block: Repeats its nested blocks a specified number of times
 
-Interpret natural language to create these sequences. For example:
+Interpret natural language to create these sequences. You can create a task and add blocks in a single command.
+Examples:
+- "create task named TapCorners with taps in each corner" → Create task and add corner tap blocks
+- "create task AutoScroll with 5 bottom taps" → Create task and add loop with bottom taps
 - "tap the screen 3 times" → Create a loop block with iterations=3 containing a tap block
 - "tap top of screen" → Create a tap block with region set to the top portion
-- "tap each corner twice" → Create a loop with iterations=2 containing tap blocks for corners
 
 Your responses should be in JSON format:
 {
-    "command": "create_task|add_blocks|execute|chat",
+    "command": "create_task_with_blocks|add_blocks|execute|chat",
     "params": {
         "taskName": "string",           // for create_task
         "blocks": [                     // array of block definitions
@@ -220,24 +222,51 @@ function updateTaskDisplay() {
     }
 }
 
-// Command processing
+// Update the command processing to handle combined creation and block addition
 async function processCommand(responseData) {
     try {
         const { command, params, message } = responseData;
 
         switch (command) {
-            case 'create_task':
+            case 'create_task_with_blocks':
                 const taskName = params.taskName || 'New Task';
                 createNewTask(taskName);
-                addMessage('assistant', `Created new task: ${taskName}`);
+                // After creating task, add the blocks
+                if (params.blocks && params.blocks.length > 0) {
+                    function createBlocks(blockDefs) {
+                        return blockDefs.map(def => {
+                            if (def.type === 'loop') {
+                                return {
+                                    type: 'loop',
+                                    iterations: def.iterations || 1,
+                                    blocks: createBlocks(def.blocks || []),
+                                    name: 'Loop Block'
+                                };
+                            } else if (def.type === 'tap') {
+                                const region = calculateRegionFromDescription(def.location);
+                                return {
+                                    type: 'tap',
+                                    name: 'Tap Block',
+                                    region: region,
+                                    description: def.location || 'Center of screen'
+                                };
+                            }
+                        });
+                    }
+
+                    const newBlocks = createBlocks(params.blocks || []);
+                    state.currentTask.blocks.push(...newBlocks);
+                    updateTaskBlocks();
+                }
+                addMessage('assistant', `Created new task "${taskName}" with ${params.blocks.length} blocks`);
                 break;
 
+            // Rest of the cases remain unchanged
             case 'add_blocks':
                 if (!state.currentTask) {
                     addMessage('assistant', 'Please create a task first.');
                     return;
                 }
-
                 // Process the block definitions recursively
                 function createBlocks(blockDefs) {
                     return blockDefs.map(def => {
@@ -294,25 +323,25 @@ function calculateRegionFromDescription(description) {
     const regions = {
         'middle': {
             x1: Math.round(DEVICE_WIDTH * 0.25),
-            y1: Math.round(DEVICE_HEIGHT * 0.35),  // Moved up slightly
+            y1: Math.round(DEVICE_HEIGHT * 0.33),  // One-third of height
             x2: Math.round(DEVICE_WIDTH * 0.75),
-            y2: Math.round(DEVICE_HEIGHT * 0.65)   // Reduced height to avoid overlap
+            y2: Math.round(DEVICE_HEIGHT * 0.67)   // Two-thirds of height
         },
         'center': {
             x1: Math.round(DEVICE_WIDTH * 0.25),
-            y1: Math.round(DEVICE_HEIGHT * 0.35),  // Matched with middle
+            y1: Math.round(DEVICE_HEIGHT * 0.33),  // Match with middle
             x2: Math.round(DEVICE_WIDTH * 0.75),
-            y2: Math.round(DEVICE_HEIGHT * 0.65)   // Matched with middle
+            y2: Math.round(DEVICE_HEIGHT * 0.67)   // Match with middle
         },
         'top': {
             x1: 0,
             y1: 0,
             x2: DEVICE_WIDTH,
-            y2: Math.round(DEVICE_HEIGHT * 0.15)   // Reduced height for top region
+            y2: Math.round(DEVICE_HEIGHT * 0.15)   // Top region
         },
         'bottom': {
             x1: 0,
-            y1: Math.round(DEVICE_HEIGHT * 0.85),  // Increased to avoid overlap with middle
+            y1: Math.round(DEVICE_HEIGHT * 0.85),  // Bottom region
             x2: DEVICE_WIDTH,
             y2: DEVICE_HEIGHT
         },
