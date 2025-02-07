@@ -37,15 +37,15 @@ body {
 /* Simulator styles */
 .simulator-header {
     position: relative;
-    padding: 1rem;
+    padding: 5px 1rem;
     display: flex;
     flex-direction: column;
-    min-height: calc(var(--device-physical-height) * var(--simulator-scale) + 2rem);
+    min-height: calc(var(--device-physical-height) * var(--simulator-scale) + 10px);
 }
 
 .title-controls {
     position: absolute;
-    top: 1rem;
+    top: 5px;
     left: 1rem;
     z-index: 10;
     background: rgba(33, 37, 41, 0.8);
@@ -55,7 +55,7 @@ body {
 
 .simulator {
     position: absolute;
-    top: 1rem;
+    top: 5px;
     right: 25%;
     transform: translateX(50%);
     width: calc(var(--device-physical-width) * var(--simulator-scale));

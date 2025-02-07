@@ -11,7 +11,7 @@
         // Constants for real device dimensions
         const REAL_WIDTH = 76.3;  // mm
         const REAL_HEIGHT = 161.4; // mm
-        const SIMULATOR_SCALE = 0.6;
+        const SIMULATOR_SCALE = 1.0;  // Changed to maximum scale
         const MIN_SCALE = 0.3;
         const MAX_SCALE = 1.0;
         const SCALE_STEP = 0.1;
@@ -96,7 +96,7 @@
                             <h4 class="mb-0">Device Simulator</h4>
                             <div class="btn-group zoom-controls">
                                 <button class="btn btn-outline-secondary" onclick="zoomOut()">-</button>
-                                <span class="btn btn-outline-secondary" id="scaleDisplay">60%</span>
+                                <span class="btn btn-outline-secondary" id="scaleDisplay">100%</span>
                                 <button class="btn btn-outline-secondary" onclick="zoomIn()">+</button>
                             </div>
                         </div>
