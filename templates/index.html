@@ -11,8 +11,11 @@
     <div class="container-fluid py-4">
         <div class="row">
             <!-- Simulator Column -->
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <div class="card mb-3">
+                    <div class="card-header">
+                        <h4 class="mb-0">Device Simulator</h4>
+                    </div>
                     <div class="card-body d-flex flex-column align-items-center">
                         <div id="simulator" class="simulator">
                             <video id="bgVideo" autoplay muted></video>
@@ -25,23 +28,29 @@
                 </div>
             </div>
 
-            <!-- Task Column -->
-            <div class="col-md-6">
-                <!-- Task Management -->
+            <!-- Task Management Column -->
+            <div class="col-md-4">
                 <div class="card mb-3">
                     <div class="card-header">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h4>Tasks</h4>
-                            <div class="btn-group">
-                                <select id="taskSelect" class="form-select">
-                                    <option value="">Select a task...</option>
-                                </select>
-                                <button class="btn btn-primary ms-2" id="newTaskBtn">New Task</button>
-                            </div>
+                            <h4 class="mb-0">Task Management</h4>
+                            <button class="btn btn-success" id="executeTaskBtn">Execute</button>
                         </div>
                     </div>
                     <div class="card-body">
-                        <!-- Block Builder -->
+                        <!-- Task Selection -->
+                        <div class="mb-3">
+                            <select id="taskSelect" class="form-select">
+                                <option value="">Select a task...</option>
+                            </select>
+                        </div>
+
+                        <!-- Task Title -->
+                        <div class="mb-3">
+                            <input type="text" id="taskTitle" class="form-control" placeholder="Task Name">
+                        </div>
+
+                        <!-- Block Controls -->
                         <div class="btn-group w-100 mb-3">
                             <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
                             <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
@@ -49,19 +58,26 @@
 
                         <!-- Current Task Blocks -->
                         <div id="currentTask" class="current-task"></div>
+
+                        <!-- Console Output -->
+                        <div id="liveConsole" class="live-console mt-3"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Execute & Console -->
+            <!-- AI Assistant Column -->
+            <div class="col-md-4">
                 <div class="card mb-3">
                     <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h4>Controls</h4>
-                            <button id="executeTaskBtn" class="btn btn-success">Execute</button>
-                        </div>
+                        <h4 class="mb-0">AI Assistant</h4>
                     </div>
                     <div class="card-body">
-                        <div id="liveConsole" class="live-console"></div>
+                        <div id="chatMessages" class="chat-messages mb-3"></div>
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control" 
+                                   placeholder="Describe what you want to create...">
+                            <button id="sendChatBtn" class="btn btn-primary">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -71,5 +87,6 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
 </body>
 </html>

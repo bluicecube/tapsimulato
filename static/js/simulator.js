@@ -7,27 +7,45 @@ const state = {
     currentTask: null,
     tasks: [],
     autoSaveTimeout: null,
-    pendingBlockConfiguration: null // Track block being configured
+    pendingBlockConfiguration: null
 };
-
-// Selection state
-let isSelecting = false;
-let selectionStartX = 0;
-let selectionStartY = 0;
-let selectionBox = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
     selectionBox = document.getElementById('selectionBox');
     const simulator = document.getElementById('simulator');
+    const taskTitle = document.getElementById('taskTitle');
 
     // Set up event listeners
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
-    document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('taskSelect').addEventListener('change', (e) => {
         if (e.target.value) loadTask(parseInt(e.target.value));
+    });
+
+    // Task title handling
+    taskTitle.addEventListener('change', async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: taskTitle.value })
+                });
+                if (response.ok) {
+                    const updatedTask = await response.json();
+                    const taskIndex = state.tasks.findIndex(t => t.id === state.currentTask.id);
+                    if (taskIndex !== -1) {
+                        state.tasks[taskIndex] = updatedTask;
+                        updateTaskSelect();
+                    }
+                    logToConsole('Task renamed successfully', 'success');
+                }
+            } catch (error) {
+                logToConsole('Failed to rename task', 'error');
+            }
+        }
     });
 
     // Selection events
@@ -38,8 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Video setup
     setupVideoSharing();
 
-    // Load initial tasks
-    loadTasks();
+    // Create initial task and load tasks
+    createNewTask().then(() => {
+        loadTasks();
+    });
 });
 
 // Task Management
@@ -157,16 +177,20 @@ function addLoopBlock() {
 function updateTaskSelect() {
     const select = document.getElementById('taskSelect');
     select.innerHTML = '<option value="">Select a task...</option>' +
-        state.tasks.map(task => 
+        state.tasks.map(task =>
             `<option value="${task.id}"${state.currentTask && state.currentTask.id === task.id ? ' selected' : ''}>${task.name}</option>`
         ).join('');
 }
 
 function updateTaskDisplay() {
     const currentTaskElement = document.getElementById('currentTask');
+    const taskTitle = document.getElementById('taskTitle');
     if (!currentTaskElement) return;
 
     currentTaskElement.innerHTML = '';
+    if (state.currentTask) {
+        taskTitle.value = state.tasks.find(t => t.id === state.currentTask.id)?.name || '';
+    }
 
     function renderBlock(block, index) {
         const blockDiv = document.createElement('div');
@@ -180,18 +204,22 @@ function updateTaskDisplay() {
 
             blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Tap Block</h6>
-                    <button class="btn btn-sm btn-outline-primary select-region-btn">
-                        ${block.region ? 'Change Region' : 'Set Region'}
-                    </button>
+                    <input type="text" class="form-control form-control-sm block-name-input" 
+                           value="${block.name || 'Tap Block'}" style="width: 120px">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary select-region-btn">
+                            ${block.region ? 'Change Region' : 'Set Region'}
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                    </div>
                 </div>
                 <small class="text-muted">Region: ${regionText}</small>
             `;
 
-            blockDiv.addEventListener('click', (e) => {
-                if (!e.target.closest('.select-region-btn')) {
-                    window.setBlockFocus(block, blockDiv);
-                }
+            const nameInput = blockDiv.querySelector('.block-name-input');
+            nameInput.addEventListener('change', () => {
+                block.name = nameInput.value;
+                scheduleAutosave();
             });
 
             blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
@@ -200,7 +228,8 @@ function updateTaskDisplay() {
         } else if (block.type === 'loop') {
             blockDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Loop Block</h6>
+                    <input type="text" class="form-control form-control-sm block-name-input" 
+                           value="${block.name || 'Loop Block'}" style="width: 120px">
                     <div class="d-flex align-items-center">
                         <input type="number" class="form-control form-control-sm iterations-input"
                             value="${block.iterations}" min="1" style="width: 70px">
@@ -213,6 +242,12 @@ function updateTaskDisplay() {
                 </div>
                 <div class="nested-blocks mt-2"></div>
             `;
+
+            const nameInput = blockDiv.querySelector('.block-name-input');
+            nameInput.addEventListener('change', () => {
+                block.name = nameInput.value;
+                scheduleAutosave();
+            });
 
             const iterationsInput = blockDiv.querySelector('.iterations-input');
             iterationsInput.addEventListener('change', (e) => {
