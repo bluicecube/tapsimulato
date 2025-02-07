@@ -1,12 +1,10 @@
-// Initialize state
-const state = {
-    tasks: [],
-    currentTask: null,
-    autoSaveTimeout: null
+// Chat interface state
+const chatState = {
+    messages: [],
+    isThinking: false
 };
 
-const AUTOSAVE_DELAY = 2000; // 2 seconds
-
+// System prompt for the AI assistant
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
 
 1. Tap Block: Defines a single tap action in a specific region of the screen
@@ -38,6 +36,276 @@ Your responses should be in JSON format:
     },
     "message": "human readable response"
 }`;
+
+// Initialize chat interface
+document.addEventListener('DOMContentLoaded', () => {
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendChatBtn');
+    const chatMessages = document.getElementById('chatMessages');
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const taskSelect = document.getElementById('taskSelect');
+
+    if (!chatMessages) return;
+
+    // Clear previous messages
+    chatMessages.innerHTML = '';
+
+    // Initialize task selection
+    loadTasks();
+
+    // Set up event listeners
+    if (chatInput && sendButton) {
+        sendButton.addEventListener('click', handleChatMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleChatMessage();
+        });
+    }
+
+    if (newTaskBtn) {
+        newTaskBtn.addEventListener('click', createNewTask);
+    }
+
+    if (taskSelect) {
+        taskSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                loadTask(parseInt(e.target.value));
+            }
+        });
+    }
+
+    // Show welcome message
+    setTimeout(() => {
+        addChatMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. What would you like to do?');
+    }, 500);
+});
+
+// Add a message to the chat interface
+function addChatMessage(role, content) {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    messageDiv.innerHTML = `
+        ${content}
+        <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+    `;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Store message in state
+    chatState.messages.push({ role, content });
+}
+
+// Show thinking indicator
+function showThinking() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'chat-thinking';
+    thinkingDiv.id = 'thinkingIndicator';
+    thinkingDiv.innerHTML = `
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+    `;
+    chatMessages.appendChild(thinkingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatState.isThinking = true;
+}
+
+// Hide thinking indicator
+function hideThinking() {
+    const thinkingDiv = document.getElementById('thinkingIndicator');
+    if (thinkingDiv) {
+        thinkingDiv.remove();
+    }
+    chatState.isThinking = false;
+}
+
+// Process blocks from AI response
+function processBlocks(blocks) {
+    if (!window.state || !window.state.currentTask) {
+        logToConsole('No active task to add blocks to', 'error');
+        return;
+    }
+
+    try {
+        const newBlocks = blocks.map(block => {
+            if (block.type === 'loop') {
+                return {
+                    type: 'loop',
+                    name: 'Loop Block',
+                    iterations: block.iterations || 1,
+                    blocks: block.blocks ? processBlocks(block.blocks) : []
+                };
+            } else if (block.type === 'tap') {
+                const region = calculateTapRegion(block.location);
+                return {
+                    type: 'tap',
+                    name: 'Tap Block',
+                    region: region,
+                    description: block.location || 'Center tap'
+                };
+            }
+            return null;
+        }).filter(block => block !== null);
+
+        window.state.currentTask.blocks.push(...newBlocks);
+
+        // Update display and save
+        if (typeof window.updateTaskDisplay === 'function') {
+            window.updateTaskDisplay();
+        }
+        if (typeof window.scheduleAutosave === 'function') {
+            window.scheduleAutosave();
+        }
+
+        logToConsole('Added new blocks to task', 'success');
+    } catch (error) {
+        console.error('Error processing blocks:', error);
+        logToConsole('Failed to process blocks', 'error');
+    }
+}
+
+// Calculate tap region based on description
+function calculateTapRegion(description) {
+    const DEVICE_WIDTH = 320;
+    const DEVICE_HEIGHT = 720;
+
+    const locations = {
+        'top': {
+            x1: 0,
+            y1: 0,
+            x2: DEVICE_WIDTH,
+            y2: Math.round(DEVICE_HEIGHT * 0.2)
+        },
+        'bottom': {
+            x1: 0,
+            y1: Math.round(DEVICE_HEIGHT * 0.8),
+            x2: DEVICE_WIDTH,
+            y2: DEVICE_HEIGHT
+        },
+        'middle': {
+            x1: Math.round(DEVICE_WIDTH * 0.25),
+            y1: Math.round(DEVICE_HEIGHT * 0.4),
+            x2: Math.round(DEVICE_WIDTH * 0.75),
+            y2: Math.round(DEVICE_HEIGHT * 0.6)
+        },
+        'left': {
+            x1: 0,
+            y1: Math.round(DEVICE_HEIGHT * 0.25),
+            x2: Math.round(DEVICE_WIDTH * 0.25),
+            y2: Math.round(DEVICE_HEIGHT * 0.75)
+        },
+        'right': {
+            x1: Math.round(DEVICE_WIDTH * 0.75),
+            y1: Math.round(DEVICE_HEIGHT * 0.25),
+            x2: DEVICE_WIDTH,
+            y2: Math.round(DEVICE_HEIGHT * 0.75)
+        }
+    };
+
+    const desc = description.toLowerCase();
+    for (const [key, region] of Object.entries(locations)) {
+        if (desc.includes(key)) {
+            return region;
+        }
+    }
+
+    // Default to center if no match
+    return locations.middle;
+}
+
+// Handle chat messages
+async function handleChatMessage() {
+    const chatInput = document.getElementById('chatInput');
+    if (!chatInput) return;
+
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    // Clear input and show message
+    chatInput.value = '';
+    addChatMessage('user', message);
+
+    // Check for direct commands
+    if (['run', 'execute'].includes(message.toLowerCase())) {
+        if (typeof window.executeTask === 'function') {
+            addChatMessage('assistant', 'Executing current sequence...');
+            window.executeTask();
+        } else {
+            addChatMessage('assistant', 'Sorry, I cannot execute tasks at the moment.');
+        }
+        return;
+    }
+
+    // Show thinking indicator
+    showThinking();
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: message }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to get response from server');
+        }
+
+        const data = await response.json();
+        hideThinking();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Parse and handle response
+        try {
+            const assistantMessage = data.choices[0].message.content;
+            const responseData = JSON.parse(assistantMessage);
+
+            // Add assistant's message to chat
+            addChatMessage('assistant', responseData.message);
+
+            // Handle commands
+            if (responseData.command === 'add_blocks' && responseData.params.blocks) {
+                processBlocks(responseData.params.blocks);
+            } else if (responseData.command === 'execute') {
+                if (typeof window.executeTask === 'function') {
+                    window.executeTask();
+                }
+            }
+        } catch (parseError) {
+            console.error('Error parsing response:', parseError);
+            addChatMessage('assistant', data.choices[0].message.content);
+        }
+    } catch (error) {
+        console.error('Chat error:', error);
+        hideThinking();
+        addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+    }
+}
+
+// Log messages to the console
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    if (!console) return;
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
 
 // Task Management Functions
 async function loadTasks() {
@@ -135,178 +403,17 @@ function scheduleAutosave() {
     }, AUTOSAVE_DELAY);
 }
 
-// Initialize chat interface
-function initializeChat() {
-    const chatInput = document.getElementById('chatInput');
-    const sendButton = document.getElementById('sendChatBtn');
-    const chatMessages = document.getElementById('chatMessages');
-    const newTaskBtn = document.getElementById('newTaskBtn');
-    const taskSelect = document.getElementById('taskSelect');
+function logLiveConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    if (!console) return;
 
-    if (!chatMessages) return;
-
-    chatMessages.innerHTML = '';
-
-    // Initialize task selection
-    loadTasks();
-
-    // Set up event listeners
-    if (chatInput && sendButton) {
-        sendButton.addEventListener('click', handleMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleMessage(e);
-        });
-    }
-
-    if (newTaskBtn) {
-        newTaskBtn.addEventListener('click', createNewTask);
-    }
-
-    if (taskSelect) {
-        taskSelect.addEventListener('change', (e) => {
-            if (e.target.value) {
-                loadTask(parseInt(e.target.value));
-            }
-        });
-    }
-
-    setTimeout(() => {
-        addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. What would you like to do?');
-    }, 500);
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
 }
 
-// Message handling
-function addMessage(role, content) {
-    const chatMessages = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-message ${role}`;
-    messageDiv.innerHTML = `
-        ${content}
-        <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-    `;
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-async function handleMessage(event) {
-    const chatInput = document.getElementById('chatInput');
-    const message = chatInput.value.trim();
-
-    if (!message) return;
-
-    chatInput.value = '';
-    addMessage('user', message);
-    showThinking();
-
-    try {
-        if (!window.state.currentTask) {
-            await createNewTask();
-        }
-
-        // Handle direct execute commands
-        if (['run', 'execute'].includes(message.toLowerCase())) {
-            hideThinking();
-            addMessage('assistant', 'Executing current sequence...');
-            window.executeSelectedTask && window.executeSelectedTask();
-            return;
-        }
-
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: message }
-                ]
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to get response from server');
-
-        const data = await response.json();
-        hideThinking();
-
-        if (data.error) throw new Error(data.error);
-
-        const assistantMessage = data.choices[0].message.content;
-        let responseData;
-
-        try {
-            responseData = JSON.parse(assistantMessage);
-        } catch (e) {
-            responseData = {
-                command: 'chat',
-                params: {},
-                message: assistantMessage
-            };
-        }
-
-        addMessage('assistant', responseData.message);
-
-        if (responseData.command === 'add_blocks') {
-            processBlocks(responseData.params.blocks || []);
-        } else if (responseData.command === 'execute') {
-            window.executeSelectedTask && window.executeSelectedTask();
-        }
-
-    } catch (error) {
-        console.error('Error:', error);
-        hideThinking();
-        addMessage('assistant', 'Sorry, something went wrong. Please try again.');
-    }
-}
-
-function showThinking() {
-    const chatMessages = document.getElementById('chatMessages');
-    const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'chat-thinking';
-    thinkingDiv.id = 'thinkingIndicator';
-    thinkingDiv.innerHTML = `
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-    `;
-    chatMessages.appendChild(thinkingDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function hideThinking() {
-    const thinkingDiv = document.getElementById('thinkingIndicator');
-    if (thinkingDiv) {
-        thinkingDiv.remove();
-    }
-}
-
-function processBlocks(blocks) {
-    if (!window.state.currentTask) return;
-
-    function createBlocks(blockDefs) {
-        return blockDefs.map(def => {
-            if (def.type === 'loop') {
-                return {
-                    type: 'loop',
-                    iterations: def.iterations || 1,
-                    blocks: createBlocks(def.blocks || []),
-                    name: 'Loop Block'
-                };
-            } else if (def.type === 'tap') {
-                const region = calculateRegionFromDescription(def.location);
-                return {
-                    type: 'tap',
-                    name: 'Tap Block',
-                    region: region,
-                    description: def.location || 'Center of screen'
-                };
-            }
-        });
-    }
-
-    const newBlocks = createBlocks(blocks);
-    window.state.currentTask.blocks.push(...newBlocks);
-    updateTaskDisplay();
-    scheduleAutosave();
-}
 
 function calculateRegionFromDescription(description) {
     const normalized = description.toLowerCase().trim();
@@ -429,14 +536,21 @@ function updateTaskDisplay() {
 }
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', initializeChat);
+//document.addEventListener('DOMContentLoaded', initializeChat); // This is now handled in the new init
 
 // Export functions for external use
-window.addMessage = addMessage;
-window.handleMessage = handleMessage;
+window.addMessage = addChatMessage; // Use the new addChatMessage function
+window.handleMessage = handleChatMessage; // Use the new handleChatMessage function
 window.state = state;
+window.processBlocks = processBlocks; // Make processBlocks available externally
 
 // Make the simulator's functions available to chatbot.js
 window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
 window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
 window.enableDrawingMode = window.enableDrawingMode || function() { console.warn('enableDrawingMode not loaded'); };
+const AUTOSAVE_DELAY = 2000; // 2 seconds
+const state = {
+    tasks: [],
+    currentTask: null,
+    autoSaveTimeout: null
+};
