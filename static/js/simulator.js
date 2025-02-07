@@ -24,56 +24,68 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskTitle = document.getElementById('taskTitle');
 
     // Set up event listeners
-    document.getElementById('executeTaskBtn')?.addEventListener('click', executeTask);
-    document.getElementById('addTapBtn')?.addEventListener('click', () => addTapBlock());
-    document.getElementById('addLoopBtn')?.addEventListener('click', () => addLoopBlock());
-    document.getElementById('addConditionalBtn')?.addEventListener('click', addConditionalBlock);
-    document.getElementById('newTaskBtn')?.addEventListener('click', async () => { await createNewTask(); });
-    document.getElementById('addFunctionTapBtn')?.addEventListener('click', () => addBlockToFunction('tap'));
-    document.getElementById('addFunctionLoopBtn')?.addEventListener('click', () => addBlockToFunction('loop'));
-    document.getElementById('saveFunctionBtn')?.addEventListener('click', saveFunction);
+    const executeTaskBtn = document.getElementById('executeTaskBtn');
+    const addTapBtn = document.getElementById('addTapBtn');
+    const addLoopBtn = document.getElementById('addLoopBtn');
+    const addConditionalBtn = document.getElementById('addConditionalBtn');
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
+    const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
 
+    if (executeTaskBtn) executeTaskBtn.addEventListener('click', executeTask);
+    if (addTapBtn) addTapBtn.addEventListener('click', () => addTapBlock());
+    if (addLoopBtn) addLoopBtn.addEventListener('click', () => addLoopBlock());
+    if (addConditionalBtn) addConditionalBtn.addEventListener('click', addConditionalBlock);
+    if (newTaskBtn) newTaskBtn.addEventListener('click', async () => { await createNewTask(); });
+    if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
+    if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
+    if (saveFunctionBtn) saveFunctionBtn.addEventListener('click', saveFunction);
 
     // Add task title change handler
-    taskTitle?.addEventListener('change', async () => {
-        if (state.currentTask) {
-            try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: taskTitle.value
-                    })
-                });
+    if (taskTitle) {
+        taskTitle.addEventListener('change', async () => {
+            if (state.currentTask) {
+                try {
+                    const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: taskTitle.value
+                        })
+                    });
 
-                if (!response.ok) throw new Error('Failed to update task name');
+                    if (!response.ok) throw new Error('Failed to update task name');
 
-                const updatedTask = await response.json();
-                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
-                if (taskIndex !== -1) {
-                    state.tasks[taskIndex] = updatedTask;
-                    updateTaskList();
+                    const updatedTask = await response.json();
+                    const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                    if (taskIndex !== -1) {
+                        state.tasks[taskIndex] = updatedTask;
+                        updateTaskList();
+                    }
+
+                    logToConsole('Task name updated', 'success');
+                } catch (error) {
+                    logToConsole('Failed to update task name', 'error');
                 }
-
-                logToConsole('Task name updated', 'success');
-            } catch (error) {
-                logToConsole('Failed to update task name', 'error');
             }
-        }
-    });
+        });
+    }
 
     // Selection events
-    simulator?.addEventListener('mousedown', startSelection);
-    simulator?.addEventListener('mousemove', updateSelection);
-    simulator?.addEventListener('mouseup', stopSelection);
-    simulator?.addEventListener('mouseleave', () => {
-        if (isSelecting) {
-            const rect = simulator.getBoundingClientRect();
-            const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-            const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-            finishSelection(lastKnownX, lastKnownY);
-        }
-    });
+    if (simulator) {
+        simulator.addEventListener('mousedown', startSelection);
+        simulator.addEventListener('mousemove', updateSelection);
+        simulator.addEventListener('mouseup', stopSelection);
+        simulator.addEventListener('mouseleave', () => {
+            if (isSelecting) {
+                const rect = simulator.getBoundingClientRect();
+                const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+                const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+                finishSelection(lastKnownX, lastKnownY);
+            }
+        });
+    }
 
     // Setup video sharing and load initial data
     setupVideoSharing();
@@ -81,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
     });
-
     // Initialize function modal
     const functionModal = document.getElementById('functionModal');
     if (functionModal) {
