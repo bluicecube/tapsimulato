@@ -350,6 +350,111 @@ function removeBlock(blockElement) {
     scheduleAutosave();
 }
 
+
+// Selection Handling (Updated from edited snippet)
+function startSelection(event) {
+    if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
+
+    isSelecting = true;
+    const rect = event.target.getBoundingClientRect();
+    selectionStartX = event.clientX - rect.left;
+    selectionStartY = event.clientY - rect.top;
+
+    const selectionBox = document.getElementById('selectionBox');
+    selectionBox.style.left = `${selectionStartX}px`;
+    selectionBox.style.top = `${selectionStartY}px`;
+    selectionBox.style.width = '0';
+    selectionBox.style.height = '0';
+    selectionBox.classList.remove('d-none');
+}
+
+function updateSelection(event) {
+    if (!isSelecting) return;
+
+    const selectionBox = document.getElementById('selectionBox');
+    const rect = event.target.getBoundingClientRect();
+    const currentX = Math.min(Math.max(event.clientX - rect.left, 0), DEVICE_WIDTH);
+    const currentY = Math.min(Math.max(event.clientY - rect.top, 0), DEVICE_HEIGHT);
+
+    const width = currentX - selectionStartX;
+    const height = currentY - selectionStartY;
+
+    selectionBox.style.width = `${Math.abs(width)}px`;
+    selectionBox.style.height = `${Math.abs(height)}px`;
+    selectionBox.style.left = `${width < 0 ? currentX : selectionStartX}px`;
+    selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
+}
+
+function stopSelection(event) {
+    if (!isSelecting) return;
+
+    const rect = event.target.getBoundingClientRect();
+    const endX = Math.min(Math.max(event.clientX - rect.left, 0), DEVICE_WIDTH);
+    const endY = Math.min(Math.max(event.clientY - rect.top, 0), DEVICE_HEIGHT);
+
+    finishSelection(endX, endY);
+}
+
+function finishSelection(endX, endY) {
+    const region = {
+        x1: Math.min(selectionStartX, endX),
+        y1: Math.min(selectionStartY, endY),
+        x2: Math.max(selectionStartX, endX),
+        y2: Math.max(selectionStartY, endY)
+    };
+
+    // Find the block to update based on the configuration index
+    const blockIndex = state.pendingBlockConfiguration.dataset.index;
+    const indices = blockIndex.split('.');
+    let targetBlock;
+    let currentBlocks = state.currentTask.blocks;
+
+    // Navigate through nested blocks
+    for (let i = 0; i < indices.length; i++) {
+        const index = parseInt(indices[i]);
+        if (i === indices.length - 1) {
+            targetBlock = currentBlocks[index];
+        } else {
+            currentBlocks = currentBlocks[index].blocks;
+        }
+    }
+
+    if (targetBlock) {
+        targetBlock.region = region;
+        state.pendingBlockConfiguration = null;
+        isSelecting = false;
+
+        // Show selection box for the newly set region
+        showSelectionBox(region);
+        updateTaskDisplay();
+        scheduleAutosave();
+        logToConsole('Region updated', 'success');
+    }
+}
+
+// Add these utility functions for block interaction
+function setBlockFocus(block, blockDiv) {
+    // Remove focus from other blocks
+    document.querySelectorAll('.block').forEach(el => {
+        el.classList.remove('focused');
+    });
+
+    // Add focus to current block
+    blockDiv.classList.add('focused');
+
+    // Update focused block state
+    window.state.focusedBlock = block;
+
+    // Show region if it exists
+    if (block.region) {
+        showSelectionBox(block.region);
+    } else {
+        const selectionBox = document.getElementById('selectionBox');
+        selectionBox.classList.add('d-none');
+    }
+}
+
+// Enhanced render block function with better iteration controls
 function renderBlock(block, index) {
     const blockDiv = document.createElement('div');
     blockDiv.className = `block ${block.type}-block`;
@@ -419,9 +524,13 @@ function renderBlock(block, index) {
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
                 <div class="d-flex align-items-center">
-                    <input type="number" class="form-control form-control-sm iterations-input"
-                        value="${block.iterations}" min="1" style="width: 70px">
-                    <span class="ms-2">times</span>
+                    <div class="input-group input-group-sm" style="width: 100px;">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control form-control-sm iterations-input text-center"
+                            value="${block.iterations}" min="1" style="width: 60px">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2 me-2">times</span>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
@@ -429,8 +538,34 @@ function renderBlock(block, index) {
         `;
 
         const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+
+        // Add event listeners for iteration controls
+        decreaseBtn.addEventListener('click', () => {
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+                scheduleAutosave();
+            }
+        });
+
+        increaseBtn.addEventListener('click', () => {
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+            scheduleAutosave();
+        });
+
         iterationsInput.addEventListener('change', (e) => {
-            block.iterations = parseInt(e.target.value) || 1;
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
             scheduleAutosave();
         });
 
@@ -446,95 +581,6 @@ function renderBlock(block, index) {
     }
 
     return blockDiv;
-}
-
-// Selection Handling
-function startSelection(event) {
-    if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
-
-    isSelecting = true;
-    const rect = event.target.getBoundingClientRect();
-    selectionStartX = event.clientX - rect.left;
-    selectionStartY = event.clientY - rect.top;
-
-    const selectionBox = document.getElementById('selectionBox');
-    selectionBox.style.left = `${selectionStartX}px`;
-    selectionBox.style.top = `${selectionStartY}px`;
-    selectionBox.style.width = '0';
-    selectionBox.style.height = '0';
-    selectionBox.classList.remove('d-none');
-}
-
-function updateSelection(event) {
-    if (!isSelecting) return;
-
-    const selectionBox = document.getElementById('selectionBox');
-    const rect = event.target.getBoundingClientRect();
-    const currentX = event.clientX - rect.left;
-    const currentY = event.clientY - rect.top;
-
-    const width = currentX - selectionStartX;
-    const height = currentY - selectionStartY;
-
-    selectionBox.style.width = `${Math.abs(width)}px`;
-    selectionBox.style.height = `${Math.abs(height)}px`;
-    selectionBox.style.left = `${width < 0 ? currentX : selectionStartX}px`;
-    selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
-}
-
-function stopSelection(event) {
-    if (!isSelecting || !state.pendingBlockConfiguration) return;
-
-    const rect = event.target.getBoundingClientRect();
-    const endX = event.clientX - rect.left;
-    const endY = event.clientY - rect.top;
-
-    const region = {
-        x1: Math.min(selectionStartX, endX),
-        y1: Math.min(selectionStartY, endY),
-        x2: Math.max(selectionStartX, endX),
-        y2: Math.max(selectionStartY, endY)
-    };
-
-    // Update the block with the selected region
-    const blockIndex = state.pendingBlockConfiguration.dataset.index;
-    const indices = blockIndex.split('.');
-    let targetBlock = state.currentTask.blocks[indices[0]];
-
-    if (indices.length > 1) {
-        // Handle nested blocks
-        targetBlock = targetBlock.blocks[indices[1]];
-    }
-
-    targetBlock.region = region;
-    state.pendingBlockConfiguration = null;
-    isSelecting = false;
-
-    // Hide selection box
-    const selectionBox = document.getElementById('selectionBox');
-    selectionBox.classList.add('d-none');
-
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Region updated', 'success');
-}
-
-
-// Add these utility functions for block interaction
-function setBlockFocus(block, blockDiv) {
-    // Hide previous selection if exists and it's not the same block
-    if (window.state.focusedBlock && window.state.focusedBlock !== block) {
-        const selectionBox = document.getElementById('selectionBox');
-        selectionBox.classList.add('d-none');
-    }
-
-    // Update focused block
-    window.state.focusedBlock = block;
-
-    if (block.region) {
-        showSelectionBox(block.region);
-    }
-    enableDrawingMode(block, blockDiv);
 }
 
 function enableDrawingMode(block, blockDiv) {
@@ -906,8 +952,7 @@ async function addFunctionBlock(functionId) {
         blocks: blocks
     };
 
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
+    state.currentTask.blocks.push(block);updateTaskDisplay();
     scheduleAutosave();
     logToConsole(`Added function: ${func.name}`, 'success');
 }
