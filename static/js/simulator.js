@@ -13,11 +13,6 @@ window.state = {
     currentFrame: null  // Store current video frame
 };
 
-// Selection state
-let isSelecting = false;
-let selectionStartX = 0;
-let selectionStartY = 0;
-
 // Functions state
 let functions = [];
 
@@ -32,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); }); // Updated event listener
+    document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
     document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
     document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
     document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
@@ -160,6 +156,11 @@ async function loadTasks() {
     } catch (error) {
         console.error('Error loading tasks:', error);
         logToConsole('Error loading tasks', 'error');
+
+        // Create a new task as fallback
+        if (!state.currentTask) {
+            await createNewTask();
+        }
     }
 }
 
@@ -187,12 +188,23 @@ async function createNewTask() {
 
         const task = await response.json();
         state.tasks.push(task);
+        state.currentTask = {
+            id: task.id,
+            blocks: []
+        };
+
+        // Save last opened task ID
+        state.lastTaskId = task.id;
+        localStorage.setItem('lastTaskId', task.id);
+
         updateTaskList();
-        await loadTask(task.id);
+        updateTaskDisplay();
 
         logToConsole('New task created', 'success');
+        return task;
     } catch (error) {
         logToConsole('Error creating task', 'error');
+        throw error;
     }
 }
 
@@ -217,12 +229,14 @@ async function loadTask(taskId) {
         state.lastTaskId = taskId;
         localStorage.setItem('lastTaskId', taskId);
 
+        const taskTitle = document.getElementById('taskTitle');
         taskTitle.value = state.tasks.find(t => t.id === taskId)?.name || '';
         updateTaskDisplay();
         updateTaskList();
         logToConsole(`Loaded task ${taskId}`, 'success');
     } catch (error) {
         logToConsole('Error loading task blocks', 'error');
+        throw error;
     }
 }
 
@@ -478,7 +492,7 @@ function finishSelection(endX, endY) {
     }
 }
 
-// Add helper function to save current task
+// Save blocks functionality
 async function saveCurrentTask() {
     if (!state.currentTask) return;
 
@@ -495,7 +509,25 @@ async function saveCurrentTask() {
         logToConsole('Task saved', 'success');
     } catch (error) {
         logToConsole('Failed to save task', 'error');
+        throw error;
     }
+}
+
+// Enhance scheduleAutosave to provide immediate feedback
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                await saveCurrentTask();
+            } catch (error) {
+                console.error('Autosave failed:', error);
+            }
+        }
+    }, 1000); // Reduced timeout for more responsive saving
 }
 
 // Add these utility functions for block interaction
@@ -504,6 +536,11 @@ function setBlockFocus(block, blockDiv) {
     document.querySelectorAll('.block').forEach(el => {
         if (el !== blockDiv) {
             el.classList.remove('focused');
+            // Hide selection box if switching focus
+            if (state.focusedBlock && state.focusedBlock.type === 'tap') {
+                const selectionBox = document.getElementById('selectionBox');
+                selectionBox.classList.add('d-none');
+            }
         }
     });
 
@@ -785,7 +822,7 @@ window.showSelectionBox = showSelectionBox;
 window.enableDrawingMode = enableDrawingMode;
 
 // Task Execution
-function executeTask() {
+async function executeTask() {
     if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
         logToConsole('No blocks to execute', 'error');
         return;
@@ -882,7 +919,7 @@ function setupVideoSharing() {
             logToConsole('Screen sharing error: ' + error.message, 'error');
         }
     });
-}
+}}
 
 function logToConsole(message, type = 'info') {
     const console = document.getElementById('liveConsole');
@@ -901,16 +938,19 @@ function scheduleAutosave() {
 
     state.autoSaveTimeout = setTimeout(async () => {
         if (state.currentTask) {
-            await saveCurrentTask();
+            try {
+                await saveCurrentTask();
+            } catch (error) {
+                console.error('Autosave failed:', error);
+            }
         }
-    }, 2000);
+    }, 1000);
 }
 
 async function deleteTask(taskId) {
     if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
-        return;
-        }
+        logToConsole('No task selected to delete', 'error');        return;
+    }
 
     try {
         const response = await fetch(`/api/tasks/${taskId}`, {
