@@ -253,90 +253,99 @@ function updateTaskDisplay() {
         taskTitle.value = state.tasks.find(t => t.id === state.currentTask.id)?.name || '';
     }
 
-    function renderBlock(block, index) {
-        const blockDiv = document.createElement('div');
-        blockDiv.className = `block ${block.type}-block`;
-        blockDiv.dataset.index = index;
+    if (state.currentTask && state.currentTask.blocks) {
+        state.currentTask.blocks.forEach((block, index) => {
+            currentTaskElement.appendChild(renderBlock(block, index.toString()));
+        });
+    }
+}
 
-        if (block.type === 'tap') {
-            const regionText = block.region ?
-                `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-                'No region set';
+// Remove block functionality
+function removeBlock(blockElement) {
+    const index = blockElement.dataset.index;
+    const indices = index.split('.');
 
-            blockDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Tap Block</h6>
+    if (indices.length === 1) {
+        state.currentTask.blocks.splice(indices[0], 1);
+    } else {
+        // Handle nested blocks in loops
+        const parentBlock = state.currentTask.blocks[indices[0]];
+        parentBlock.blocks.splice(indices[1], 1);
+    }
+
+    updateTaskDisplay();
+    scheduleAutosave();
+}
+
+function renderBlock(block, index) {
+    const blockDiv = document.createElement('div');
+    blockDiv.className = `block ${block.type}-block`;
+    blockDiv.dataset.index = index;
+
+    if (block.type === 'tap') {
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            'No region set';
+
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary select-region-btn">
                         ${block.region ? 'Change Region' : 'Set Region'}
                     </button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
-                <small class="text-muted">Region: ${regionText}</small>
-            `;
+            </div>
+            <small class="text-muted">Region: ${regionText}</small>
+        `;
 
-            blockDiv.addEventListener('click', (e) => {
-                if (!e.target.closest('.select-region-btn')) {
-                    setBlockFocus(block, blockDiv);
-                }
-            });
-
-            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-                enableDrawingMode(block, blockDiv);
-            });
-        } else if (block.type === 'loop') {
-            blockDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center">
-                    <input type="text" class="form-control form-control-sm block-name-input" 
-                           value="${block.name || 'Loop Block'}" style="width: 120px">
-                    <div class="d-flex align-items-center">
-                        <input type="number" class="form-control form-control-sm iterations-input"
-                            value="${block.iterations}" min="1" style="width: 70px">
-                        <span class="ms-2">times</span>
-                        <div class="btn-group ms-2">
-                            <button class="btn btn-sm btn-outline-primary add-nested-tap-btn">Add Tap</button>
-                            <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="nested-blocks mt-2"></div>
-            `;
-
-            const nameInput = blockDiv.querySelector('.block-name-input');
-            nameInput.addEventListener('change', () => {
-                block.name = nameInput.value;
-                scheduleAutosave();
-            });
-
-            const iterationsInput = blockDiv.querySelector('.iterations-input');
-            iterationsInput.addEventListener('change', (e) => {
-                block.iterations = parseInt(e.target.value) || 1;
-                scheduleAutosave();
-            });
-
-            const addNestedTapBtn = blockDiv.querySelector('.add-nested-tap-btn');
-            addNestedTapBtn.addEventListener('click', () => {
-                const loopIndex = parseInt(index);
-                addTapBlock(loopIndex);
-            });
-
-            const nestedContainer = blockDiv.querySelector('.nested-blocks');
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
+        blockDiv.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                setBlockFocus(block, blockDiv);
+            }
+        });
 
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
         if (removeBtn) {
             removeBtn.addEventListener('click', () => removeBlock(blockDiv));
         }
 
-        return blockDiv;
-    }
+        blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+            enableDrawingMode(block, blockDiv);
+        });
+    } else if (block.type === 'loop') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="d-flex align-items-center">
+                    <input type="number" class="form-control form-control-sm iterations-input"
+                        value="${block.iterations}" min="1" style="width: 70px">
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+        `;
 
-    if (state.currentTask && state.currentTask.blocks) {
-        state.currentTask.blocks.forEach((block, index) => {
-            currentTaskElement.appendChild(renderBlock(block, index.toString()));
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        iterationsInput.addEventListener('change', (e) => {
+            block.iterations = parseInt(e.target.value) || 1;
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+        }
+
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        block.blocks.forEach((nestedBlock, nestedIndex) => {
+            nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
         });
     }
+
+    return blockDiv;
 }
 
 // Selection Handling
@@ -512,21 +521,6 @@ function scheduleAutosave() {
     }, 2000);
 }
 
-function removeBlock(blockElement) {
-    const index = blockElement.dataset.index;
-    const indices = index.split('.');
-
-    if (indices.length === 1) {
-        state.currentTask.blocks.splice(indices[0], 1);
-    } else {
-        // Handle nested blocks in loops
-        const parentBlock = state.currentTask.blocks[indices[0]];
-        parentBlock.blocks.splice(indices[1], 1);
-    }
-
-    updateTaskDisplay();
-    scheduleAutosave();
-}
 
 async function deleteTask(taskId) {
     if (!taskId) {
