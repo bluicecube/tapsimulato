@@ -479,21 +479,30 @@ function renderBlock(block, index) {
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-light edit-function-btn">Edit</button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
             <small class="text-muted">${block.description || ''}</small>
             <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
         `;
 
-        const editBtn = blockDiv.querySelector('.edit-function-btn');
-        editBtn.addEventListener('click', () => {
-            // Implementation for editing function
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+        }
+
+        // Add event listeners for nested block buttons
+        blockDiv.querySelector('.add-tap-to-function-btn').addEventListener('click', () => {
+            addBlockToFunction('tap', blockDiv);
         });
 
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+        blockDiv.querySelector('.add-loop-to-function-btn').addEventListener('click', () => {
+            addBlockToFunction('loop', blockDiv);
+        });
 
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
         if (block.blocks) {
@@ -501,6 +510,7 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
+
     } else if (block.type === 'tap') {
         const regionText = block.region ?
             `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
@@ -537,15 +547,15 @@ function renderBlock(block, index) {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
-                <div class="d-flex align-items-center">
-                    <div class="input-group input-group-sm" style="width: 100px;">
+                <div class="iteration-controls"> <!-- New wrapper div -->
+                    <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control form-control-sm iterations-input text-center"
-                            value="${block.iterations}" min="1" style="width: 60px">
+                        <input type="number" class="form-control iterations-input"
+                            value="${block.iterations}" min="1">
                         <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
                     </div>
-                    <span class="ms-2 me-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
                 </div>
             </div>
             <div class="nested-blocks mt-2"></div>
@@ -555,7 +565,6 @@ function renderBlock(block, index) {
         const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
         const increaseBtn = blockDiv.querySelector('.increase-iterations');
 
-        // Add event listeners for iteration controls
         decreaseBtn.addEventListener('click', () => {
             const currentValue = parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
@@ -589,9 +598,11 @@ function renderBlock(block, index) {
         }
 
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        block.blocks.forEach((nestedBlock, nestedIndex) => {
-            nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-        });
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
     }
 
     return blockDiv;
@@ -921,7 +932,7 @@ async function saveFunction() {
             bsModal.hide();
         } else {
             const newModal = new bootstrap.Modal(modal);
-            newModal.hide();
+            newModal.hide();        }
         }
 
         nameInput.value = '';
@@ -932,7 +943,7 @@ async function saveFunction() {
     } catch (error) {
         logToConsole('Error saving function: ' + error.message, 'error');
     }
-}}
+}
 
 async function addFunctionBlock(functionId) {
     const func = functions.find(f => f.id === functionId);
