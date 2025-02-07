@@ -1,10 +1,11 @@
 // Initialize state
 const state = {
-    task: {
-        name: 'Current Task',
-        blocks: []
-    }
+    tasks: [],
+    currentTask: null,
+    autoSaveTimeout: null
 };
+
+const AUTOSAVE_DELAY = 2000; // 2 seconds
 
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
 
@@ -38,6 +39,143 @@ Your responses should be in JSON format:
     "message": "human readable response"
 }`;
 
+// Task Management Functions
+async function loadTasks() {
+    try {
+        const response = await fetch('/api/tasks');
+        if (!response.ok) throw new Error('Failed to load tasks');
+
+        state.tasks = await response.json();
+        updateTaskSelect();
+
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+        logLiveConsole('Error loading tasks', 'error');
+    }
+}
+
+async function createNewTask() {
+    try {
+        const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: `Task ${state.tasks.length + 1}`
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to create task');
+
+        const task = await response.json();
+        state.tasks.push(task);
+        updateTaskSelect();
+        await loadTask(task.id);
+
+        logLiveConsole('New task created', 'success');
+    } catch (error) {
+        console.error('Error creating task:', error);
+        logLiveConsole('Error creating task', 'error');
+    }
+}
+
+async function loadTask(taskId) {
+    try {
+        const response = await fetch(`/api/tasks/${taskId}/blocks`);
+        if (!response.ok) throw new Error('Failed to load task blocks');
+
+        const blocks = await response.json();
+        state.currentTask = {
+            id: taskId,
+            blocks: blocks
+        };
+
+        updateTaskDisplay();
+        logLiveConsole(`Loaded task ${taskId}`, 'success');
+    } catch (error) {
+        console.error('Error loading task:', error);
+        logLiveConsole('Error loading task blocks', 'error');
+    }
+}
+
+function updateTaskSelect() {
+    const select = document.getElementById('taskSelect');
+    select.innerHTML = '<option value="">Select a task...</option>' +
+        state.tasks.map(task => 
+            `<option value="${task.id}">${task.name}</option>`
+        ).join('');
+}
+
+// Autosave functionality
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        blocks: state.currentTask.blocks
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save blocks');
+                logLiveConsole('Task autosaved', 'success');
+            } catch (error) {
+                console.error('Autosave error:', error);
+                logLiveConsole('Failed to autosave task', 'error');
+            }
+        }
+    }, AUTOSAVE_DELAY);
+}
+
+// Initialize chat interface
+function initializeChat() {
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendChatBtn');
+    const chatMessages = document.getElementById('chatMessages');
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const taskSelect = document.getElementById('taskSelect');
+
+    if (!chatMessages) return;
+
+    chatMessages.innerHTML = '';
+
+    // Initialize task selection
+    loadTasks();
+
+    // Set up event listeners
+    if (chatInput && sendButton) {
+        sendButton.addEventListener('click', handleMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleMessage(e);
+        });
+    }
+
+    if (newTaskBtn) {
+        newTaskBtn.addEventListener('click', createNewTask);
+    }
+
+    if (taskSelect) {
+        taskSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                loadTask(parseInt(e.target.value));
+            }
+        });
+    }
+
+    setTimeout(() => {
+        addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. What would you like to do?');
+    }, 500);
+}
+
+// Message handling
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
@@ -50,29 +188,6 @@ function addMessage(role, content) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function initializeChat() {
-    const chatInput = document.getElementById('chatInput');
-    const sendButton = document.getElementById('sendChatBtn');
-    const chatMessages = document.getElementById('chatMessages');
-
-    if (!chatMessages) return;
-
-    chatMessages.innerHTML = '';
-
-    if (chatInput && sendButton) {
-        sendButton.addEventListener('click', handleMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleMessage(e);
-        });
-    }
-
-    setTimeout(() => {
-        addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. What would you like to do?');
-    }, 500);
-}
-
-document.addEventListener('DOMContentLoaded', initializeChat);
-
 async function handleMessage(event) {
     const chatInput = document.getElementById('chatInput');
     const message = chatInput.value.trim();
@@ -84,6 +199,10 @@ async function handleMessage(event) {
     showThinking();
 
     try {
+        if (!state.currentTask) {
+            await createNewTask();
+        }
+
         // Handle direct execute commands
         if (['run', 'execute'].includes(message.toLowerCase())) {
             hideThinking();
@@ -160,6 +279,8 @@ function hideThinking() {
 }
 
 function processBlocks(blocks) {
+    if (!state.currentTask) return;
+
     function createBlocks(blockDefs) {
         return blockDefs.map(def => {
             if (def.type === 'loop') {
@@ -182,8 +303,9 @@ function processBlocks(blocks) {
     }
 
     const newBlocks = createBlocks(blocks);
-    state.task.blocks.push(...newBlocks);
+    state.currentTask.blocks.push(...newBlocks);
     updateTaskDisplay();
+    scheduleAutosave();
 }
 
 function calculateRegionFromDescription(description) {
@@ -287,6 +409,7 @@ function updateTaskDisplay() {
             const iterationsInput = blockDiv.querySelector('.iterations-input');
             iterationsInput.addEventListener('change', (e) => {
                 block.iterations = parseInt(e.target.value) || 1;
+                scheduleAutosave();
             });
 
             const nestedContainer = blockDiv.querySelector('.nested-blocks');
@@ -298,10 +421,15 @@ function updateTaskDisplay() {
         return blockDiv;
     }
 
-    state.task.blocks.forEach(block => {
-        currentTaskElement.appendChild(renderBlock(block));
-    });
+    if (state.currentTask && state.currentTask.blocks) {
+        state.currentTask.blocks.forEach(block => {
+            currentTaskElement.appendChild(renderBlock(block));
+        });
+    }
 }
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', initializeChat);
 
 // Export functions for external use
 window.addMessage = addMessage;
