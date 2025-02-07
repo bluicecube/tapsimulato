@@ -714,8 +714,11 @@ function updateFunctionsList() {
 }
 
 // Function creation handling
-function addBlockToFunction(type) {
-    const blocksContainer = document.getElementById('functionBlocks');
+function addBlockToFunction(type, parentElement = null) {
+    const container = parentElement ? 
+        parentElement.querySelector('.nested-blocks') : 
+        document.getElementById('functionBlocks');
+
     const block = {
         type: type,
         name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
@@ -725,18 +728,44 @@ function addBlockToFunction(type) {
 
     const blockElement = document.createElement('div');
     blockElement.className = `block ${type}-block`;
-    blockElement.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">${block.name}</h6>
-            <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-        </div>
-    `;
+
+    if (type === 'loop') {
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary add-to-loop-btn">Add Block</button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-loop-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-loop-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners for nested block buttons
+        blockElement.querySelector('.add-tap-to-loop-btn').addEventListener('click', () => {
+            addBlockToFunction('tap', blockElement);
+        });
+        blockElement.querySelector('.add-loop-to-loop-btn').addEventListener('click', () => {
+            addBlockToFunction('loop', blockElement);
+        });
+    } else {
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+            </div>
+        `;
+    }
 
     blockElement.querySelector('.remove-block-btn').addEventListener('click', () => {
         blockElement.remove();
     });
 
-    blocksContainer.appendChild(blockElement);
+    container.appendChild(blockElement);
 }
 
 async function saveFunction() {
@@ -752,15 +781,27 @@ async function saveFunction() {
         return;
     }
 
-    // Collect blocks from the container
-    const blocks = Array.from(blocksContainer.children).map(blockElement => {
-        const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
-        return {
-            type,
-            name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
-            data: {} // Empty data for now, will be set when added to task
-        };
-    });
+    // Collect blocks from the container with nested structure
+    function collectBlocks(container) {
+        return Array.from(container.children).map(blockElement => {
+            const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
+            const block = {
+                type,
+                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
+                data: {} // Empty data for now, will be set when added to task
+            };
+
+            if (type === 'loop') {
+                const nestedContainer = blockElement.querySelector('.nested-blocks');
+                if (nestedContainer) {
+                    block.blocks = collectBlocks(nestedContainer);
+                }
+            }
+            return block;
+        });
+    }
+
+    const blocks = collectBlocks(blocksContainer);
 
     try {
         const response = await fetch('/api/functions', {

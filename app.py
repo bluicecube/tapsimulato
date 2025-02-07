@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, jsonify
 import os
-from flask_sqlalchemy import SQLAlchemy
-from openai import OpenAI
+from extensions import db
 import logging
 from datetime import datetime
+from openai import OpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -21,13 +21,15 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "development_key"
 
 # Initialize database
-db = SQLAlchemy(app)
+db.init_app(app)
 
 # Initialize OpenAI client
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Import models after db initialization
-from models import Task, Block, Function
+with app.app_context():
+    # Import models after db initialization to avoid circular imports
+    from models import Task, Block, Function
+    db.create_all()
 
 @app.route('/')
 def index():
@@ -223,6 +225,4 @@ def chat():
         return jsonify({'error': error_msg}), 500
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(host="0.0.0.0", port=5000, debug=True)
