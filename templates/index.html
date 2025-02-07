@@ -7,89 +7,12 @@
     <title>Samsung Galaxy A11 Simulator</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
-    <script>
-        // Constants for real device dimensions
-        const REAL_WIDTH = 76.3;  // mm
-        const REAL_HEIGHT = 161.4; // mm
-        const SIMULATOR_SCALE = 1.0;  // Changed to maximum scale
-        const MIN_SCALE = 0.3;
-        const MAX_SCALE = 1.0;
-        const SCALE_STEP = 0.1;
-
-        let currentScale = SIMULATOR_SCALE;
-
-        // Accurately calculate and maintain physical size
-        function setupPhysicalSize() {
-            const root = document.documentElement;
-            updateSimulatorScale(currentScale);
-
-            // Get device pixel ratio
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            root.style.setProperty('--device-pixel-ratio', devicePixelRatio);
-
-            // Create a test element to measure physical mm
-            const testElement = document.createElement('div');
-            testElement.style.width = '1mm';
-            testElement.style.height = '1mm';
-            testElement.style.position = 'absolute';
-            testElement.style.visibility = 'hidden';
-            document.body.appendChild(testElement);
-
-            // Get actual pixels per mm
-            const pixelsPerMm = testElement.offsetWidth;
-            document.body.removeChild(testElement);
-        }
-
-        function updateSimulatorScale(scale) {
-            const root = document.documentElement;
-            root.style.setProperty('--simulator-scale', scale.toString());
-
-            // Update scale display
-            const scaleDisplay = document.getElementById('scaleDisplay');
-            if (scaleDisplay) {
-                scaleDisplay.textContent = `${Math.round(scale * 100)}%`;
-            }
-
-            const scaledWidth = REAL_WIDTH * scale;
-            const scaledHeight = REAL_HEIGHT * scale;
-            const simulator = document.querySelector('.simulator');
-            if (simulator) {
-                simulator.style.width = `${scaledWidth}mm`;
-                simulator.style.height = `${scaledHeight}mm`;
-            }
-        }
-
-        function zoomIn() {
-            if (currentScale < MAX_SCALE) {
-                currentScale = Math.min(MAX_SCALE, currentScale + SCALE_STEP);
-                updateSimulatorScale(currentScale);
-            }
-        }
-
-        function zoomOut() {
-            if (currentScale > MIN_SCALE) {
-                currentScale = Math.max(MIN_SCALE, currentScale - SCALE_STEP);
-                updateSimulatorScale(currentScale);
-            }
-        }
-
-        // Helper function to convert simulator coordinates to real device coordinates
-        window.simulatorToRealCoordinates = function(x, y) {
-            return {
-                x: x / currentScale,
-                y: y / currentScale
-            };
-        }
-
-        window.addEventListener('load', setupPhysicalSize);
-        window.addEventListener('resize', setupPhysicalSize);
-    </script>
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <!-- Simulator Column -->
-            <div class="col-md-9">
+            <div class="col-md-4">
                 <div class="card mb-3">
                     <div class="card-header">
                         <h4 class="mb-2">Device Simulator</h4>
@@ -100,7 +23,7 @@
                                 <button class="btn btn-outline-secondary" onclick="zoomIn()">+</button>
                             </div>
                             <button class="btn btn-primary" id="setVideoSource">
-                                Share Screen/Tab
+                                Share Screen
                             </button>
                         </div>
                     </div>
@@ -111,7 +34,10 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <!-- Task Controls Column -->
+            <div class="col-md-5">
                 <!-- Task Controls -->
                 <div class="card mb-3">
                     <div class="card-header">
