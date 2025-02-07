@@ -1,27 +1,33 @@
-from flask import Flask, render_template, send_from_directory, request, jsonify
+from flask import Flask, render_template, request, jsonify
 import os
-import logging
+from flask_sqlalchemy import SQLAlchemy
 from openai import OpenAI
+import logging
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "a secret key"
+
+# Configure database
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 300,
+    "pool_pre_ping": True,
+}
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "development_key"
+
+# Initialize database
+db = SQLAlchemy(app)
+
+# Initialize OpenAI client
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/financials')
-def financials():
-    return render_template('financials.html')
-
-@app.route('/static/<path:path>')
-def serve_static(path):
-    return send_from_directory('static', path)
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -30,28 +36,20 @@ def chat():
         logger.debug(f"Received chat request with data: {data}")
 
         if not data or 'messages' not in data:
-            logger.error("Invalid request data")
             return jsonify({'error': 'Invalid request data'}), 400
 
-        # Ensure the messages array follows the correct format
         messages = data['messages']
-        if not messages or not isinstance(messages, list):
-            logger.error("Invalid messages format")
+        if not isinstance(messages, list):
             return jsonify({'error': 'Invalid messages format'}), 400
 
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=messages,
             temperature=0.7,
-            max_tokens=500  # Increased from 150 to handle longer responses
+            max_tokens=500
         )
 
         logger.debug(f"OpenAI API response: {response}")
-
-        # Extract the response content
-        if not response.choices or not response.choices[0].message:
-            logger.error("Invalid response from OpenAI")
-            return jsonify({'error': 'Invalid response from OpenAI'}), 500
 
         return jsonify({
             "choices": [{

@@ -9,6 +9,7 @@ body {
     padding: 20px;
 }
 
+/* Simulator Styles */
 .simulator {
     width: var(--device-width);
     height: var(--device-height);
@@ -19,16 +20,12 @@ body {
     margin: 0 auto;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
-    /* Remove any scaling */
     transform: none !important;
-    /* Ensure exact dimensions */
     max-width: var(--device-width);
     max-height: var(--device-height);
-    /* Prevent content overflow */
     overflow: hidden;
 }
 
-/* Add these new styles for video integration */
 #bgVideo {
     position: absolute;
     top: 0;
@@ -39,13 +36,7 @@ body {
     z-index: 1;
 }
 
-/* Remove media query that was affecting simulator size */
-@media (min-width: 1200px) {
-    .simulator {
-        /* All scaling removed */
-    }
-}
-
+/* Selection Box Styles */
 .selection-box {
     position: absolute;
     border: 2px solid var(--bs-purple);
@@ -63,22 +54,14 @@ body {
     z-index: 100;
 }
 
+/* Block Styles */
 .block {
     padding: 8px;
     margin: 5px 0;
     border-radius: 4px;
     position: relative;
-    cursor: move;
+    cursor: pointer;
     transition: all 0.3s ease-out;
-}
-
-.block.dragging {
-    opacity: 0.5;
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-.block:hover {
-    transform: translateX(5px);
 }
 
 .tap-block {
@@ -96,28 +79,13 @@ body {
     box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
 }
 
-.undefined-region {
-    border-color: var(--bs-warning) !important;
-}
-
-.blink-warning {
-    color: var(--bs-warning);
-    animation: blink 1s ease-in-out infinite;
-    margin-left: 0.5rem;
-}
-
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
 .nested-blocks {
     margin-left: 20px;
     padding-left: 10px;
     border-left: 2px solid var(--bs-secondary);
 }
 
-/* Chat related styles */
+/* Chat Interface */
 .chat-messages {
     height: 250px;
     overflow-y: auto;
@@ -155,6 +123,7 @@ body {
     margin-top: 0.25rem;
 }
 
+/* Thinking Animation */
 .chat-thinking {
     display: flex;
     align-items: center;
@@ -188,7 +157,18 @@ body {
     }
 }
 
-/* Tap feedback animation */
+/* Live Console */
+.live-console {
+    height: 200px;
+    overflow-y: auto;
+    background-color: var(--bs-dark);
+    padding: 10px;
+    font-family: monospace;
+    border: 1px solid var(--bs-secondary);
+    border-radius: 4px;
+}
+
+/* Tap Animation */
 .tap-feedback {
     position: absolute;
     width: 20px;
@@ -210,6 +190,47 @@ body {
         transform: translate(-50%, -50%) scale(2);
         opacity: 0;
     }
+}
+
+/* Card and Form Styles */
+.card {
+    background-color: var(--bs-dark);
+    border: 1px solid var(--bs-secondary);
+}
+
+.form-control {
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+    border-color: var(--bs-secondary);
+}
+
+.form-control:focus {
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+}
+
+.task-block {
+    background-color: var(--bs-dark);
+    border: 1px solid var(--bs-secondary);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.delete-dot {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 12px;
+    height: 12px;
+    background-color: var(--bs-danger);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.delete-dot:hover {
+    transform: scale(1.2);
 }
 
 .task-container {
@@ -265,13 +286,6 @@ body {
     background-color: rgba(13, 110, 253, 0.1);
 }
 
-.deleted-task-list {
-    opacity: 0.7;
-}
-
-.deleted-task-list .task-list-item {
-    border-style: dashed;
-}
 
 .restore-btn {
     opacity: 0;
@@ -280,40 +294,6 @@ body {
 
 .task-list-item:hover .restore-btn {
     opacity: 1;
-}
-
-.task-block {
-    background-color: var(--bs-dark);
-    border: 1px solid var(--bs-secondary);
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 10px;
-}
-
-.delete-dot {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    width: 12px;
-    height: 12px;
-    background-color: var(--bs-danger);
-    border-radius: 50%;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-}
-
-.delete-dot:hover {
-    transform: scale(1.2);
-}
-
-.live-console {
-    height: 200px;
-    overflow-y: auto;
-    background-color: var(--bs-dark);
-    padding: 10px;
-    font-family: monospace;
-    border: 1px solid var(--bs-secondary);
-    border-radius: 4px;
 }
 
 .task-log {
@@ -341,18 +321,7 @@ body {
     border-color: var(--bs-secondary);
 }
 
-.form-control {
-    background-color: var(--bs-dark);
-    color: var(--bs-light);
-    border-color: var(--bs-secondary);
-}
 
-.form-control:focus {
-    background-color: var(--bs-dark);
-    color: var(--bs-light);
-}
-
-/* Tab System Styles */
 .nav-tabs {
     border-bottom: 1px solid var(--bs-secondary);
     background-color: var(--bs-dark);
@@ -374,66 +343,4 @@ body {
     background-color: transparent;
     border-bottom: 2px solid var(--bs-primary);
     color: var(--bs-primary);
-}
-
-/* Chart Styles */
-.chart-container {
-    height: 300px;
-    width: 100%;
-    margin: 1rem 0;
-}
-
-.card {
-    background-color: var(--bs-dark);
-    border: 1px solid var(--bs-secondary);
-}
-
-.card-title {
-    color: var(--bs-light);
-    margin-bottom: 1rem;
-}
-
-/* Task List Styles */
-.task-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.task-list-item {
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
-    border: 1px solid var(--bs-secondary);
-    border-radius: 4px;
-    background-color: var(--bs-dark);
-    transition: all 0.2s ease-in-out;
-}
-
-.task-list-item:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    transform: translateX(5px);
-}
-
-.task-list-item.active {
-    border-color: var(--bs-primary);
-    background-color: rgba(13, 110, 253, 0.1);
-}
-
-.task-list-item .task-name {
-    cursor: pointer;
-    flex-grow: 1;
-    margin-right: 1rem;
-}
-
-.task-list-item .delete-task-btn {
-    opacity: 0.8;
-    transition: all 0.2s ease-in-out;
-}
-
-.task-list-item:hover .delete-task-btn {
-    opacity: 1;
-}
-
-.task-list-item .delete-task-btn:hover {
-    transform: scale(1.1);
 }

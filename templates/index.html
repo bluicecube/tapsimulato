@@ -3,82 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Touchscreen Simulator for Samsung Galaxy A11</title>
+    <title>Samsung Galaxy A11 Simulator</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
 </head>
 <body>
-    <div class="container-fluid">
+    <div class="container-fluid py-4">
         <div class="row">
-            <!-- Main Content -->
-            <div class="col-12">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h4>Samsung Galaxy A11 Simulator</h4>
-                            </div>
-                            <div class="card-body d-flex flex-column align-items-center">
-                                <div id="simulator" class="simulator">
-                                    <video id="bgVideo" autoplay muted></video>
-                                    <div id="selectionBox" class="selection-box d-none"></div>
-                                </div>
-                                <div class="input-group mt-3">
-                                    <button class="btn btn-primary w-100" id="setVideoSource">
-                                        <i data-feather="monitor"></i>
-                                        Share Screen/Tab
-                                    </button>
-                                </div>
-                            </div>
+            <!-- Simulator Column -->
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h4>Samsung Galaxy A11 Simulator</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column align-items-center">
+                        <div id="simulator" class="simulator">
+                            <video id="bgVideo" autoplay muted></video>
+                            <div id="selectionBox" class="selection-box d-none"></div>
+                        </div>
+                        <button class="btn btn-primary mt-3 w-100" id="setVideoSource">
+                            <i data-feather="monitor"></i> Share Screen/Tab
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task & Chat Column -->
+            <div class="col-md-6">
+                <!-- Task Management -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h4>Current Task</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="currentTask" class="current-task"></div>
+                    </div>
+                </div>
+
+                <!-- AI Assistant -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h4>AI Assistant</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="chatMessages" class="chat-messages mb-3"></div>
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control" 
+                                   placeholder="Describe what you want to create...">
+                            <button id="sendChatBtn" class="btn btn-primary">
+                                <i data-feather="send"></i>
+                            </button>
+                            <button id="executeTaskBtn" class="btn btn-success ms-2">
+                                <i data-feather="play"></i> Execute
+                            </button>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h4>Task Management</h4>
-                            </div>
-                            <div class="card-body">
-                                <div id="currentTask" class="current-task"></div>
-                            </div>
-                        </div>
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h4>AI Assistant</h4>
-                            </div>
-                            <div class="card-body">
-                                <div id="chatMessages" class="chat-messages mb-3"></div>
-                                <div class="input-group">
-                                    <input type="text" id="chatInput" class="form-control" placeholder="Describe what you want to create...">
-                                    <button id="sendChatBtn" class="btn btn-primary">
-                                        <i data-feather="send"></i>
-                                    </button>
-                                    <button id="executeTaskBtn" class="btn btn-success ms-2">
-                                        <i data-feather="play"></i> Execute Task
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h4>Live Console</h4>
-                            </div>
-                            <div class="card-body">
-                                <div id="liveConsole" class="live-console"></div>
-                            </div>
-                        </div>
+                </div>
+
+                <!-- Console -->
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Live Console</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="liveConsole" class="live-console"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Load scripts at the end of body -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/gcode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
-    <!--<script src="{{ url_for('static', filename='js/financials.js') }}"></script>-->
 </body>
 </html>
