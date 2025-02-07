@@ -49,6 +49,11 @@ function addConditionalBlock() {
     logToConsole('Added Logic block', 'success');  // Updated message
 }
 
+// New function for adding logic blocks
+function addLogicBlock() {
+    addConditionalBlock();
+}
+
 // State management
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize UI elements
@@ -60,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const executeTaskBtn = document.getElementById('executeTaskBtn');
     const addTapBtn = document.getElementById('addTapBtn');
     const addLoopBtn = document.getElementById('addLoopBtn');
-    const addConditionalBtn = document.getElementById('addConditionalBtn');
+    const addLogicBtn = document.getElementById('addLogicBtn'); // Updated button ID
     const newTaskBtn = document.getElementById('newTaskBtn');
     const deleteAllTasksBtn = document.getElementById('deleteAllTasksBtn');
     const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
@@ -92,8 +97,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (addConditionalBtn) {
-        addConditionalBtn.addEventListener('click', addConditionalBlock);
+    if (addLogicBtn) {
+        addLogicBtn.addEventListener('click', addLogicBlock);
     }
 
     if (newTaskBtn) {
@@ -410,6 +415,7 @@ function updateTaskList() {
         });
     });
 }
+
 
 
 // Block Management
@@ -1574,7 +1580,7 @@ async function executeTask() {
 
 // Add button to UI
 document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
-    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
+    <button class="btn btn-outline-info" id="addLogicBtn">Add Conditional</button>
 `);
 
 // Add this utility function for random coordinates
