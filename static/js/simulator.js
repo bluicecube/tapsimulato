@@ -710,7 +710,6 @@ function addLoopBlock(parent) {
 }
 
 
-
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
@@ -718,12 +717,19 @@ function generateGCode() {
     }
 
     let gcode = `; G-code for Samsung Galaxy A11\n`;
-    gcode += `; Physical dimensions: ${PHYSICAL_WIDTH}mm x ${PHYSICAL_HEIGHT}mm\n\n`;
+    gcode += `; Physical dimensions: ${PHYSICAL_WIDTH}mm x ${PHYSICAL_HEIGHT}mm\n`;
+    gcode += `; Screen dimensions: ${DEVICE_WIDTH}px x ${DEVICE_HEIGHT}px\n\n`;
+    gcode += `G21 ; Set units to millimeters\n`;
+    gcode += `G90 ; Use absolute coordinates\n\n`;
 
     function convertToPhysical(pixelX, pixelY) {
+        // Convert pixel coordinates to physical coordinates (mm)
         const physicalX = (pixelX / DEVICE_WIDTH) * PHYSICAL_WIDTH;
         const physicalY = (pixelY / DEVICE_HEIGHT) * PHYSICAL_HEIGHT;
-        return { x: physicalX, y: physicalY };
+        return { 
+            x: Math.max(0, Math.min(PHYSICAL_WIDTH, physicalX)),  // Clamp to physical boundaries
+            y: Math.max(0, Math.min(PHYSICAL_HEIGHT, physicalY))
+        };
     }
 
     function processBlocks(blocks, indent = 0) {
@@ -732,22 +738,26 @@ function generateGCode() {
 
         blocks.forEach(block => {
             if (block.type === 'tap' && block.region) {
+                // Calculate center point of the tap region
                 const center = {
                     x: (block.region.x1 + block.region.x2) / 2,
                     y: (block.region.y1 + block.region.y2) / 2
                 };
                 const physical = convertToPhysical(center.x, center.y);
+
+                code += `${indentation}; Tap at pixel coordinates (${Math.round(center.x)}, ${Math.round(center.y)})\n`;
                 code += `${indentation}G1 X${physical.x.toFixed(2)} Y${physical.y.toFixed(2)} F1000 ; Move to tap position\n`;
-                code += `${indentation}G1 Z0 ; Tap down\n`;
+                code += `${indentation}G1 Z0 F500 ; Tap down\n`;
                 code += `${indentation}G4 P100 ; Wait 100ms\n`;
-                code += `${indentation}G1 Z5 ; Tap up\n`;
+                code += `${indentation}G1 Z5 F500 ; Tap up\n`;
+                code += `${indentation}G4 P200 ; Wait 200ms between taps\n\n`;
             } else if (block.type === 'loop') {
                 code += `${indentation}; Start loop (${block.iterations} iterations)\n`;
                 for (let i = 0; i < block.iterations; i++) {
                     code += `${indentation}; Iteration ${i + 1}\n`;
                     code += processBlocks(block.blocks, indent + 1);
                 }
-                code += `${indentation}; End loop\n`;
+                code += `${indentation}; End loop\n\n`;
             }
         });
         return code;
