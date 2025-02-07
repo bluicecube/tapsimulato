@@ -15,7 +15,7 @@ let focusedBlock = null;
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize selection box
     selectionRectangle = document.getElementById('selectionBox');
-    document.getElementById('runTaskBtn').addEventListener('click', executeSelectedTask);
+    document.getElementById('executeTaskBtn').addEventListener('click', executeSelectedTask);
 
     const simulator = document.getElementById('simulator');
     simulator.addEventListener('mousedown', startSelection);
