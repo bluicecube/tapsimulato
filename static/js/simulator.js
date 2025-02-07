@@ -282,7 +282,7 @@ document.getElementById('deleteAllTasksBtn').addEventListener('click', async () 
         state.tasks = [];
         state.currentTask = null;
 
-        // Create a new task since all are deleted
+        // Create a new task
         const newTask = await createNewTask();
         await loadTask(newTask.id);
 
