@@ -1,10 +1,11 @@
 ')) {
         try {
-            const jsonStr = content.split('```json')[1].split('```')[0];
+            // Extract only the JSON object from the message
+            const jsonStr = content.match(/```json\s*([\s\S]*?)\s*```/)[1];
             const parsed = JSON.parse(jsonStr);
+            // Use only the human-readable message
             content = parsed.message;
         } catch (e) {
-            // If parsing fails, use the original content
             console.error('Failed to parse JSON in message:', e);
         }
     }
@@ -68,5 +69,9 @@ async function handleMessage(event) {
         let responseData;
 
         try {
-            // Extract JSON from markdown if present
-            const jsonMatch = assistantMessage.match(/```json\s*([\s\S]*?)\s*
+            // Try to parse the JSON directly first
+            responseData = JSON.parse(assistantMessage);
+        } catch (e) {
+            try {
+                // If direct parse fails, try to extract JSON from markdown
+                const jsonMatch = assistantMessage.match(/```json\s*([\s\S]*?)\s*
