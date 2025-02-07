@@ -888,13 +888,12 @@ async function executeTask() {
 
 // Utilities
 function showTapFeedback(region) {
-    const centerX = (region.x1 + region.x2) / 2;
-    const centerY = (region.y1 + region.y2) / 2;
+    const coordinates = getRandomCoordinatesInRegion(region);
 
     const feedback = document.createElement('div');
     feedback.className = 'tap-feedback';
-    feedback.style.left = `${centerX}px`;
-    feedback.style.top = `${centerY}px`;
+    feedback.style.left = `${coordinates.x}px`;
+    feedback.style.top = `${coordinates.y}px`;
 
     document.getElementById('simulator').appendChild(feedback);
 
@@ -916,7 +915,7 @@ function setupVideoSharing() {
                 audio: false
             });
             video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
+            logToConsole('Screen sharing started','success');
         } catch (error) {
             logToConsole('Screen sharing error: ' +error.message, 'error');
         }
@@ -1415,3 +1414,26 @@ document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
 `);
 
 document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+
+// Add this utility function for random coordinates
+function getRandomCoordinatesInRegion(region) {
+    return {
+        x: region.x1 + Math.random() * (region.x2 - region.x1),
+        y: region.y1 + Math.random() * (region.y2 - region.y1)
+    };
+}
+
+// Update showTapFeedback to use random coordinates
+function showTapFeedback(region) {
+    const coordinates = getRandomCoordinatesInRegion(region);
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${coordinates.x}px`;
+    feedback.style.top = `${coordinates.y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+
+    // Remove the feedback element after animation completes
+    feedback.addEventListener('animationend', () => feedback.remove());
+}
