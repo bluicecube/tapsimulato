@@ -294,25 +294,25 @@ function calculateRegionFromDescription(description) {
     const regions = {
         'middle': {
             x1: Math.round(DEVICE_WIDTH * 0.25),
-            y1: Math.round(DEVICE_HEIGHT * 0.25),
+            y1: Math.round(DEVICE_HEIGHT * 0.4),  // Adjusted to be more centered
             x2: Math.round(DEVICE_WIDTH * 0.75),
-            y2: Math.round(DEVICE_HEIGHT * 0.75)
+            y2: Math.round(DEVICE_HEIGHT * 0.6)   // Adjusted to be more centered
         },
         'center': {
             x1: Math.round(DEVICE_WIDTH * 0.25),
-            y1: Math.round(DEVICE_HEIGHT * 0.25),
+            y1: Math.round(DEVICE_HEIGHT * 0.4),  // Adjusted to be more centered
             x2: Math.round(DEVICE_WIDTH * 0.75),
-            y2: Math.round(DEVICE_HEIGHT * 0.75)
+            y2: Math.round(DEVICE_HEIGHT * 0.6)   // Adjusted to be more centered
         },
         'top': {
             x1: 0,
             y1: 0,
             x2: DEVICE_WIDTH,
-            y2: Math.round(DEVICE_HEIGHT * 0.25)
+            y2: Math.round(DEVICE_HEIGHT * 0.2)   // Reduced height for top region
         },
         'bottom': {
             x1: 0,
-            y1: Math.round(DEVICE_HEIGHT * 0.75),
+            y1: Math.round(DEVICE_HEIGHT * 0.8),  // Adjusted to be closer to bottom
             x2: DEVICE_WIDTH,
             y2: DEVICE_HEIGHT
         },

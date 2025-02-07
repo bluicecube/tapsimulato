@@ -19,11 +19,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
     document.getElementById('executeBtn').addEventListener('click', () => {
         if (currentTask) {
-            // Call the chatbot's processCommand function with execute command
-            window.processCommand({
-                command: 'execute',
-                params: {},
-                message: 'Executing current task'
+            // Simulate user sending an execute command through chat
+            handleMessage({
+                preventDefault: () => {},
+                type: 'click'
+            });
+
+            const chatInput = document.getElementById('chatInput');
+            chatInput.value = 'execute current task';
+            handleMessage({
+                preventDefault: () => {},
+                type: 'click'
             });
         } else {
             logLiveConsole('No task selected', 'error');
