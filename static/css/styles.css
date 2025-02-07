@@ -56,7 +56,7 @@ body {
 .simulator {
     position: absolute;
     top: 5px;
-    right: 25%;
+    right: 50%;
     transform: translateX(50%);
     width: calc(var(--device-physical-width) * var(--simulator-scale));
     height: calc(var(--device-physical-height) * var(--simulator-scale));
