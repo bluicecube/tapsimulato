@@ -120,20 +120,15 @@
                     <div class="card-header">
                         <div class="d-flex justify-content-between align-items-center">
                             <h4 class="mb-0">Task Management</h4>
-                            <button class="btn btn-success" id="executeTaskBtn">Execute</button>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" id="toggleTasksBtn">
+                                    Tasks
+                                </button>
+                                <button class="btn btn-success" id="executeTaskBtn">Execute</button>
+                            </div>
                         </div>
                     </div>
                     <div class="card-body">
-                        <!-- Task Selection -->
-                        <div class="mb-3 d-flex align-items-center">
-                            <select id="taskSelect" class="form-select me-2">
-                                <option value="">Select a task...</option>
-                            </select>
-                            <button class="btn btn-outline-danger" onclick="deleteTask(state.currentTask?.id)" title="Delete current task">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-
                         <!-- Task Title -->
                         <div class="mb-3">
                             <input type="text" id="taskTitle" class="form-control" placeholder="Task Name">
@@ -151,6 +146,15 @@
                         <!-- Console Output -->
                         <div id="liveConsole" class="live-console mt-3"></div>
                     </div>
+                </div>
+
+                <!-- Task Sidebar -->
+                <div class="sidebar" id="taskSidebar">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Tasks</h5>
+                        <button class="btn btn-sm btn-outline-primary" id="newTaskBtn">New Task</button>
+                    </div>
+                    <div id="taskList" class="task-list"></div>
                 </div>
 
                 <!-- AI Assistant -->

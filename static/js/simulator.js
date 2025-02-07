@@ -56,6 +56,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Video setup
     setupVideoSharing();
 
+    // Sidebar toggle
+    const toggleTasksBtn = document.getElementById('toggleTasksBtn');
+    const taskSidebar = document.getElementById('taskSidebar');
+
+    toggleTasksBtn.addEventListener('click', () => {
+        taskSidebar.classList.toggle('show');
+    });
+
+    // Close sidebar when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#taskSidebar') &&
+            !e.target.closest('#toggleTasksBtn') &&
+            taskSidebar.classList.contains('show')) {
+            taskSidebar.classList.remove('show');
+        }
+    });
+
+
     // Create initial task and load tasks
     createNewTask().then(() => {
         loadTasks();
@@ -115,6 +133,7 @@ async function loadTask(taskId) {
         };
 
         updateTaskDisplay();
+        updateTaskSelect(); //Added to update sidebar on task load
         logToConsole(`Loaded task ${taskId}`, 'success');
     } catch (error) {
         logToConsole('Error loading task blocks', 'error');
@@ -175,11 +194,26 @@ function addLoopBlock() {
 
 // UI Updates
 function updateTaskSelect() {
-    const select = document.getElementById('taskSelect');
-    select.innerHTML = '<option value="">Select a task...</option>' +
-        state.tasks.map(task =>
-            `<option value="${task.id}"${state.currentTask && state.currentTask.id === task.id ? ' selected' : ''}>${task.name}</option>`
-        ).join('');
+    const taskList = document.getElementById('taskList');
+    taskList.innerHTML = state.tasks.map(task => `
+        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
+             data-task-id="${task.id}">
+            <span>${task.name}</span>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${task.id})">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `).join('');
+
+    // Add click handlers for task selection
+    taskList.querySelectorAll('.task-list-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {  // Ignore clicks on the delete button
+                const taskId = parseInt(item.dataset.taskId);
+                loadTask(taskId);
+            }
+        });
+    });
 }
 
 function updateTaskDisplay() {
@@ -502,20 +536,11 @@ async function deleteTask(taskId) {
     }
 }
 
-
-// Add delete button to taskSelect
-document.getElementById('taskSelect').addEventListener('change', (e) => {
-    const taskId = e.target.value;
-    if (taskId) {
-        loadTask(parseInt(taskId));
-    } else {
-        state.currentTask = null;
-        updateTaskDisplay();
-    }
-});
-
-// Add delete button event listener
+// Add delete button event listener (moved here from original code)
 document.getElementById('deleteTaskBtn').addEventListener('click', () => {
     const taskId = document.getElementById('taskSelect').value;
     deleteTask(taskId);
 });
+
+let isSelecting = false;
+let selectionStartX, selectionStartY;
