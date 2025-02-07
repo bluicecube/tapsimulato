@@ -22,8 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
 
-        // Set the chat input value
-        chatInput.value = 'run button';
+        // Set the chat input value to "run" instead of "run button"
+        chatInput.value = 'run';
 
         // Trigger the chat send button click
         sendChatBtn.click();
@@ -167,13 +167,20 @@ function updateTaskList() {
             }
         });
 
-        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
+        // Add delete functionality
+        const deleteBtn = taskItem.querySelector('.delete-task-btn');
+        deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             deleteTask(task);
         });
 
         taskList.appendChild(taskItem);
     });
+
+    // Initialize Feather icons for the new elements
+    if (window.feather) {
+        feather.replace();
+    }
 }
 
 function updateDeletedTaskList() {
@@ -752,6 +759,8 @@ function addLoopBlock(parent) {
 
 
 
+
+
 function generateGCode() {
     if (!currentTask) {
         logLiveConsole("No task selected", "error");
@@ -900,7 +909,7 @@ function handleMessage(message) {
                         currentTask.blocks.push(tapBlock);
                     } else if (blockData.type === 'loop') {
                         const loopBlock = {
-                            type: 'loop',
+                            type: ''loop',
                             iterations: blockData.iterations || 1,
                             blocks: [],
                             name: 'Loop Block'
