@@ -18,119 +18,39 @@
     state.chatHistory.push({ role, content });
 }
 
-// Helper function to calculate region from description
-function calculateRegionFromDescription(description) {
-    const normalized = description.toLowerCase().trim();
+// Initialize chat interface
+function initializeChat() {
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendChatBtn');
+    const chatMessages = document.getElementById('chatMessages');
 
-    // Screen dimensions must match the CSS variables
-    const DEVICE_WIDTH = 320;
-    const DEVICE_HEIGHT = 720;
-
-    // Define screen regions with actual coordinates
-    const regions = {
-        'middle': {
-            x1: Math.round(DEVICE_WIDTH * 0.25),
-            y1: Math.round(DEVICE_HEIGHT * 0.33),
-            x2: Math.round(DEVICE_WIDTH * 0.75),
-            y2: Math.round(DEVICE_HEIGHT * 0.67)
-        },
-        'center': {
-            x1: Math.round(DEVICE_WIDTH * 0.25),
-            y1: Math.round(DEVICE_HEIGHT * 0.33),
-            x2: Math.round(DEVICE_WIDTH * 0.75),
-            y2: Math.round(DEVICE_HEIGHT * 0.67)
-        },
-        'top': {
-            x1: 0,
-            y1: 0,
-            x2: DEVICE_WIDTH,
-            y2: Math.round(DEVICE_HEIGHT * 0.15)
-        },
-        'bottom': {
-            x1: 0,
-            y1: Math.round(DEVICE_HEIGHT * 0.85),
-            x2: DEVICE_WIDTH,
-            y2: DEVICE_HEIGHT
-        },
-        'left': {
-            x1: 0,
-            y1: Math.round(DEVICE_HEIGHT * 0.25),
-            x2: Math.round(DEVICE_WIDTH * 0.25),
-            y2: Math.round(DEVICE_HEIGHT * 0.75)
-        },
-        'right': {
-            x1: Math.round(DEVICE_WIDTH * 0.75),
-            y1: Math.round(DEVICE_HEIGHT * 0.25),
-            x2: DEVICE_WIDTH,
-            y2: Math.round(DEVICE_HEIGHT * 0.75)
-        }
-    };
-
-    // Try to match description to a region
-    for (const [key, region] of Object.entries(regions)) {
-        if (normalized.includes(key)) {
-            return region;
-        }
+    if (!chatMessages) {
+        console.error('Chat container not found');
+        return;
     }
 
-    // Default to center if no match
-    return regions.center;
-}
+    // Clear existing messages
+    chatMessages.innerHTML = '';
 
-// Command processing
-async function processCommand(responseData) {
-    try {
-        const { command, params, message } = responseData;
-
-        switch (command) {
-            case 'create_task_with_blocks':
-                const taskName = params.taskName || 'New Task';
-                // Create new task with specified name
-                const newTask = window.simulatorAPI.createNewTask();
-                // Update task name
-                newTask.name = taskName;
-                // Process and add blocks
-                if (params.blocks && params.blocks.length > 0) {
-                    const processedBlocks = params.blocks.map(block => {
-                        if (block.type === 'loop') {
-                            return {
-                                type: 'loop',
-                                iterations: block.iterations || 1,
-                                blocks: block.blocks.map(b => ({
-                                    type: 'tap',
-                                    region: calculateRegionFromDescription(b.location),
-                                    name: b.name || 'Tap Block'
-                                }))
-                            };
-                        } else {
-                            return {
-                                type: 'tap',
-                                region: calculateRegionFromDescription(block.location),
-                                name: block.name || 'Tap Block'
-                            };
-                        }
-                    });
-                    window.simulatorAPI.addBlocksToChatbotTask(newTask, processedBlocks);
-                }
-                console.log('Created task with blocks:', processedBlocks);
-                break;
-
-            case 'execute':
-                if (!state.currentTask) {
-                    addMessage('assistant', 'Please select a task to execute.');
-                    return;
-                }
-                window.simulatorAPI.executeSelectedTask();
-                break;
-
-            default:
-                console.log('Unknown command:', command);
-        }
-    } catch (error) {
-        console.error('Error processing command:', error);
-        addMessage('assistant', 'Error processing command. Please try again.');
+    if (chatInput && sendButton) {
+        sendButton.addEventListener('click', handleMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleMessage(e);
+        });
     }
+
+    // Show initial greeting with delay to ensure DOM is ready
+    setTimeout(() => {
+        if (chatMessages && state.chatHistory.length === 0) {
+            addMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. Would you like to create a new task?');
+        }
+    }, 500);
 }
+
+// Start initialization when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    initializeChat();
+});
 
 // Message handling
 async function handleMessage(event) {
@@ -158,7 +78,6 @@ async function handleMessage(event) {
         if (data.error) throw new Error(data.error);
 
         const assistantMessage = data.choices[0].message.content;
-
         try {
             const responseData = JSON.parse(assistantMessage);
             addMessage('assistant', responseData.message);
