@@ -24,11 +24,12 @@ body {
 
 /* Simulator styles */
 .simulator-content {
+    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 0.5rem;
-    min-height: calc(var(--device-physical-height) * var(--simulator-scale) + 10px);
+    height: calc(100vh - 60px);
 }
 
 .simulator {
@@ -234,4 +235,18 @@ body {
     :root {
         --simulator-scale: 0.5;
     }
+}
+
+/* Share screen button positioning */
+.share-screen-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.share-screen-btn:hover {
+    opacity: 1;
 }
