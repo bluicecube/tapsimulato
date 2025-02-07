@@ -19,17 +19,17 @@ Examples:
 
 Your responses should be in JSON format:
 {
-    "command": "create_task_with_blocks|add_blocks|execute|chat",
+    "command": "create_task_with_blocks",
     "params": {
-        "taskName": "string",           // for create_task
-        "blocks": [                     // array of block definitions
+        "taskName": "string",
+        "blocks": [
             {
                 "type": "loop",
-                "iterations": number,
-                "blocks": [             // nested blocks for loop
+                "iterations": 2,
+                "blocks": [
                     {
                         "type": "tap",
-                        "location": "string"    // natural language location description
+                        "location": "right"
                     }
                 ]
             }
@@ -132,20 +132,13 @@ async function handleMessage(event) {
 
         try {
             responseData = JSON.parse(assistantMessage);
-        } catch (e) {
-            responseData = {
-                command: 'chat',
-                params: {},
-                message: assistantMessage
-            };
-        }
-
-        // Add assistant's message to chat
-        addMessage('assistant', responseData.message);
-
-        // Process any commands
-        if (responseData.command !== 'chat') {
+            // Only show the human-readable message to the user
+            addMessage('assistant', responseData.message);
+            // Process any commands
             await processCommand(responseData);
+        } catch (e) {
+            console.error('Error parsing JSON response:', e);
+            addMessage('assistant', 'Sorry, I had trouble processing that request. Please try again.');
         }
 
     } catch (error) {
