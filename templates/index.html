@@ -12,15 +12,12 @@
     <div class="container-fluid">
         <div class="row">
             <!-- Main Content -->
-            <div class="col-md-9">
+            <div class="col-12">
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="card-header">
                                 <h4>Samsung Galaxy A11 Simulator</h4>
-                                <button id="toggleTasksBtn" class="btn btn-secondary d-md-none">
-                                    <i data-feather="menu"></i>
-                                </button>
                             </div>
                             <div class="card-body d-flex flex-column align-items-center">
                                 <div id="simulator" class="simulator">
@@ -41,8 +38,7 @@
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h4>Task Management</h4>
                                 <div>
-                                    <button id="newTaskBtn" class="btn btn-primary">New Task</button>
-                                    <button id="runTaskBtn" class="btn btn-success ms-2">Run</button>
+                                    <button id="runTaskBtn" class="btn btn-success">Run</button>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -74,81 +70,8 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Right Sidebar -->
-            <div class="col-md-3 sidebar" id="tasksSidebar">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h4 class="mb-0">Saved Tasks</h4>
-                    </div>
-                    <div class="card-body d-flex flex-column">
-                        <div id="taskList" class="task-list flex-grow-1"></div>
-                        <div class="recently-deleted mt-3">
-                            <h5>Recently Deleted</h5>
-                            <div id="deletedTaskList" class="deleted-task-list"></div>
-                        </div>
-                        <div class="mt-3">
-                            <a href="/financials" id="financialsLink" class="btn btn-outline-primary w-100">
-                                Financials
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
-
-
-    <!-- Excel-style tab system -->
-    <div class="col-12 mt-4">
-        <div class="card">
-            <div class="card-body p-0">
-                <ul class="nav nav-tabs" id="dataTabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="task-tab" data-bs-toggle="tab" href="#taskContent" role="tab">Tasks</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="financials-tab" data-bs-toggle="tab" href="#financialsContent" role="tab">Financials</a>
-                    </li>
-                </ul>
-
-                <div class="tab-content p-3" id="dataTabsContent">
-                    <div class="tab-pane fade show active" id="taskContent" role="tabpanel">
-                        <!-- Existing content will go here -->
-                    </div>
-                    <div class="tab-pane fade" id="financialsContent" role="tabpanel">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="card-title">Daily Revenue</h5>
-                                        <div id="dailyChart" class="chart-container"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="card-title">Weekly Summary</h5>
-                                        <div id="weeklyChart" class="chart-container"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="card-title">Monthly Overview</h5>
-                                        <div id="monthlyChart" class="chart-container"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
 
     <!-- Load scripts at the end of body -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -156,6 +79,5 @@
     <script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
     <script src="{{ url_for('static', filename='js/gcode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/financials.js') }}"></script>
-</body>
+    <!--<script src="{{ url_for('static', filename='js/financials.js') }}"></script>--> </body>
 </html>

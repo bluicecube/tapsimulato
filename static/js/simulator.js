@@ -5,20 +5,17 @@ const PHYSICAL_WIDTH = 76.3; // mm
 const PHYSICAL_HEIGHT = 161.4; // mm
 
 // Task management state
-let tasks = [];
-let currentTask = null;
+let currentBlock = null;
+let selectionRectangle = null;
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+let focusedBlock = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Existing initialization code
+    // Initialize selection box
     selectionRectangle = document.getElementById('selectionBox');
-    document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
-    document.getElementById('runTaskBtn').addEventListener('click', () => {
-        const chatInput = document.getElementById('chatInput');
-        const sendChatBtn = document.getElementById('sendChatBtn');
-        chatInput.value = 'run';
-        sendChatBtn.click();
-    });
-    document.getElementById('toggleTasksBtn').addEventListener('click', toggleTasksSidebar);
+    document.getElementById('runTaskBtn').addEventListener('click', executeSelectedTask);
 
     const simulator = document.getElementById('simulator');
     simulator.addEventListener('mousedown', startSelection);
@@ -61,10 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
             video.srcObject = null;
         }
     });
-
-    // Load saved tasks
-    loadSavedTasks();
-
     // Add Financials navigation
     document.getElementById('financialsLink').addEventListener('click', (e) => {
         e.preventDefault();
@@ -72,159 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-function toggleTasksSidebar() {
-    const sidebar = document.getElementById('tasksSidebar');
-    sidebar.classList.toggle('show');
-}
-
-function createNewTask() {
-    const task = {
-        id: `task-${Date.now()}`,
-        name: 'New Task',
-        blocks: [],
-        created: new Date().toISOString()
-    };
-    tasks.push(task);
-    currentTask = task;
-    loadTask(task);
-    saveTasksToStorage();
-    updateTaskList();
-    logLiveConsole('New task created', 'info');
-}
-
-function saveTasksToStorage() {
-    localStorage.setItem('savedTasks', JSON.stringify(tasks));
-}
-
-function loadSavedTasks() {
-    const savedTasks = localStorage.getItem('savedTasks');
-    if (savedTasks) {
-        tasks = JSON.parse(savedTasks);
-    }
-    updateTaskList();
-}
-
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = ''; // Clear current list
-
-    tasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item d-flex justify-content-between align-items-center';
-
-        // Add active class if this is the current task
-        if (currentTask && currentTask.id === task.id) {
-            taskItem.classList.add('active');
-        }
-
-        taskItem.innerHTML = `
-            <span class="task-name">${task.name}</span>
-            <button class="btn btn-danger btn-sm delete-task-btn">
-                <i data-feather="trash-2"></i>
-            </button>
-        `;
-
-        // Add click handler for task selection
-        taskItem.querySelector('.task-name').addEventListener('click', () => {
-            loadTask(task);
-            // Update active state
-            document.querySelectorAll('.task-list-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            taskItem.classList.add('active');
-            logLiveConsole(`Loaded task: ${task.name}`, 'info');
-        });
-
-        // Add click handler for delete button
-        taskItem.querySelector('.delete-task-btn').addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent task selection when deleting
-            const index = tasks.findIndex(t => t.id === task.id);
-            if (index > -1) {
-                tasks.splice(index, 1);
-                saveTasksToStorage();
-                updateTaskList();
-
-                // If the current task was deleted, clear the current task area
-                if (currentTask && currentTask.id === task.id) {
-                    currentTask = null;
-                    document.getElementById('currentTask').innerHTML = '';
-                }
-
-                logLiveConsole(`Deleted task: ${task.name}`, 'info');
-            }
-        });
-
-        taskList.appendChild(taskItem);
-    });
-
-    // Initialize icons
-    if (window.feather) {
-        feather.replace();
-    }
-}
-
-function loadTask(task) {
-    if (!task) return;
-
-    currentTask = task;
-    const currentTaskElement = document.getElementById('currentTask');
-    currentTaskElement.innerHTML = '';
-
-    // Create task container
-    const taskDiv = document.createElement('div');
-    taskDiv.className = 'task-block';
-    taskDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="task-name mb-0" contenteditable="true">${task.name}</h5>
-            <div class="btn-group">
-                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-            </div>
-        </div>
-        <div class="blocks-container"></div>
-    `;
-
-    // Add task name editing functionality
-    const nameElement = taskDiv.querySelector('.task-name');
-    nameElement.addEventListener('blur', () => {
-        task.name = nameElement.textContent;
-        saveTasksToStorage();
-        updateTaskList();
-    });
-
-    // Add tap block functionality
-    taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-        const tapDiv = addTapBlock(task);
-        taskDiv.querySelector('.blocks-container').appendChild(tapDiv);
-        saveTasksToStorage();
-    });
-
-    // Add loop block functionality
-    taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
-        const loopDiv = addLoopBlock(task);
-        taskDiv.querySelector('.blocks-container').appendChild(loopDiv);
-        saveTasksToStorage();
-    });
-
-    currentTaskElement.appendChild(taskDiv);
-
-    // Load existing blocks
-    const blocksContainer = taskDiv.querySelector('.blocks-container');
-    task.blocks.forEach(blockData => {
-        if (blockData.type === 'tap') {
-            const tapDiv = addTapBlock(task, blockData);
-            blocksContainer.appendChild(tapDiv);
-        } else if (blockData.type === 'loop') {
-            const loopDiv = addLoopBlock(task, blockData);
-            blocksContainer.appendChild(loopDiv);
-        }
-    });
-}
-
-
 function executeSelectedTask() {
-    if (!currentTask) {
-        logLiveConsole('No task selected', 'error');
+    const task = window.state && window.state.task;
+    if (!task || !task.blocks || task.blocks.length === 0) {
+        logLiveConsole('No blocks to execute', 'error');
         return;
     }
 
@@ -267,70 +111,15 @@ function executeSelectedTask() {
         });
     }
 
-    executeBlocks(currentTask.blocks);
+    executeBlocks(task.blocks);
 
     setTimeout(() => {
         logLiveConsole('Task execution completed', 'success');
-        // Re-enable all Add Tap buttons after execution
-        document.querySelectorAll('.add-tap-btn').forEach(btn => {
-            btn.disabled = false;
-        });
     }, delay + 500);
 }
 
-function addTaskBlock(task) {
-    const currentTaskElement = document.getElementById('currentTask');
-    const taskDiv = document.createElement('div');
-    taskDiv.className = 'task-block';
-    taskDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="task-name mb-0" contenteditable="true">${task.name}</h5>
-            <div>
-                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">Delete</button>
-            </div>
-        </div>
-        <div class="blocks-container"></div>
-    `;
-
-    // Add task name editing functionality
-    const nameElement = taskDiv.querySelector('.task-name');
-    nameElement.addEventListener('blur', () => {
-        task.name = nameElement.textContent;
-        saveTasksToStorage(); //Auto-save on name change
-        updateTaskList();
-    });
-
-    taskDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-        const tapDiv = addTapBlock(task);
-        taskDiv.querySelector('.blocks-container').appendChild(tapDiv);
-        saveTasksToStorage(); // Auto-save after adding a tap block
-    });
-
-    taskDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
-        const loopDiv = addLoopBlock(task);
-        taskDiv.querySelector('.blocks-container').appendChild(loopDiv);
-        saveTasksToStorage(); // Auto-save after adding a loop block
-    });
-
-    taskDiv.querySelector('.delete-task-btn').addEventListener('click', () => {
-        const index = tasks.findIndex(t => t.id === task.id);
-        if (index > -1) {
-            tasks.splice(index, 1);
-            saveTasksToStorage();
-            updateTaskList();
-            taskDiv.remove();
-            logLiveConsole(`Task deleted: ${task.name}`, 'info');
-        }
-    });
-
-    currentTaskElement.appendChild(taskDiv);
-}
-
-
 function startSelection(event) {
-    if (!currentTapBlock) return;
+    if (!currentBlock) return;
 
     isSelecting = true;
     const rect = event.target.getBoundingClientRect();
@@ -368,14 +157,14 @@ function stopSelection(event) {
     const endX = event.clientX - rect.left;
     const endY = event.clientY - rect.top;
 
-    if (currentTapBlock) {
-        currentTapBlock.region = {
+    if (currentBlock) {
+        currentBlock.region = {
             x1: Math.min(selectionStartX, endX),
             y1: Math.min(selectionStartY, endY),
             x2: Math.max(selectionStartX, endX),
             y2: Math.max(selectionStartY, endY)
         };
-        showSelectionBox(currentTapBlock);
+        showSelectionBox(currentBlock);
         logLiveConsole('Tap region set', 'success');
     }
 
@@ -387,7 +176,6 @@ function setBlockFocus(block, element) {
     // Remove focus from previous block if exists
     if (focusedBlock) {
         focusedBlock.element.classList.remove('focused');
-        // Also ensure we remove the active-block class
         focusedBlock.element.classList.remove('active-block');
     }
 
@@ -441,7 +229,6 @@ function logLiveConsole(message, type = 'info') {
     console.scrollTop = console.scrollHeight;
 }
 
-
 function enableDrawingMode(tapBlock, tapDiv) {
     // Clear any existing focus first
     if (focusedBlock && focusedBlock.element !== tapDiv) {
@@ -454,7 +241,7 @@ function enableDrawingMode(tapBlock, tapDiv) {
         box.classList.add('d-none');
     });
 
-    currentTapBlock = tapBlock;
+    currentBlock = tapBlock;
     tapDiv.classList.add('active-block');
     setBlockFocus(tapBlock, tapDiv);
     logLiveConsole('Drawing mode enabled - Select tap region', 'info');
@@ -465,127 +252,36 @@ function disableDrawingMode() {
     if (activeBlock) {
         activeBlock.classList.remove('active-block');
     }
-    currentTapBlock = null;
+    currentBlock = null;
 
     // Also clear focus when disabling drawing mode
     if (focusedBlock) {
         focusedBlock.element.classList.remove('focused');
         focusedBlock = null;
     }
-
-    // Re-enable all Add Tap buttons
-    document.querySelectorAll('.add-tap-btn').forEach(btn => {
-        btn.disabled = false;
-    });
 }
 
 // Event listeners for drawing mode
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.block') && currentTapBlock) {
+    if (!e.target.closest('.block') && currentBlock) {
         disableDrawingMode();
     }
 });
 
 document.addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && currentTapBlock) {
+    if ((e.key === 'Enter' || e.key === ' ') && currentBlock) {
         disableDrawingMode();
     }
 });
 
-function addTapBlock(parent, blockData = null) {
-    const tapBlock = blockData || {
-        type: 'tap',
-        region: null,
-        name: 'Tap Block'
-    };
-    parent.blocks.push(tapBlock);
-
-    const blockDiv = document.createElement('div');
-    blockDiv.className = 'block tap-block';
-    blockDiv.draggable = true;
-    blockDiv.innerHTML = `
-        <div class="delete-dot"></div>
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="block-name" contenteditable="true">${tapBlock.name}</h6>
-            <button class="btn btn-sm btn-outline-primary select-region-btn">Select Region</button>
-        </div>
-    `;
-
-    setupDragAndDrop(blockDiv);
-
-    // Setup event listeners and drag-and-drop
-    blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-        const index = parent.blocks.indexOf(tapBlock);
-        if (index > -1) {
-            parent.blocks.splice(index, 1);
-            blockDiv.remove();
-            logLiveConsole('Tap block removed', 'info');
-            saveTasksToStorage(); //Auto-save after deleting a block
-        }
-    });
-
-    blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-        enableDrawingMode(tapBlock, blockDiv);
-    });
-
-    blockDiv.addEventListener('click', (e) => {
-        if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
-            setBlockFocus(tapBlock, blockDiv);
-        }
-    });
-
-    // Auto-focus new tap block
-    setTimeout(() => setBlockFocus(tapBlock, blockDiv), 0);
-
-    return blockDiv;
-}
-
-function addLoopBlock(parent, blockData = null) {
-    const loopBlock = blockData || {
-        type: 'loop',
-        iterations: 1,
-        blocks: [],
-        name: 'Loop Block'
-    };
-    parent.blocks.push(loopBlock);
-
-    const blockDiv = document.createElement('div');
-    blockDiv.className = 'block loop-block';
-    blockDiv.innerHTML = `
-        <div class="delete-dot"></div>
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="block-name" contenteditable="true">${loopBlock.name}</h6>
-        </div>
-        <div class="input-group mb-2">
-            <span class="input-group-text">Iterations</span>
-            <input type="number" class="form-control iterations-input" value="1" min="1">
-        </div>
-        <div class="nested-blocks"></div>
-        <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-            <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
-        </div>
-    `;
-
-    const iterationsInput = blockDiv.querySelector('.iterations-input');
-    iterationsInput.value = parent.iterations || 1;
-    iterationsInput.addEventListener('change', (e) => {
-        loopBlock.iterations = parseInt(e.target.value) || 1;
-        saveTasksToStorage();
-    });
-
-    blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
-        const tapDiv = addTapBlock(loopBlock);
-        blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
-        saveTasksToStorage();
-    });
-
-    return blockDiv;
-}
-
+// Export functions for external use
+window.executeSelectedTask = executeSelectedTask;
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
 
 function generateGCode() {
-    if (!currentTask) {
+    if (!window.state || !window.state.task) {
         logLiveConsole("No task selected", "error");
         return;
     }
@@ -637,10 +333,11 @@ function generateGCode() {
         return code;
     }
 
-    gcode += processBlocks(currentTask.blocks);
+    gcode += processBlocks(window.state.task.blocks);
     logLiveConsole("G-code generated successfully", "success");
     return gcode;
 }
+
 
 // Placeholder functions -  These need actual implementations
 function setupDragAndDrop(blockDiv) {}
@@ -650,50 +347,8 @@ function handleMessage(message) {
     if (!message || !message.command) return;
 
     switch (message.command) {
-        case 'create_task_with_blocks':
-            // Create new task with proper initialization
-            const task = {
-                id: `task-${Date.now()}`,
-                name: message.params.taskName || 'New Task',
-                blocks: [],
-                minimized: false,
-                created: new Date().toISOString()
-            };
-
-            // Add the task to tasks array and select it
-            tasks.push(task);
-            currentTask = task;
-
-            // Load the task UI and update the task list
-            loadTask(task);
-            saveTasksToStorage();
-            updateTaskList();
-
-            // Add blocks if provided
-            if (message.params.blocks && Array.isArray(message.params.blocks)) {
-                message.params.blocks.forEach(blockData => {
-                    if (blockData.type === 'tap') {
-                        const tapBlock = {
-                            type: 'tap',
-                            region: null,
-                            name: blockData.name || 'Tap Block'
-                        };
-                        task.blocks.push(tapBlock);
-                    }
-                });
-            }
-            break;
-        case 'load_task':
-            const taskToLoad = tasks.find(t => t.name.toLowerCase() === message.params.taskName.toLowerCase());
-            if (taskToLoad) {
-                loadTask(taskToLoad);
-                logLiveConsole(`Loaded task: ${taskToLoad.name}`, 'success');
-            } else {
-                logLiveConsole(`Task '${message.params.taskName}' not found`, 'error');
-            }
-            break;
         case 'execute':
-            if (currentTask) {
+            if (window.state && window.state.task) {
                 executeSelectedTask();
             } else {
                 logLiveConsole('No task selected to execute', 'error');
