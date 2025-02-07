@@ -246,9 +246,20 @@ function startTapRegionSelection(blockElement) {
         logToConsole('Please create or select a task first', 'error');
         return;
     }
-    logToConsole('Select tap region on the simulator', 'info');
-    isSelecting = true;
+
+    // Reset selection state
+    isSelecting = false;
+    selectionStartX = 0;
+    selectionStartY = 0;
+
+    // Clear any existing selection box
+    const selectionBox = document.getElementById('selectionBox');
+    selectionBox.classList.add('d-none');
+    selectionBox.style.width = '0';
+    selectionBox.style.height = '0';
+
     state.pendingBlockConfiguration = blockElement;
+    logToConsole('Select tap region on the simulator', 'info');
 }
 
 function addTapBlock(parentLoopIndex = null, region = null) {
@@ -439,7 +450,7 @@ function renderBlock(block, index) {
 
 // Selection Handling
 function startSelection(event) {
-    if (!state.pendingBlockConfiguration) return;
+    if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
 
     isSelecting = true;
     const rect = event.target.getBoundingClientRect();
