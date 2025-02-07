@@ -281,13 +281,14 @@ document.getElementById('deleteAllTasksBtn').addEventListener('click', async () 
         // Clear tasks from state
         state.tasks = [];
         state.currentTask = null;
-        updateTaskList();
-        updateTaskDisplay();
-
-        logToConsole('All tasks deleted successfully', 'success');
 
         // Create a new task since all are deleted
-        await createNewTask();
+        const newTask = await createNewTask();
+        await loadTask(newTask.id);
+
+        updateTaskList();
+        updateTaskDisplay();
+        logToConsole('All tasks deleted and new task created', 'success');
     } catch (error) {
         logToConsole('Error deleting all tasks', 'error');
     }
@@ -949,9 +950,7 @@ function scheduleAutosave() {
 }
 
 async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');        return;
-    }
+    if (!confirm('Are you sure you want to delete this task?')) return;
 
     try {
         const response = await fetch(`/api/tasks/${taskId}`, {
@@ -962,29 +961,57 @@ async function deleteTask(taskId) {
 
         // Remove task from state
         state.tasks = state.tasks.filter(t => t.id !== taskId);
+
+        if (state.tasks.length === 0) {
+            // If no tasks remain, create a new one
+            const newTask = await createNewTask();
+            await loadTask(newTask.id);
+            logToConsole('Created new task after deletion', 'success');
+        } else if (state.currentTask && state.currentTask.id === taskId) {
+            // If deleted current task, load the most recent task
+            const mostRecentTask = state.tasks.reduce((latest, current) => {
+                const latestDate = new Date(latest.updated_at);
+                const currentDate = new Date(current.updated_at);
+                return currentDate > latestDate ? current : latest;
+            }, state.tasks[0]);
+
+            await loadTask(mostRecentTask.id);
+        }
+
         updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
         logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
     } catch (error) {
         logToConsole('Error deleting task', 'error');
     }
 }
 
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
+// Update delete all tasks handler
+document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete all tasks?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/tasks/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all tasks');
+
+        // Clear tasks from state
+        state.tasks = [];
+        state.currentTask = null;
+
+        // Create a new task since all are deleted
+        const newTask = await createNewTask();
+        await loadTask(newTask.id);
+
+        updateTaskList();
+        updateTaskDisplay();
+        logToConsole('All tasks deleted and new task created', 'success');
+    } catch (error) {
+        logToConsole('Error deleting all tasks', 'error');
+    }
 });
 
 // Add new function to show selection box for existing region
