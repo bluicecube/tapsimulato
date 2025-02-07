@@ -6,21 +6,26 @@ const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help use
 
 Your responses should be in JSON format:
 {
-    "command": "add_blocks|execute|chat",
+    "command": "add_blocks",
     "params": {
         "blocks": [
             {
                 "type": "loop",
-                "iterations": number,
-                "blocks": []
+                "iterations": 2,
+                "blocks": [
+                    {
+                        "type": "tap",
+                        "location": "top"
+                    }
+                ]
             },
             {
                 "type": "tap",
-                "location": "string"
+                "location": "middle"
             }
         ]
     },
-    "message": "human readable response"
+    "message": "Created sequence: tap top 2 times, then middle once"
 }`;
 
 // Add message to chat interface
@@ -86,14 +91,20 @@ function calculateTapRegion(description) {
 
 // Process blocks from AI response
 function processBlocks(blocks) {
+    console.log('Processing blocks:', blocks);
 
-    const newBlocks = blocks.map(block => {
+    if (!window.state?.currentTask) {
+        console.error('No active task to add blocks to');
+        return [];
+    }
+
+    const processedBlocks = blocks.map(block => {
         if (block.type === 'loop') {
             return {
                 type: 'loop',
                 name: 'Loop Block',
                 iterations: block.iterations || 1,
-                blocks: block.blocks || []
+                blocks: block.blocks ? processBlocks(block.blocks) : []
             };
         } else if (block.type === 'tap') {
             const region = calculateTapRegion(block.location);
@@ -101,23 +112,23 @@ function processBlocks(blocks) {
                 type: 'tap',
                 name: 'Tap Block',
                 region: region,
-                description: block.location || 'Center tap'
+                description: `Tap at ${block.location}`
             };
         }
         return null;
     }).filter(block => block !== null);
 
-    if (window.state && window.state.currentTask) {
-        window.state.currentTask.blocks.push(...newBlocks);
+    if (processedBlocks.length > 0) {
+        window.state.currentTask.blocks.push(...processedBlocks);
         if (typeof window.updateTaskDisplay === 'function') {
             window.updateTaskDisplay();
         }
         if (typeof window.scheduleAutosave === 'function') {
             window.scheduleAutosave();
         }
-    } else {
-        console.error('No active task to add blocks to');
     }
+
+    return processedBlocks;
 }
 
 // Simple chat interface implementation
@@ -179,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are a touchscreen task automation assistant. Help users create sequences using tap and loop blocks.'
+                            content: SYSTEM_PROMPT
                         },
                         { role: 'user', content: message }
                     ]
@@ -187,21 +198,32 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
-
-            // Remove thinking message
             chatMessages.removeChild(thinkingMessage);
 
-            // Add response message
             const responseMessage = document.createElement('div');
             responseMessage.className = 'chat-message assistant';
 
-            if (data.error) {
-                responseMessage.textContent = 'Sorry, there was an error. Please try again.';
-            } else {
-                responseMessage.textContent = data.choices[0].message.content;
-            }
+            try {
+                const aiResponse = data.choices[0].message.content;
+                console.log('AI Response:', aiResponse);
 
-            chatMessages.appendChild(responseMessage);
+                const parsedResponse = JSON.parse(aiResponse);
+                responseMessage.textContent = parsedResponse.message;
+                chatMessages.appendChild(responseMessage);
+
+                if (parsedResponse.command === 'add_blocks' && parsedResponse.params?.blocks) {
+                    console.log('Creating blocks:', parsedResponse.params.blocks);
+                    if (window.processBlocks) {
+                        window.processBlocks(parsedResponse.params.blocks);
+                    } else {
+                        console.error('processBlocks function not found');
+                    }
+                }
+            } catch (parseError) {
+                console.error('Failed to parse AI response:', parseError);
+                responseMessage.textContent = aiResponse;
+                chatMessages.appendChild(responseMessage);
+            }
         } catch (error) {
             console.error('Chat error:', error);
             chatMessages.removeChild(thinkingMessage);
@@ -212,7 +234,6 @@ document.addEventListener('DOMContentLoaded', function() {
             chatMessages.appendChild(errorMessage);
         }
 
-        // Scroll to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
