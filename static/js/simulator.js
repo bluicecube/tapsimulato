@@ -70,9 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.addEventListener('mouseup', stopSelection);
     simulator.addEventListener('mouseleave', () => {
         if (isSelecting) {
-            isSelecting = false;
-            const selectionBox = document.getElementById('selectionBox');
-            selectionBox.classList.add('d-none');
+            const rect = simulator.getBoundingClientRect();
+            const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+            const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+            finishSelection(lastKnownX, lastKnownY);
         }
     });
 
@@ -380,8 +381,14 @@ function updateSelection(event) {
 
     const selectionBox = document.getElementById('selectionBox');
     const rect = event.target.getBoundingClientRect();
-    const currentX = Math.min(Math.max(event.clientX - rect.left, 0), DEVICE_WIDTH);
-    const currentY = Math.min(Math.max(event.clientY - rect.top, 0), DEVICE_HEIGHT);
+
+    // Calculate position relative to simulator
+    let currentX = event.clientX - rect.left;
+    let currentY = event.clientY - rect.top;
+
+    // Clamp coordinates to simulator bounds
+    currentX = Math.min(Math.max(currentX, 0), rect.width);
+    currentY = Math.min(Math.max(currentY, 0), rect.height);
 
     const width = currentX - selectionStartX;
     const height = currentY - selectionStartY;
@@ -611,20 +618,19 @@ function executeTask() {
 
     logToConsole('Starting task execution', 'info');
     let delay = 0;
+    const delayIncrement = 800; // Increased delay between actions for better visibility
 
     function executeBlocks(blocks) {
         blocks.forEach(block => {
-            if (block.type === 'function') {
-                executeBlocks(block.blocks);
-            } else if (block.type === 'loop') {
+            if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
                     executeBlocks(block.blocks);
                 }
             } else if (block.type === 'tap' && block.region) {
-                delay += 500;
+                delay += delayIncrement;
                 setTimeout(() => {
                     showTapFeedback(block.region);
-                    logToConsole(`Executed ${block.description || 'tap'}`, 'success');
+                    logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
                 }, delay);
             }
         });
@@ -634,7 +640,7 @@ function executeTask() {
 
     setTimeout(() => {
         logToConsole('Task execution completed', 'success');
-    }, delay + 500);
+    }, delay + delayIncrement);
 }
 
 // Utilities
@@ -648,7 +654,9 @@ function showTapFeedback(region) {
     feedback.style.top = `${centerY}px`;
 
     document.getElementById('simulator').appendChild(feedback);
-    setTimeout(() => feedback.remove(), 500);
+
+    // Remove the feedback element after animation completes
+    feedback.addEventListener('animationend', () => feedback.remove());
 }
 
 function setupVideoSharing() {
@@ -931,8 +939,7 @@ async function addFunctionBlock(functionId) {
 
     // Deep clone the function's blocks to maintain structure
     function cloneBlock(block) {
-        if (block.type === 'tap') {
-            return {
+        if (block.type === 'tap') {            return {
                 type: 'tap',
                 name: block.name || 'Tap Block',
                 description: 'Click to set region',                region: null // Region will be set by user
