@@ -541,13 +541,8 @@ function loadTask(task) {
     // Clear existing visual elements
     document.querySelectorAll('.active-selection-box').forEach(box => box.remove());
 
-    // Store the original blocks array
-    const originalBlocks = [...task.blocks];
-    // Clear the blocks array before rebuilding
-    task.blocks = [];
-
     // Rebuild blocks from saved data
-    originalBlocks.forEach(blockData => {
+    task.blocks.forEach(blockData => {
         let blockDiv;
         if (blockData.type === 'tap') {
             blockDiv = document.createElement('div');
@@ -563,17 +558,9 @@ function loadTask(task) {
 
             setupDragAndDrop(blockDiv);
 
-            // Create the block data structure
-            const tapBlock = {
-                type: 'tap',
-                region: blockData.region,
-                name: blockData.name || 'Tap Block'
-            };
-            task.blocks.push(tapBlock);
-
             // Setup event listeners
             blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
-                const index = task.blocks.indexOf(tapBlock);
+                const index = task.blocks.indexOf(blockData);
                 if (index > -1) {
                     task.blocks.splice(index, 1);
                     blockDiv.remove();
@@ -583,12 +570,12 @@ function loadTask(task) {
             });
 
             blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-                enableDrawingMode(tapBlock, blockDiv);
+                enableDrawingMode(blockData, blockDiv);
             });
 
             blockDiv.addEventListener('click', (e) => {
                 if (!e.target.closest('.select-region-btn') && !e.target.closest('.delete-dot')) {
-                    setBlockFocus(tapBlock, blockDiv);
+                    setBlockFocus(blockData, blockDiv);
                 }
             });
 
@@ -597,11 +584,70 @@ function loadTask(task) {
                 const selectionBoxElement = document.createElement('div');
                 selectionBoxElement.className = 'active-selection-box';
                 document.getElementById('simulator').appendChild(selectionBoxElement);
-                tapBlock.selectionBoxElement = selectionBoxElement;
-                showSelectionBox(tapBlock);
+                blockData.selectionBoxElement = selectionBoxElement;
+                showSelectionBox(blockData);
             }
         } else if (blockData.type === 'loop') {
-            blockDiv = addLoopBlock(task);
+            blockDiv = document.createElement('div');
+            blockDiv.className = 'block loop-block';
+            blockDiv.innerHTML = `
+                <div class="delete-dot"></div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="block-name" contenteditable="true">${blockData.name || 'Loop Block'}</h6>
+                </div>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">Iterations</span>
+                    <input type="number" class="form-control iterations-input" value="${blockData.iterations || 1}" min="1">
+                </div>
+                <div class="nested-blocks"></div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                    <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+                </div>
+            `;
+
+            const iterationsInput = blockDiv.querySelector('.iterations-input');
+            iterationsInput.addEventListener('change', (e) => {
+                blockData.iterations = parseInt(e.target.value) || 1;
+                saveTasksToStorage();
+            });
+
+            // Setup event listeners for nested blocks
+            blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
+                const tapDiv = addTapBlock(blockData);
+                blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
+                saveTasksToStorage();
+            });
+
+            blockDiv.querySelector('.add-loop-btn').addEventListener('click', () => {
+                const nestedLoopDiv = addLoopBlock(blockData);
+                blockDiv.querySelector('.nested-blocks').appendChild(nestedLoopDiv);
+                saveTasksToStorage();
+            });
+
+            blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
+                const index = task.blocks.indexOf(blockData);
+                if (index > -1) {
+                    task.blocks.splice(index, 1);
+                    blockDiv.remove();
+                    logLiveConsole('Loop block removed', 'info');
+                    saveTasksToStorage();
+                }
+            });
+
+            // Recursively load nested blocks
+            if (blockData.blocks && blockData.blocks.length > 0) {
+                const nestedBlocksContainer = blockDiv.querySelector('.nested-blocks');
+                blockData.blocks.forEach(nestedBlockData => {
+                    if (nestedBlockData.type === 'tap') {
+                        const nestedTapDiv = addTapBlock(blockData);
+                        nestedBlocksContainer.appendChild(nestedTapDiv);
+                    } else if (nestedBlockData.type === 'loop') {
+                        const nestedLoopDiv = addLoopBlock(blockData);
+                        nestedBlocksContainer.appendChild(nestedLoopDiv);
+                    }
+                });
+            }
         }
 
         if (blockDiv) {
