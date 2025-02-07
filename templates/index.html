@@ -125,10 +125,13 @@
                     </div>
                     <div class="card-body">
                         <!-- Task Selection -->
-                        <div class="mb-3">
-                            <select id="taskSelect" class="form-select">
+                        <div class="mb-3 d-flex align-items-center">
+                            <select id="taskSelect" class="form-select me-2">
                                 <option value="">Select a task...</option>
                             </select>
+                            <button class="btn btn-outline-danger" onclick="deleteTask(state.currentTask?.id)" title="Delete current task">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </div>
 
                         <!-- Task Title -->

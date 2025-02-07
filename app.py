@@ -72,6 +72,13 @@ def update_task(task_id):
         'updated_at': task.updated_at.isoformat()
     })
 
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    task.is_active = False  # Soft delete
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/tasks/<int:task_id>/blocks', methods=['POST'])
 def save_blocks(task_id):
     task = Task.query.get_or_404(task_id)

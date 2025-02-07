@@ -466,3 +466,56 @@ function removeBlock(blockElement) {
     updateTaskDisplay();
     scheduleAutosave();
 }
+
+
+async function deleteTask(taskId) {
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete task');
+
+        // Remove task from state
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskSelect();
+
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
+        }
+
+        logToConsole('Task deleted successfully', 'success');
+
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
+    } catch (error) {
+        logToConsole('Error deleting task', 'error');
+    }
+}
+
+
+// Add delete button to taskSelect
+document.getElementById('taskSelect').addEventListener('change', (e) => {
+    const taskId = e.target.value;
+    if (taskId) {
+        loadTask(parseInt(taskId));
+    } else {
+        state.currentTask = null;
+        updateTaskDisplay();
+    }
+});
+
+// Add delete button event listener
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.getElementById('taskSelect').value;
+    deleteTask(taskId);
+});
