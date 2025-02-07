@@ -15,6 +15,10 @@ openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def index():
     return render_template('index.html')
 
+@app.route('/financials')
+def financials():
+    return render_template('financials.html')
+
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory('static', path)

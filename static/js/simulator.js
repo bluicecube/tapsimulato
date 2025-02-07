@@ -91,6 +91,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load saved tasks
     loadSavedTasks();
+
+    // Add Financials navigation
+    document.getElementById('financialsLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        window.location.href = '/financials';
+    });
 });
 
 function toggleTasksSidebar() {
@@ -753,6 +759,7 @@ function addLoopBlock(parent) {
 
     return blockDiv;
 }
+
 
 
 
