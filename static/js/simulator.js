@@ -2,6 +2,11 @@
 const DEVICE_WIDTH = 320;
 const DEVICE_HEIGHT = 720;
 
+// State management
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+
 // Initialize state
 window.state = {
     currentTask: null,
@@ -23,24 +28,88 @@ document.addEventListener('DOMContentLoaded', () => {
     const simulator = document.getElementById('simulator');
     const taskTitle = document.getElementById('taskTitle');
 
-    // Set up event listeners
+    // Setup event listeners for task controls
     const executeTaskBtn = document.getElementById('executeTaskBtn');
     const addTapBtn = document.getElementById('addTapBtn');
     const addLoopBtn = document.getElementById('addLoopBtn');
     const addConditionalBtn = document.getElementById('addConditionalBtn');
     const newTaskBtn = document.getElementById('newTaskBtn');
+    const deleteAllTasksBtn = document.getElementById('deleteAllTasksBtn');
     const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
     const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
     const saveFunctionBtn = document.getElementById('saveFunctionBtn');
 
-    if (executeTaskBtn) executeTaskBtn.addEventListener('click', executeTask);
-    if (addTapBtn) addTapBtn.addEventListener('click', () => addTapBlock());
-    if (addLoopBtn) addLoopBtn.addEventListener('click', () => addLoopBlock());
-    if (addConditionalBtn) addConditionalBtn.addEventListener('click', addConditionalBlock);
-    if (newTaskBtn) newTaskBtn.addEventListener('click', async () => { await createNewTask(); });
-    if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
-    if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
-    if (saveFunctionBtn) saveFunctionBtn.addEventListener('click', saveFunction);
+
+    if (executeTaskBtn) {
+        executeTaskBtn.addEventListener('click', executeTask);
+    }
+
+    if (addTapBtn) {
+        addTapBtn.addEventListener('click', () => {
+            if (!state.currentTask) {
+                logToConsole('Please create or select a task first', 'error');
+                return;
+            }
+            addTapBlock();
+        });
+    }
+
+    if (addLoopBtn) {
+        addLoopBtn.addEventListener('click', () => {
+            if (!state.currentTask) {
+                logToConsole('Please create or select a task first', 'error');
+                return;
+            }
+            addLoopBlock();
+        });
+    }
+
+    if (addConditionalBtn) {
+        addConditionalBtn.addEventListener('click', () => {
+            if (!state.currentTask) {
+                logToConsole('Please create or select a task first', 'error');
+                return;
+            }
+            addConditionalBlock();
+        });
+    }
+
+    if (newTaskBtn) {
+        newTaskBtn.addEventListener('click', () => {
+            createNewTask().catch(error => {
+                logToConsole('Failed to create new task: ' + error.message, 'error');
+            });
+        });
+    }
+
+    if (deleteAllTasksBtn) {
+        deleteAllTasksBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to delete all tasks?')) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/tasks/all', {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete all tasks');
+
+                // Clear tasks from state
+                state.tasks = [];
+                state.currentTask = null;
+
+                // Create a new task
+                const newTask = await createNewTask();
+                await loadTask(newTask.id);
+
+                updateTaskList();
+                updateTaskDisplay();
+                logToConsole('All tasks deleted and new task created', 'success');
+            } catch (error) {
+                logToConsole('Error deleting all tasks', 'error');
+            }
+        });
+    }
 
     // Add task title change handler
     if (taskTitle) {
@@ -77,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         simulator.addEventListener('mousedown', startSelection);
         simulator.addEventListener('mousemove', updateSelection);
         simulator.addEventListener('mouseup', stopSelection);
-        simulator.addEventListener('mouseleave', () => {
+        simulator.addEventListener('mouseleave', (event) => {
             if (isSelecting) {
                 const rect = simulator.getBoundingClientRect();
                 const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
@@ -87,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Setup video sharing and load initial data
+    // Initialize
     setupVideoSharing();
     loadFunctions();
     loadTasks().then(() => {
@@ -100,10 +169,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Add save function button handler
-    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
     if (saveFunctionBtn) {
         saveFunctionBtn.addEventListener('click', saveFunction);
     }
+    if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
+    if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
+
 });
 
 // Make functions available globally
