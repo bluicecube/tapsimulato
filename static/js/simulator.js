@@ -1,278 +1,215 @@
-// Galaxy A11 dimensions
+// Device dimensions
 const DEVICE_WIDTH = 320;
 const DEVICE_HEIGHT = 720;
 
+// State management
+const state = {
+    currentTask: null,
+    tasks: [],
+    autoSaveTimeout: null
+};
+
 // Selection state
-let selectionRectangle = null;
 let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
-let currentBlock = null;
-let focusedBlock = null;
+let selectionBox = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize selection box
-    selectionRectangle = document.getElementById('selectionBox');
-    document.getElementById('executeTaskBtn').addEventListener('click', executeSelectedTask);
-
+    // Initialize UI elements
+    selectionBox = document.getElementById('selectionBox');
     const simulator = document.getElementById('simulator');
+
+    // Set up event listeners
+    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
+    document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+    document.getElementById('addTapBtn').addEventListener('click', () => startTapSelection());
+    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
+    document.getElementById('taskSelect').addEventListener('change', (e) => {
+        if (e.target.value) loadTask(parseInt(e.target.value));
+    });
+
+    // Selection events
     simulator.addEventListener('mousedown', startSelection);
     simulator.addEventListener('mousemove', updateSelection);
     simulator.addEventListener('mouseup', stopSelection);
 
-    // Set simulator size
-    simulator.style.width = `${DEVICE_WIDTH}px`;
-    simulator.style.height = `${DEVICE_HEIGHT}px`;
+    // Video setup
+    setupVideoSharing();
 
-    // Initialize manual block building controls
-    initializeBlockControls();
-
-    // Initialize video stream functionality
-    const setVideoSourceBtn = document.getElementById('setVideoSource');
-    const video = document.getElementById('bgVideo');
-
-    setVideoSourceBtn.addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                const tracks = video.srcObject.getTracks();
-                tracks.forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logLiveConsole('Screen sharing started successfully', 'success');
-            stream.getVideoTracks()[0].addEventListener('ended', () => {
-                logLiveConsole('Screen sharing ended', 'info');
-                video.srcObject = null;
-            });
-        } catch (error) {
-            logLiveConsole(`Screen sharing error: ${error.message}`, 'error');
-            video.srcObject = null;
-        }
-    });
+    // Load initial tasks
+    loadTasks();
 });
 
-function initializeBlockControls() {
-    const blockType = document.getElementById('blockType');
-    const tapControls = document.getElementById('tapControls');
-    const loopControls = document.getElementById('loopControls');
-    const startTapSelect = document.getElementById('startTapSelect');
-    const addBlock = document.getElementById('addBlock');
+// Task Management
+async function loadTasks() {
+    try {
+        const response = await fetch('/api/tasks');
+        if (!response.ok) throw new Error('Failed to load tasks');
 
-    if (!blockType || !tapControls || !loopControls || !startTapSelect || !addBlock) return;
+        state.tasks = await response.json();
+        updateTaskSelect();
 
-    // Toggle controls based on block type
-    blockType.addEventListener('change', () => {
-        if (blockType.value === 'tap') {
-            tapControls.style.display = 'block';
-            loopControls.style.display = 'none';
-        } else {
-            tapControls.style.display = 'none';
-            loopControls.style.display = 'block';
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
         }
-    });
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+        logToConsole('Error loading tasks', 'error');
+    }
+}
 
-    // Start tap region selection
-    startTapSelect.addEventListener('click', () => {
-        currentBlock = { type: 'tap', name: 'Tap Block' };
-        logLiveConsole('Select tap region on the simulator', 'info');
-    });
+async function createNewTask() {
+    try {
+        const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: `Task ${state.tasks.length + 1}`
+            })
+        });
 
-    // Add block button handler
-    addBlock.addEventListener('click', () => {
-        if (!window.state || !window.state.currentTask) {
-            logLiveConsole('Please create or select a task first', 'error');
-            return;
-        }
+        if (!response.ok) throw new Error('Failed to create task');
 
-        if (blockType.value === 'tap') {
-            if (!currentBlock || !currentBlock.region) {
-                logLiveConsole('Please select a tap region first', 'error');
-                return;
-            }
-            addTapBlock(currentBlock.region);
-        } else {
-            const iterations = parseInt(document.getElementById('loopIterations').value) || 1;
-            addLoopBlock(iterations);
-        }
-    });
+        const task = await response.json();
+        state.tasks.push(task);
+        updateTaskSelect();
+        await loadTask(task.id);
+
+        logToConsole('New task created', 'success');
+    } catch (error) {
+        logToConsole('Error creating task', 'error');
+    }
+}
+
+async function loadTask(taskId) {
+    try {
+        const response = await fetch(`/api/tasks/${taskId}/blocks`);
+        if (!response.ok) throw new Error('Failed to load task blocks');
+
+        const blocks = await response.json();
+        state.currentTask = {
+            id: taskId,
+            blocks: blocks
+        };
+
+        updateTaskDisplay();
+        logToConsole(`Loaded task ${taskId}`, 'success');
+    } catch (error) {
+        logToConsole('Error loading task blocks', 'error');
+    }
+}
+
+// Block Management
+function startTapSelection() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+    logToConsole('Select tap region on the simulator', 'info');
+    isSelecting = true;
+}
+
+function addLoopBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const iterations = prompt('Enter number of iterations:', '1');
+    if (!iterations) return;
+
+    const block = {
+        type: 'loop',
+        iterations: parseInt(iterations) || 1,
+        blocks: []
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Loop block added', 'success');
 }
 
 function addTapBlock(region) {
     const block = {
         type: 'tap',
-        name: 'Tap Block',
         region: region,
-        description: `Tap at (${Math.round(region.x1)}, ${Math.round(region.y1)})`
+        description: `Tap at (${Math.round((region.x1 + region.x2)/2)}, ${Math.round((region.y1 + region.y2)/2)})`
     };
 
-    window.state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    currentBlock = null;
-    scheduleAutosave();
-    logLiveConsole('Tap block added', 'success');
-}
-
-function addLoopBlock(iterations) {
-    const block = {
-        type: 'loop',
-        name: 'Loop Block',
-        iterations: iterations,
-        blocks: []
-    };
-
-    window.state.currentTask.blocks.push(block);
+    state.currentTask.blocks.push(block);
     updateTaskDisplay();
     scheduleAutosave();
-    logLiveConsole('Loop block added', 'success');
+    logToConsole('Tap block added', 'success');
 }
 
-// Update the updateTaskDisplay function
+// UI Updates
+function updateTaskSelect() {
+    const select = document.getElementById('taskSelect');
+    select.innerHTML = '<option value="">Select a task...</option>' +
+        state.tasks.map(task => 
+            `<option value="${task.id}"${state.currentTask && state.currentTask.id === task.id ? ' selected' : ''}>${task.name}</option>`
+        ).join('');
+}
+
 function updateTaskDisplay() {
-    const currentTaskElement = document.getElementById('currentTask');
-    if (!currentTaskElement) return;
+    const container = document.getElementById('currentTask');
+    container.innerHTML = '';
 
-    currentTaskElement.innerHTML = '';
+    if (!state.currentTask || !state.currentTask.blocks) return;
 
     function renderBlock(block) {
-        const blockDiv = document.createElement('div');
-        blockDiv.className = `block ${block.type}-block`;
+        const blockEl = document.createElement('div');
+        blockEl.className = `block ${block.type}-block`;
 
         if (block.type === 'tap') {
-            const regionText = block.region ?
-                `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-                'No region set';
-
-            blockDiv.innerHTML = `
+            blockEl.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Tap Block</h6>
-                    <button class="btn btn-sm btn-outline-primary select-region-btn">
-                        ${block.region ? 'Change Region' : 'Set Region'}
-                    </button>
+                    <strong>Tap</strong>
+                    <small>${block.description}</small>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeBlock(this)">×</button>
                 </div>
-                <small class="text-muted">Region: ${regionText}</small>
             `;
-
-            blockDiv.addEventListener('click', (e) => {
-                if (!e.target.closest('.select-region-btn')) {
-                    window.setBlockFocus(block, blockDiv);
-                }
-            });
-
-            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-                window.enableDrawingMode(block, blockDiv);
-            });
-        } else if (block.type === 'loop') {
-            blockDiv.innerHTML = `
+        } else {
+            blockEl.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Loop Block</h6>
-                    <div class="d-flex align-items-center">
-                        <input type="number" class="form-control form-control-sm iterations-input"
-                            value="${block.iterations}" min="1" style="width: 70px">
-                        <span class="ms-2">times</span>
-                    </div>
+                    <strong>Loop ${block.iterations}x</strong>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeBlock(this)">×</button>
                 </div>
-                <div class="nested-blocks mt-2"></div>
+                <div class="nested-blocks"></div>
             `;
-
-            const iterationsInput = blockDiv.querySelector('.iterations-input');
-            iterationsInput.addEventListener('change', (e) => {
-                block.iterations = parseInt(e.target.value) || 1;
-                scheduleAutosave();
-            });
-
-            const nestedContainer = blockDiv.querySelector('.nested-blocks');
+            const nestedContainer = blockEl.querySelector('.nested-blocks');
             block.blocks.forEach(nestedBlock => {
                 nestedContainer.appendChild(renderBlock(nestedBlock));
             });
         }
 
-        return blockDiv;
+        return blockEl;
     }
 
-    if (state.currentTask && state.currentTask.blocks) {
-        state.currentTask.blocks.forEach(block => {
-            currentTaskElement.appendChild(renderBlock(block));
-        });
-    }
+    state.currentTask.blocks.forEach(block => {
+        container.appendChild(renderBlock(block));
+    });
 }
 
-
-// Update the executeSelectedTask function to add visual feedback
-function executeSelectedTask() {
-    const task = window.state && window.state.currentTask;
-    if (!task || !task.blocks || task.blocks.length === 0) {
-        logLiveConsole('No blocks to execute', 'error');
-        return;
-    }
-
-    // Clear any existing focus
-    if (focusedBlock) {
-        focusedBlock.element.classList.remove('focused');
-        focusedBlock = null;
-    }
-
-    logLiveConsole('Starting task execution', 'info');
-
-    let delay = 0;
-    const simulator = document.getElementById('simulator');
-
-    function executeBlocks(blocks) {
-        blocks.forEach(block => {
-            if (block.type === 'loop') {
-                for (let i = 0; i < block.iterations; i++) {
-                    executeBlocks(block.blocks);
-                }
-            } else if (block.type === 'tap' && block.region) {
-                delay += Math.random() * 500 + 200; // Random delay between 200-700ms
-                setTimeout(() => {
-                    // Calculate random point within region
-                    const x = block.region.x1 + Math.random() * (block.region.x2 - block.region.x1);
-                    const y = block.region.y1 + Math.random() * (block.region.y2 - block.region.y1);
-
-                    // Create visual feedback
-                    const feedback = document.createElement('div');
-                    feedback.className = 'tap-feedback';
-                    feedback.style.left = `${x}px`;
-                    feedback.style.top = `${y}px`;
-
-                    simulator.appendChild(feedback);
-                    setTimeout(() => feedback.remove(), 500);
-
-                    logLiveConsole(`Tapped at (${Math.round(x)}, ${Math.round(y)})`, 'success');
-                }, delay);
-            }
-        });
-    }
-
-    executeBlocks(task.blocks);
-
-    setTimeout(() => {
-        logLiveConsole('Task execution completed', 'success');
-    }, delay + 500);
-}
-
+// Selection Handling
 function startSelection(event) {
-    if (!currentBlock) return;
+    if (!isSelecting) return;
 
-    isSelecting = true;
     const rect = event.target.getBoundingClientRect();
     selectionStartX = event.clientX - rect.left;
     selectionStartY = event.clientY - rect.top;
 
-    selectionRectangle.style.left = `${selectionStartX}px`;
-    selectionRectangle.style.top = `${selectionStartY}px`;
-    selectionRectangle.style.width = '0';
-    selectionRectangle.style.height = '0';
-    selectionRectangle.classList.remove('d-none');
+    selectionBox.style.left = `${selectionStartX}px`;
+    selectionBox.style.top = `${selectionStartY}px`;
+    selectionBox.style.width = '0';
+    selectionBox.style.height = '0';
+    selectionBox.classList.remove('d-none');
 }
 
 function updateSelection(event) {
-    if (!isSelecting) return;
+    if (!isSelecting || selectionBox.classList.contains('d-none')) return;
 
     const rect = event.target.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
@@ -281,97 +218,149 @@ function updateSelection(event) {
     const width = currentX - selectionStartX;
     const height = currentY - selectionStartY;
 
-    selectionRectangle.style.width = `${Math.abs(width)}px`;
-    selectionRectangle.style.height = `${Math.abs(height)}px`;
-    selectionRectangle.style.left = `${width < 0 ? currentX : selectionStartX}px`;
-    selectionRectangle.style.top = `${height < 0 ? currentY : selectionStartY}px`;
+    selectionBox.style.width = `${Math.abs(width)}px`;
+    selectionBox.style.height = `${Math.abs(height)}px`;
+    selectionBox.style.left = `${width < 0 ? currentX : selectionStartX}px`;
+    selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
 }
 
 function stopSelection(event) {
     if (!isSelecting) return;
 
-    isSelecting = false;
     const rect = event.target.getBoundingClientRect();
     const endX = event.clientX - rect.left;
     const endY = event.clientY - rect.top;
 
-    if (currentBlock) {
-        currentBlock.region = {
-            x1: Math.min(selectionStartX, endX),
-            y1: Math.min(selectionStartY, endY),
-            x2: Math.max(selectionStartX, endX),
-            y2: Math.max(selectionStartY, endY)
-        };
-        showSelectionBox(currentBlock);
-        logLiveConsole('Tap region set', 'success');
-    }
+    const region = {
+        x1: Math.min(selectionStartX, endX),
+        y1: Math.min(selectionStartY, endY),
+        x2: Math.max(selectionStartX, endX),
+        y2: Math.max(selectionStartY, endY)
+    };
 
-    selectionRectangle.classList.add('d-none');
-    disableDrawingMode();
+    addTapBlock(region);
+
+    selectionBox.classList.add('d-none');
+    isSelecting = false;
 }
 
-function setBlockFocus(block, element) {
-    if (focusedBlock) {
-        focusedBlock.element.classList.remove('focused');
+// Task Execution
+function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
     }
-    focusedBlock = { block, element };
-    element.classList.add('focused');
-    if (block.type === 'tap' && block.region) {
-        showSelectionBox(block);
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += 500;
+                setTimeout(() => {
+                    showTapFeedback(block.region);
+                    logToConsole(`Executed ${block.description}`, 'success');
+                }, delay);
+            }
+        });
     }
+
+    executeBlocks(state.currentTask.blocks);
+
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + 500);
 }
 
-function showSelectionBox(tapBlock) {
-    if (!tapBlock.region) return;
+// Utilities
+function showTapFeedback(region) {
+    const centerX = (region.x1 + region.x2) / 2;
+    const centerY = (region.y1 + region.y2) / 2;
 
-    // Remove any existing selection boxes
-    const existingBoxes = document.querySelectorAll('.active-selection-box');
-    existingBoxes.forEach(box => box.remove());
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${centerX}px`;
+    feedback.style.top = `${centerY}px`;
 
-    const selectionBox = document.createElement('div');
-    selectionBox.className = 'active-selection-box';
-    selectionBox.style.left = `${tapBlock.region.x1}px`;
-    selectionBox.style.top = `${tapBlock.region.y1}px`;
-    selectionBox.style.width = `${tapBlock.region.x2 - tapBlock.region.x1}px`;
-    selectionBox.style.height = `${tapBlock.region.y2 - tapBlock.region.y1}px`;
-
-    const simulator = document.getElementById('simulator');
-    simulator.appendChild(selectionBox);
+    document.getElementById('simulator').appendChild(feedback);
+    setTimeout(() => feedback.remove(), 500);
 }
 
-function enableDrawingMode(tapBlock, tapDiv) {
-    if (focusedBlock && focusedBlock.element !== tapDiv) {
-        focusedBlock.element.classList.remove('focused');
-    }
-    currentBlock = tapBlock;
-    tapDiv.classList.add('focused');
-    logLiveConsole('Drawing mode enabled - Select tap region', 'info');
+function setupVideoSharing() {
+    const video = document.getElementById('bgVideo');
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
+        try {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Screen sharing error: ' + error.message, 'error');
+        }
+    });
 }
 
-function disableDrawingMode() {
-    if (focusedBlock) {
-        focusedBlock.element.classList.remove('focused');
-        focusedBlock = null;
-    }
-    currentBlock = null;
-}
-
-function logLiveConsole(message, type = 'info') {
+function logToConsole(message, type = 'info') {
     const console = document.getElementById('liveConsole');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `text-${type}`;
-    messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    console.appendChild(messageDiv);
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
     console.scrollTop = console.scrollHeight;
 }
 
-// Export functions for external use
-window.executeSelectedTask = executeSelectedTask;
-window.setBlockFocus = setBlockFocus;
-window.showSelectionBox = showSelectionBox;
-window.enableDrawingMode = enableDrawingMode;
-window.scheduleAutosave = window.scheduleAutosave || function() { console.warn('scheduleAutosave not loaded'); };
-window.addTapBlock = addTapBlock; // Added for external access
-window.addLoopBlock = addLoopBlock; // Added for external access
-window.initializeBlockControls = initializeBlockControls; //Added for external access
-window.updateTaskDisplay = updateTaskDisplay; //Added for external access
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        blocks: state.currentTask.blocks
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save blocks');
+                logToConsole('Task autosaved', 'success');
+            } catch (error) {
+                logToConsole('Failed to autosave task', 'error');
+            }
+        }
+    }, 2000);
+}
+
+function removeBlock(button) {
+    const blockElement = button.closest('.block');
+    const index = Array.from(blockElement.parentNode.children).indexOf(blockElement);
+
+    if (blockElement.parentNode.id === 'currentTask') {
+        state.currentTask.blocks.splice(index, 1);
+    } else {
+        // Handle nested blocks in loops
+        const parentBlock = blockElement.closest('.loop-block');
+        if (parentBlock) {
+            const parentIndex = Array.from(parentBlock.parentNode.children).indexOf(parentBlock);
+            state.currentTask.blocks[parentIndex].blocks.splice(index, 1);
+        }
+    }
+
+    updateTaskDisplay();
+    scheduleAutosave();
+}
