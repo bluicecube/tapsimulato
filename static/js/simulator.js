@@ -222,7 +222,36 @@ async function loadTask(taskId) {
         const blocks = await response.json();
         state.currentTask = {
             id: taskId,
-            blocks: blocks
+            blocks: blocks.map(block => {
+                // Ensure all properties are properly loaded
+                if (block.type === 'tap') {
+                    return {
+                        ...block,
+                        region: block.region || null
+                    };
+                } else if (block.type === 'loop') {
+                    return {
+                        ...block,
+                        iterations: block.iterations || 1,
+                        blocks: (block.blocks || []).map(nestedBlock => ({
+                            ...nestedBlock,
+                            region: nestedBlock.region || null
+                        }))
+                    };
+                } else if (block.type === 'conditional') {
+                    return {
+                        ...block,
+                        data: {
+                            ...block.data,
+                            threshold: block.data.threshold || 90,
+                            referenceImage: block.data.referenceImage || null,
+                            thenBlocks: block.data.thenBlocks || [],
+                            elseBlocks: block.data.elseBlocks || []
+                        }
+                    }
+                }
+                return block;
+            })
         };
 
         // Save last opened task ID
@@ -891,7 +920,7 @@ function showTapFeedback(region) {
     const coordinates = getRandomCoordinatesInRegion(region);
 
     const feedback = document.createElement('div');
-    feedback.className = 'tap-feedback';
+    feedback.className = ''tap-feedback';
     feedback.style.left = `${coordinates.x}px`;
     feedback.style.top = `${coordinates.y}px`;
 
@@ -915,8 +944,7 @@ function setupVideoSharing() {
                 audio: false
             });
             video.srcObject = stream;
-            logToConsole('Screen sharing started','success');
-        } catch (error) {
+            logToConsole('Screen sharing started','success');        } catch (error) {
             logToConsole('Screen sharing error: ' +error.message, 'error');
         }
     });
@@ -1412,8 +1440,6 @@ async function executeTask() {
 document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
     <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
 `);
-
-document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
 
 // Add this utility function for random coordinates
 function getRandomCoordinatesInRegion(region) {
