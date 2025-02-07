@@ -829,32 +829,121 @@ function updateFunctionsList() {
     `).join('') || '<li><span class="dropdown-item">No functions available</span></li>';
 }
 
-async function addFunctionBlock(functionId) {
-    const func = functions.find(f => f.id === functionId);
-    if (!func) {
-        logToConsole('Function not found', 'error');
-        return;
-    }
+// Added functions from edited snippet
+function addBlockToFunction(type, parentElement = null) {
+    const container = parentElement ? 
+        parentElement.querySelector('.nested-blocks') : 
+        document.getElementById('functionBlocks');
 
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
+    if (!container) {
+        logToConsole('Error: Could not find container for new block', 'error');
         return;
     }
 
     const block = {
-        type: 'function',
-        name: func.name,
-        description: func.description || '',
-        blocks: func.blocks // Store the function's blocks for reference
+        type: type,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
     };
 
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole(`Added function: ${func.name}`, 'success');
+    if (type === 'loop') {
+        block.iterations = 1;
+        block.blocks = [];
+    }
+
+    const blockElement = document.createElement('div');
+    blockElement.className = `block ${type}-block`;
+
+    if (type === 'loop') {
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input" 
+                               value="1" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners for nested block buttons
+        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockElement);
+        });
+
+        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockElement);
+        });
+
+        // Add event listeners for iterations
+        const iterationsInput = blockElement.querySelector('.iterations-input');
+        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
+        const increaseBtn = blockElement.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
+        });
+    } else { // Tap block
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="textmuted">No region set</small>
+        `;
+
+        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            startTapRegionSelection(blockElement);
+        });
+    }
+
+    // Add remove button handler
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        blockElement.remove();
+    });
+
+    container.appendChild(blockElement);
 }
 
-// Add the saveFunction implementation
 async function saveFunction() {
     const nameInput = document.getElementById('functionName');
     const descriptionInput = document.getElementById('functionDescription');
@@ -870,8 +959,6 @@ async function saveFunction() {
 
     // Collect blocks from the container with nested structure
     function collectBlocks(container) {
-        if (!container) return [];
-
         return Array.from(container.children).map(blockElement => {
             const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
             const block = {
@@ -927,4 +1014,29 @@ async function saveFunction() {
     } catch (error) {
         logToConsole('Error saving function: ' + error.message, 'error');
     }
+}
+
+async function addFunctionBlock(functionId) {
+    const func = functions.find(f => f.id === functionId);
+    if (!func) {
+        logToConsole('Function not found', 'error');
+        return;
+    }
+
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: func.blocks // Store the function's blocks for reference
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
 }
