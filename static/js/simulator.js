@@ -49,7 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 logToConsole('Please create or select a task first', 'error');
                 return;
             }
-            addTapBlock();
+            const block = {
+                type: 'tap',
+                region: null
+            };
+            state.currentTask.blocks.push(block);
+            updateTaskDisplay();
+            scheduleAutosave();
+            logToConsole('Tap block added', 'success');
         });
     }
 
@@ -59,7 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 logToConsole('Please create or select a task first', 'error');
                 return;
             }
-            addLoopBlock();
+            const block = {
+                type: 'loop',
+                iterations: 1,
+                blocks: []
+            };
+            state.currentTask.blocks.push(block);
+            updateTaskDisplay();
+            scheduleAutosave();
+            logToConsole('Loop block added', 'success');
         });
     }
 
@@ -612,7 +627,60 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
+    } else if (block.type === 'function') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${block.name}</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">${block.description}</small>
+        `;
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+    } else if (block.type === 'conditional') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Conditional Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <div>
+                <label for="threshold">Threshold:</label>
+                <input type="number" id="threshold" value="${block.data.threshold}" min="0" max="100">
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-primary capture-image-btn">Capture Image</button>
+            </div>
+            <div class="nested-blocks mt-2">
+            </div>
+
+        `;
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+        const captureImageButton = blockDiv.querySelector('.capture-image-btn');
+        if (captureImageButton) {
+            captureImageButton.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                block.data.referenceImage = captureVideoFrame();
+            });
+        }
+
     }
+
 
     return blockDiv;
 }
@@ -937,8 +1005,8 @@ function updateFunctionsList() {
 
 // Added functions from edited snippet
 function addBlockToFunction(type, parentElement = null) {
-    const container = parentElement ? 
-        parentElement.querySelector('.nested-blocks') : 
+    const container = parentElement ?
+        parentElement.querySelector('.nested-blocks') :
         document.getElementById('functionBlocks');
 
     if (!container) {
