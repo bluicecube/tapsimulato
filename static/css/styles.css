@@ -6,6 +6,7 @@
     --device-pixel-width: 720px;     /* Screen width in pixels */
     --device-pixel-height: 1560px;   /* Screen height in pixels */
     --device-pixel-ratio: 1;         /* Will be set by JS */
+    --simulator-scale: 0.6;          /* Scale factor for display */
 }
 
 /* Basic styles */
@@ -35,8 +36,8 @@ body {
 
 /* Simulator styles */
 .simulator {
-    width: calc(var(--device-physical-width));
-    height: calc(var(--device-physical-height));
+    width: calc(var(--device-physical-width) * var(--simulator-scale));
+    height: calc(var(--device-physical-height) * var(--simulator-scale));
     border: 2px solid var(--bs-secondary);
     border-radius: 20px;
     position: relative;

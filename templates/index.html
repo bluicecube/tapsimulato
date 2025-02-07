@@ -8,6 +8,11 @@
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
     <script>
+        // Constants for real device dimensions
+        const REAL_WIDTH = 76.3;  // mm
+        const REAL_HEIGHT = 161.4; // mm
+        const SIMULATOR_SCALE = 0.6;
+
         // Accurately calculate and maintain physical size
         function setupPhysicalSize() {
             const root = document.documentElement;
@@ -28,16 +33,27 @@
             const pixelsPerMm = testElement.offsetWidth;
             document.body.removeChild(testElement);
 
-            // Calculate screen dimensions
-            const physicalWidth = 76.3; // Samsung Galaxy A11 width in mm
-            const physicalHeight = 161.4; // Samsung Galaxy A11 height in mm
+            // Set simulator scale
+            root.style.setProperty('--simulator-scale', SIMULATOR_SCALE.toString());
 
-            // Set pixel dimensions based on physical size
+            // Calculate scaled dimensions
+            const scaledWidth = REAL_WIDTH * SIMULATOR_SCALE;
+            const scaledHeight = REAL_HEIGHT * SIMULATOR_SCALE;
+
+            // Set dimensions
             const simulator = document.querySelector('.simulator');
             if (simulator) {
-                simulator.style.width = `${physicalWidth}mm`;
-                simulator.style.height = `${physicalHeight}mm`;
+                simulator.style.width = `${scaledWidth}mm`;
+                simulator.style.height = `${scaledHeight}mm`;
             }
+        }
+
+        // Helper function to convert simulator coordinates to real device coordinates
+        window.simulatorToRealCoordinates = function(x, y) {
+            return {
+                x: x / SIMULATOR_SCALE,
+                y: y / SIMULATOR_SCALE
+            };
         }
 
         window.addEventListener('load', setupPhysicalSize);
