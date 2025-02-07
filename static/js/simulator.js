@@ -828,7 +828,102 @@ function clearAllDeletedTasks() {
     logLiveConsole('All deleted tasks cleared', 'info');
 }
 
+// Update handleMessage function to properly manage task creation and block addition
 function handleMessage(message) {
-    // Placeholder for handling messages.  This needs a proper implementation
-    console.log("Message received:", message);
+    if (!message || !message.command) return;
+
+    switch (message.command) {
+        case 'create_task_with_blocks':
+            // Create new task
+            const task = {
+                id: `task-${Date.now()}`,
+                name: message.params.taskName || 'New Task',
+                blocks: [],
+                minimized: false,
+                created: new Date().toISOString()
+            };
+
+            // Add the task to tasks array
+            tasks.push(task);
+            currentTask = task; // Set as current task immediately
+
+            // Add blocks if provided
+            if (message.params.blocks && Array.isArray(message.params.blocks)) {
+                message.params.blocks.forEach(blockData => {
+                    if (blockData.type === 'tap') {
+                        const tapBlock = {
+                            type: 'tap',
+                            region: null, // Will be set during selection
+                            name: 'Tap Block'
+                        };
+                        currentTask.blocks.push(tapBlock);
+                    } else if (blockData.type === 'loop') {
+                        const loopBlock = {
+                            type: 'loop',
+                            iterations: blockData.iterations || 1,
+                            blocks: [],
+                            name: 'Loop Block'
+                        };
+                        currentTask.blocks.push(loopBlock);
+                    }
+                });
+            }
+
+            // Update UI
+            const currentTaskElement = document.getElementById('currentTask');
+            currentTaskElement.innerHTML = '';
+            addTaskBlock(currentTask);
+
+            // Auto-save and update lists
+            saveTasksToStorage();
+            updateTaskList();
+            logLiveConsole(`Created new task: ${task.name} with ${task.blocks.length} blocks`, 'success');
+            break;
+
+        case 'add_blocks':
+            if (!currentTask) {
+                logLiveConsole('No task selected to add blocks to', 'error');
+                return;
+            }
+
+            if (message.params.blocks && Array.isArray(message.params.blocks)) {
+                message.params.blocks.forEach(blockData => {
+                    if (blockData.type === 'tap') {
+                        const tapBlock = {
+                            type: 'tap',
+                            region: null,
+                            name: 'Tap Block'
+                        };
+                        currentTask.blocks.push(tapBlock);
+                    } else if (blockData.type === 'loop') {
+                        const loopBlock = {
+                            type: 'loop',
+                            iterations: blockData.iterations || 1,
+                            blocks: [],
+                            name: 'Loop Block'
+                        };
+                        currentTask.blocks.push(loopBlock);
+                    }
+                });
+
+                // Refresh the task display
+                const currentTaskElement = document.getElementById('currentTask');
+                currentTaskElement.innerHTML = '';
+                addTaskBlock(currentTask);
+
+                // Auto-save and update
+                saveTasksToStorage();
+updateTaskList();
+                logLiveConsole(`Added ${message.params.blocks.length} blocks to task: ${currentTask.name}`, 'success');
+            }
+            break;
+
+        case 'execute':
+            if (currentTask) {
+                executeSelectedTask();
+            } else {
+                logLiveConsole('No task selected to execute', 'error');
+            }
+            break;
+    }
 }
