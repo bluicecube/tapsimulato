@@ -11,12 +11,11 @@ const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help use
 1. Tap Block: Defines a single tap action in a specific region of the screen
 2. Loop Block: Repeats its nested blocks a specified number of times
 
-Interpret natural language to create these sequences. You can create a task and add blocks in a single command.
+If a user requests multiple taps (e.g., "tap right twice", "tap 3 times"), create a loop block with the appropriate number of iterations and the tap block inside it.
 Examples:
-- "create task named TapCorners with taps in each corner" → Create task and add corner tap blocks
-- "create task AutoScroll with 5 bottom taps" → Create task and add loop with bottom taps
-- "tap the screen 3 times" → Create a loop block with iterations=3 containing a tap block
-- "tap top of screen" → Create a tap block with region set to the top portion
+- "tap right twice" → Create a loop block with iterations=2 containing a tap block on the right
+- "three taps on top" → Create a loop block with iterations=3 containing a tap block at the top
+- "tap top of screen" → Create a single tap block at the top
 
 Your responses should be in JSON format:
 {
@@ -27,11 +26,12 @@ Your responses should be in JSON format:
             {
                 "type": "loop",
                 "iterations": number,
-                "blocks": []            // nested blocks
-            },
-            {
-                "type": "tap",
-                "location": "string"    // natural language location description
+                "blocks": [             // nested blocks for loop
+                    {
+                        "type": "tap",
+                        "location": "string"    // natural language location description
+                    }
+                ]
             }
         ]
     },
@@ -176,7 +176,7 @@ function hideThinking() {
     }
 }
 
-// Update the command processing to handle combined creation and block addition
+// Update the command processing to handle multiple taps correctly
 async function processCommand(responseData) {
     try {
         const { command, params, message } = responseData;
@@ -191,13 +191,7 @@ async function processCommand(responseData) {
                 // Process and add blocks
                 if (params.blocks && params.blocks.length > 0) {
                     const processedBlocks = params.blocks.map(block => {
-                        if (block.type === 'tap') {
-                            return {
-                                type: 'tap',
-                                region: calculateRegionFromDescription(block.location),
-                                name: block.name || 'Tap Block'
-                            };
-                        } else if (block.type === 'loop') {
+                        if (block.type === 'loop') {
                             return {
                                 type: 'loop',
                                 iterations: block.iterations || 1,
@@ -206,6 +200,12 @@ async function processCommand(responseData) {
                                     region: calculateRegionFromDescription(b.location),
                                     name: b.name || 'Tap Block'
                                 }))
+                            };
+                        } else {
+                            return {
+                                type: 'tap',
+                                region: calculateRegionFromDescription(block.location),
+                                name: block.name || 'Tap Block'
                             };
                         }
                     });
@@ -229,13 +229,7 @@ async function processCommand(responseData) {
                 }
                 // Process blocks before adding them
                 const processedBlocks = params.blocks.map(block => {
-                    if (block.type === 'tap') {
-                        return {
-                            type: 'tap',
-                            region: calculateRegionFromDescription(block.location),
-                            name: block.name || 'Tap Block'
-                        };
-                    } else if (block.type === 'loop') {
+                    if (block.type === 'loop') {
                         return {
                             type: 'loop',
                             iterations: block.iterations || 1,
@@ -244,6 +238,12 @@ async function processCommand(responseData) {
                                 region: calculateRegionFromDescription(b.location),
                                 name: b.name || 'Tap Block'
                             }))
+                        };
+                    } else {
+                        return {
+                            type: 'tap',
+                            region: calculateRegionFromDescription(block.location),
+                            name: block.name || 'Tap Block'
                         };
                     }
                 });
@@ -259,7 +259,6 @@ async function processCommand(responseData) {
         addMessage('assistant', 'Error processing command. Please try again.');
     }
 }
-
 
 // Helper function to calculate region from description
 function calculateRegionFromDescription(description) {
