@@ -46,6 +46,7 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
     overflow: hidden;
+    transition: width 0.3s ease, height 0.3s ease;
 }
 
 /* Zoom controls */
@@ -297,9 +298,23 @@ body {
     margin-bottom: 1rem;
 }
 
-.card-body {
+.card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--bs-secondary);
     padding: 1rem;
 }
+
+.card-body {
+    padding: 0.5rem;
+}
+
+.zoom-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: 0.5rem;
+}
+
 
 .task-block {
     background-color: var(--bs-dark);
@@ -435,7 +450,4 @@ body {
     .simulator {
         margin-bottom: 1rem;
     }
-}
-.simulator {
-    transition: width 0.3s ease, height 0.3s ease;
 }
