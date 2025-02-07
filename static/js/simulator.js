@@ -774,7 +774,7 @@ function generateGCode() {
         // Convert pixel coordinates to physical coordinates (mm)
         const physicalX = (pixelX / DEVICE_WIDTH) * PHYSICAL_WIDTH;
         const physicalY = (pixelY / DEVICE_HEIGHT) * PHYSICAL_HEIGHT;
-        return {
+        return { 
             x: Math.max(0, Math.min(PHYSICAL_WIDTH, physicalX)),  // Clamp to physical boundaries
             y: Math.max(0, Math.min(PHYSICAL_HEIGHT, physicalY))
         };
@@ -867,27 +867,18 @@ function addBlocksToChatbotTask(taskToUpdate, blocks) {
                 blocks: [],
                 name: blockData.name || 'Loop Block'
             };
-
-            // Only attempt to add nested blocks if they exist
-            if (Array.isArray(blockData.blocks) && blockData.blocks.length > 0) {
-                blockData.blocks.forEach(nestedBlock => {
-                    if (nestedBlock.type === 'tap') {
-                        loopBlock.blocks.push({
-                            type: 'tap',
-                            region: nestedBlock.region || null,
-                            name: nestedBlock.name || 'Tap Block'
-                        });
-                    }
-                });
+            if (blockData.blocks) {
+                addBlocksToChatbotTask(loopBlock, blockData.blocks);
             }
-
             taskToUpdate.blocks.push(loopBlock);
             logLiveConsole(`Added loop block with ${loopBlock.blocks.length} nested blocks`, 'info');
         }
     });
 
-    // Save and reload task to update UI
+    // Save after adding blocks
     saveTasksToStorage();
+
+    // Refresh the task display
     loadTask(taskToUpdate);
 }
 
