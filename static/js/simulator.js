@@ -21,7 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('taskSelect').addEventListener('change', (e) => {
-        if (e.target.value) loadTask(parseInt(e.target.value));
+        const taskId = e.target.value;
+        if (taskId) {
+            loadTask(parseInt(taskId));
+        } else {
+            state.currentTask = null;
+            updateTaskDisplay();
+        }
     });
 
     // Task title handling
@@ -194,26 +200,11 @@ function addLoopBlock() {
 
 // UI Updates
 function updateTaskSelect() {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = state.tasks.map(task => `
-        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
-             data-task-id="${task.id}">
-            <span>${task.name}</span>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${task.id})">
-                <i class="bi bi-trash"></i>
-            </button>
-        </div>
-    `).join('');
-
-    // Add click handlers for task selection
-    taskList.querySelectorAll('.task-list-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn')) {  // Ignore clicks on the delete button
-                const taskId = parseInt(item.dataset.taskId);
-                loadTask(taskId);
-            }
-        });
-    });
+    const select = document.getElementById('taskSelect');
+    select.innerHTML = '<option value="">Select a task...</option>' +
+        state.tasks.map(task =>
+            `<option value="${task.id}"${state.currentTask && state.currentTask.id === task.id ? ' selected' : ''}>${task.name}</option>`
+        ).join('');
 }
 
 function updateTaskDisplay() {
