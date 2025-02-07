@@ -131,6 +131,78 @@ function addLoopBlock(iterations) {
     logLiveConsole('Loop block added', 'success');
 }
 
+// Update the updateTaskDisplay function
+function updateTaskDisplay() {
+    const currentTaskElement = document.getElementById('currentTask');
+    if (!currentTaskElement) return;
+
+    currentTaskElement.innerHTML = '';
+
+    function renderBlock(block) {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `block ${block.type}-block`;
+
+        if (block.type === 'tap') {
+            const regionText = block.region ?
+                `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+                'No region set';
+
+            blockDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Tap Block</h6>
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
+                </div>
+                <small class="text-muted">Region: ${regionText}</small>
+            `;
+
+            blockDiv.addEventListener('click', (e) => {
+                if (!e.target.closest('.select-region-btn')) {
+                    window.setBlockFocus(block, blockDiv);
+                }
+            });
+
+            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+                window.enableDrawingMode(block, blockDiv);
+            });
+        } else if (block.type === 'loop') {
+            blockDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Loop Block</h6>
+                    <div class="d-flex align-items-center">
+                        <input type="number" class="form-control form-control-sm iterations-input"
+                            value="${block.iterations}" min="1" style="width: 70px">
+                        <span class="ms-2">times</span>
+                    </div>
+                </div>
+                <div class="nested-blocks mt-2"></div>
+            `;
+
+            const iterationsInput = blockDiv.querySelector('.iterations-input');
+            iterationsInput.addEventListener('change', (e) => {
+                block.iterations = parseInt(e.target.value) || 1;
+                scheduleAutosave();
+            });
+
+            const nestedContainer = blockDiv.querySelector('.nested-blocks');
+            block.blocks.forEach(nestedBlock => {
+                nestedContainer.appendChild(renderBlock(nestedBlock));
+            });
+        }
+
+        return blockDiv;
+    }
+
+    if (state.currentTask && state.currentTask.blocks) {
+        state.currentTask.blocks.forEach(block => {
+            currentTaskElement.appendChild(renderBlock(block));
+        });
+    }
+}
+
+
+// Update the executeSelectedTask function to add visual feedback
 function executeSelectedTask() {
     const task = window.state && window.state.currentTask;
     if (!task || !task.blocks || task.blocks.length === 0) {
@@ -302,3 +374,4 @@ window.scheduleAutosave = window.scheduleAutosave || function() { console.warn('
 window.addTapBlock = addTapBlock; // Added for external access
 window.addLoopBlock = addLoopBlock; // Added for external access
 window.initializeBlockControls = initializeBlockControls; //Added for external access
+window.updateTaskDisplay = updateTaskDisplay; //Added for external access
