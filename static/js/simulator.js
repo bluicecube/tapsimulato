@@ -175,8 +175,14 @@ async function createNewTask() {
     }
 }
 
+// Add autosave before loading new task
 async function loadTask(taskId) {
     try {
+        // Save current task before loading new one
+        if (state.currentTask) {
+            await saveCurrentTask();
+        }
+
         const response = await fetch(`/api/tasks/${taskId}/blocks`);
         if (!response.ok) throw new Error('Failed to load task blocks');
 
@@ -186,6 +192,7 @@ async function loadTask(taskId) {
             blocks: blocks
         };
 
+        taskTitle.value = state.tasks.find(t => t.id === taskId)?.name || '';
         updateTaskDisplay();
         updateTaskList();
         logToConsole(`Loaded task ${taskId}`, 'success');
@@ -443,6 +450,26 @@ function finishSelection(endX, endY) {
         updateTaskDisplay();
         scheduleAutosave();
         logToConsole('Region updated', 'success');
+    }
+}
+
+// Add helper function to save current task
+async function saveCurrentTask() {
+    if (!state.currentTask) return;
+
+    try {
+        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                blocks: state.currentTask.blocks
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Task saved', 'success');
+    } catch (error) {
+        logToConsole('Failed to save task', 'error');
     }
 }
 
@@ -733,6 +760,7 @@ function logToConsole(message, type = 'info') {
     console.scrollTop = console.scrollHeight;
 }
 
+// Update scheduleAutosave to use the new save function
 function scheduleAutosave() {
     if (state.autoSaveTimeout) {
         clearTimeout(state.autoSaveTimeout);
@@ -740,20 +768,7 @@ function scheduleAutosave() {
 
     state.autoSaveTimeout = setTimeout(async () => {
         if (state.currentTask) {
-            try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        blocks: state.currentTask.blocks
-                    })
-                });
-
-                if (!response.ok) throw new Error('Failed to save blocks');
-                logToConsole('Task autosaved', 'success');
-            } catch (error) {
-                logToConsole('Failed to autosave task', 'error');
-            }
+            await saveCurrentTask();
         }
     }, 2000);
 }
@@ -922,7 +937,7 @@ function addBlockToFunction(type, parentElement = null) {
         });
     } else { // Tap block
         blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flexjustify-content-between align-items-center">
                 <h6 class="mb-0">Tap Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
@@ -1042,4 +1057,48 @@ async function addFunctionBlock(functionId) {
     updateTaskDisplay();
     scheduleAutosave();
     logToConsole(`Added function: ${func.name}`, 'success');
+}
+
+// Update the block data collection in saveBlocks
+function collectBlockData(block) {
+    const data = {
+        type: block.type,
+        name: block.name
+    };
+
+    if (block.type === 'tap' && block.region) {
+        data.region = block.region;
+    } else if (block.type === 'loop') {
+        data.iterations = block.iterations || 1;
+        if (block.blocks) {
+            data.blocks = block.blocks.map(b => collectBlockData(b));
+        }
+    } else if (block.type === 'function') {
+        data.description = block.description;
+        if (block.blocks) {
+            data.blocks = block.blocks.map(b => collectBlockData(b));
+        }
+    }
+
+    return data;
+}
+
+// Update save_blocks endpoint handling
+async function saveBlocks(taskId, blocks) {
+    try {
+        const processedBlocks = blocks.map(block => collectBlockData(block));
+
+        const response = await fetch(`/api/tasks/${taskId}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                blocks: processedBlocks
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Blocks saved successfully', 'success');
+    } catch (error) {
+        logToConsole('Error saving blocks: ' + error.message, 'error');
+    }
 }
