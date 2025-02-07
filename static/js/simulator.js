@@ -962,7 +962,7 @@ async function deleteTask(taskId) {
         } else if (state.currentTask && state.currentTask.id === taskId) {
             // If deleted current task, load the most recent task
             const mostRecentTask = state.tasks.reduce((latest, current) => {
-                const latestDate = new Date(latest.updated_at);
+                const latestDate = new Datelatest.updated_at);
                 const currentDate = new Date(current.updated_at);
                 return currentDate > latestDate ? current : latest;
             }, state.tasks[0]);
