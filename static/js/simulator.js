@@ -63,31 +63,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const setVideoSourceBtn = document.getElementById('setVideoSource');
     const video = document.getElementById('bgVideo');
 
-    setVideoSourceBtn.addEventListener('click', () => {
-        const url = videoSource.value.trim();
-        if (url) {
+    // Add screen capture functionality
+    setVideoSourceBtn.addEventListener('click', async () => {
+        try {
             // Stop any existing stream
             if (video.srcObject) {
                 const tracks = video.srcObject.getTracks();
                 tracks.forEach(track => track.stop());
             }
 
-            try {
-                video.src = url;
-                video.onerror = () => {
-                    logLiveConsole('Error loading video stream. Please check the URL.', 'error');
-                    video.src = ''; // Clear the source on error
-                };
-                video.onloadeddata = () => {
-                    logLiveConsole('Video stream connected successfully', 'success');
-                };
-            } catch (error) {
-                logLiveConsole(`Error setting video source: ${error.message}`, 'error');
-            }
-        } else {
-            logLiveConsole('Please enter a valid video stream URL', 'error');
+            // Request screen sharing
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+
+            video.srcObject = stream;
+            logLiveConsole('Screen sharing started successfully', 'success');
+
+            // Handle stream end
+            stream.getVideoTracks()[0].addEventListener('ended', () => {
+                logLiveConsole('Screen sharing ended', 'info');
+                video.srcObject = null;
+            });
+
+        } catch (error) {
+            logLiveConsole(`Screen sharing error: ${error.message}`, 'error');
+            video.srcObject = null;
         }
     });
+
 
     // Load saved tasks
     loadSavedTasks();
@@ -759,6 +766,8 @@ function addLoopBlock(parent) {
 
     return blockDiv;
 }
+
+
 
 
 
