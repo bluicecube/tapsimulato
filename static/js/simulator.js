@@ -701,21 +701,60 @@ function updateFunctionsList() {
     `).join('') || '<li><span class="dropdown-item">No functions available</span></li>';
 }
 
+// Function creation handling
+function addBlockToFunction(type) {
+    const blocksContainer = document.getElementById('functionBlocks');
+    const block = {
+        type: type,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
+        // For function creation, we don't set region or iterations initially
+        data: {} // Empty data object for now
+    };
+
+    const blockElement = document.createElement('div');
+    blockElement.className = `block ${type}-block`;
+    blockElement.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">${block.name}</h6>
+            <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+        </div>
+    `;
+
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', () => {
+        blockElement.remove();
+    });
+
+    blocksContainer.appendChild(blockElement);
+}
+
 async function saveFunction() {
     const nameInput = document.getElementById('functionName');
     const descriptionInput = document.getElementById('functionDescription');
     const blocksContainer = document.getElementById('functionBlocks');
 
-    const functionData = {
-        name: nameInput.value.trim(),
-        description: descriptionInput.value.trim(),
-        blocks: [] // We'll need to gather blocks from the container
-    };
+    const name = nameInput.value.trim();
+    const description = descriptionInput.value.trim();
 
-    if (!functionData.name) {
+    if (!name) {
         logToConsole('Function name is required', 'error');
         return;
     }
+
+    // Collect blocks from the container
+    const blocks = Array.from(blocksContainer.children).map(blockElement => {
+        const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
+        return {
+            type,
+            name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
+            data: {} // Empty data for now, will be set when added to task
+        };
+    });
+
+    const functionData = {
+        name,
+        description,
+        blocks
+    };
 
     try {
         const response = await fetch('/api/functions', {
@@ -743,17 +782,6 @@ async function saveFunction() {
     }
 }
 
-function addBlockToFunction(type) {
-    const blocksContainer = document.getElementById('functionBlocks');
-    const block = {
-        type: type,
-        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
-    };
-
-    const blockElement = renderBlock(block, blocksContainer.children.length.toString());
-    blocksContainer.appendChild(blockElement);
-}
-
 async function addFunctionBlock(functionId) {
     const func = functions.find(f => f.id === functionId);
     if (!func) {
@@ -761,18 +789,36 @@ async function addFunctionBlock(functionId) {
         return;
     }
 
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    // When adding function to task, initialize empty blocks with default values
+    const blocks = func.blocks.map(block => {
+        if (block.type === 'tap') {
+            return {
+                ...block,
+                region: null, // Region will be set by user
+                description: 'Click to set region'
+            };
+        } else if (block.type === 'loop') {
+            return {
+                ...block,
+                iterations: 1,
+                blocks: [] // Empty blocks array for nested blocks
+            };
+        }
+        return block;
+    });
+
     const block = {
         type: 'function',
         name: func.name,
         description: func.description,
         functionId: func.id,
-        blocks: func.blocks || []
+        blocks: blocks
     };
-
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
 
     state.currentTask.blocks.push(block);
     updateTaskDisplay();
