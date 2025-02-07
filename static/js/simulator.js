@@ -6,7 +6,8 @@ const DEVICE_HEIGHT = 720;
 const state = {
     currentTask: null,
     tasks: [],
-    autoSaveTimeout: null
+    autoSaveTimeout: null,
+    pendingBlockConfiguration: null // Track block being configured
 };
 
 // Selection state
@@ -23,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up event listeners
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
-    document.getElementById('addTapBtn').addEventListener('click', () => startTapSelection());
+    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('taskSelect').addEventListener('change', (e) => {
         if (e.target.value) loadTask(parseInt(e.target.value));
@@ -101,13 +102,30 @@ async function loadTask(taskId) {
 }
 
 // Block Management
-function startTapSelection() {
+function startTapRegionSelection(blockElement) {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
     }
     logToConsole('Select tap region on the simulator', 'info');
     isSelecting = true;
+    state.pendingBlockConfiguration = blockElement;
+}
+
+function addTapBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'tap',
+        description: 'Click to set region'
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
 }
 
 function addLoopBlock() {
@@ -131,19 +149,6 @@ function addLoopBlock() {
     logToConsole('Loop block added', 'success');
 }
 
-function addTapBlock(region) {
-    const block = {
-        type: 'tap',
-        region: region,
-        description: `Tap at (${Math.round((region.x1 + region.x2)/2)}, ${Math.round((region.y1 + region.y2)/2)})`
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Tap block added', 'success');
-}
-
 // UI Updates
 function updateTaskSelect() {
     const select = document.getElementById('taskSelect');
@@ -159,37 +164,63 @@ function updateTaskDisplay() {
 
     if (!state.currentTask || !state.currentTask.blocks) return;
 
-    function renderBlock(block) {
+    function renderBlock(block, index) {
         const blockEl = document.createElement('div');
         blockEl.className = `block ${block.type}-block`;
+        blockEl.dataset.index = index;
 
         if (block.type === 'tap') {
+            const regionText = block.region ?
+                `Region: (${Math.round(block.region.x1)}, ${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)}, ${Math.round(block.region.y2)})` :
+                'No region set';
+
             blockEl.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <strong>Tap</strong>
-                    <small>${block.description}</small>
-                    <button class="btn btn-sm btn-outline-danger" onclick="removeBlock(this)">×</button>
+                    <strong>Tap Block</strong>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary set-region-btn">
+                            ${block.region ? 'Change Region' : 'Set Region'}
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                    </div>
                 </div>
+                <small class="text-muted">${regionText}</small>
             `;
-        } else {
+
+            const setRegionBtn = blockEl.querySelector('.set-region-btn');
+            setRegionBtn.addEventListener('click', () => startTapRegionSelection(blockEl));
+        } else if (block.type === 'loop') {
             blockEl.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <strong>Loop ${block.iterations}x</strong>
-                    <button class="btn btn-sm btn-outline-danger" onclick="removeBlock(this)">×</button>
+                    <strong>Loop Block</strong>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="number" class="form-control form-control-sm iterations-input"
+                            value="${block.iterations}" min="1" style="width: 70px">
+                        <span>times</span>
+                        <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                    </div>
                 </div>
-                <div class="nested-blocks"></div>
+                <div class="nested-blocks mt-2"></div>
             `;
+
+            const iterationsInput = blockEl.querySelector('.iterations-input');
+            iterationsInput.addEventListener('change', (e) => {
+                block.iterations = parseInt(e.target.value) || 1;
+                scheduleAutosave();
+            });
+
             const nestedContainer = blockEl.querySelector('.nested-blocks');
-            block.blocks.forEach(nestedBlock => {
-                nestedContainer.appendChild(renderBlock(nestedBlock));
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
 
+        blockEl.querySelector('.remove-block-btn').addEventListener('click', () => removeBlock(blockEl));
         return blockEl;
     }
 
-    state.currentTask.blocks.forEach(block => {
-        container.appendChild(renderBlock(block));
+    state.currentTask.blocks.forEach((block, index) => {
+        container.appendChild(renderBlock(block, index));
     });
 }
 
@@ -225,7 +256,7 @@ function updateSelection(event) {
 }
 
 function stopSelection(event) {
-    if (!isSelecting) return;
+    if (!isSelecting || !state.pendingBlockConfiguration) return;
 
     const rect = event.target.getBoundingClientRect();
     const endX = event.clientX - rect.left;
@@ -238,10 +269,26 @@ function stopSelection(event) {
         y2: Math.max(selectionStartY, endY)
     };
 
-    addTapBlock(region);
+    // Update the block with the selected region
+    const blockIndex = state.pendingBlockConfiguration.dataset.index;
+    const indices = blockIndex.split('.');
+    let targetBlock = state.currentTask.blocks[indices[0]];
+
+    if (indices.length > 1) {
+        // Handle nested blocks
+        targetBlock = targetBlock.blocks[indices[1]];
+    }
+
+    targetBlock.region = region;
+    targetBlock.description = `Tap at (${Math.round((region.x1 + region.x2)/2)}, ${Math.round((region.y1 + region.y2)/2)})`;
+
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Region set for tap block', 'success');
 
     selectionBox.classList.add('d-none');
     isSelecting = false;
+    state.pendingBlockConfiguration = null;
 }
 
 // Task Execution
@@ -346,19 +393,16 @@ function scheduleAutosave() {
     }, 2000);
 }
 
-function removeBlock(button) {
-    const blockElement = button.closest('.block');
-    const index = Array.from(blockElement.parentNode.children).indexOf(blockElement);
+function removeBlock(blockElement) {
+    const index = blockElement.dataset.index;
+    const indices = index.split('.');
 
-    if (blockElement.parentNode.id === 'currentTask') {
-        state.currentTask.blocks.splice(index, 1);
+    if (indices.length === 1) {
+        state.currentTask.blocks.splice(indices[0], 1);
     } else {
         // Handle nested blocks in loops
-        const parentBlock = blockElement.closest('.loop-block');
-        if (parentBlock) {
-            const parentIndex = Array.from(parentBlock.parentNode.children).indexOf(parentBlock);
-            state.currentTask.blocks[parentIndex].blocks.splice(index, 1);
-        }
+        const parentBlock = state.currentTask.blocks[indices[0]];
+        parentBlock.blocks.splice(indices[1], 1);
     }
 
     updateTaskDisplay();
