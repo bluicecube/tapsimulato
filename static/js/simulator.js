@@ -918,7 +918,7 @@ function setupVideoSharing() {
             video.srcObject = stream;
             logToConsole('Screen sharing started', 'success');
         } catch (error) {
-            logToConsole('Screen sharing error: ' + error.message, 'error');
+            logToConsole('Screen sharing error: ' +error.message, 'error');
         }
     });
 }
