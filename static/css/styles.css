@@ -1,7 +1,8 @@
 /* Device dimensions */
 :root {
-    --device-width: 320px;
-    --device-height: 720px;
+    --device-width: 320px;  /* Physical width in pixels */
+    --device-height: 720px; /* Physical height in pixels */
+    --device-scale: 1;      /* Base scale factor */
 }
 
 /* Basic styles */
@@ -41,6 +42,21 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
     overflow: hidden;
+    transform-origin: top left;
+    transform: scale(var(--device-scale));
+}
+
+/* Scale adjustment for different screen sizes */
+@media (max-height: 800px) {
+    :root {
+        --device-scale: 0.8;
+    }
+}
+
+@media (max-height: 600px) {
+    :root {
+        --device-scale: 0.6;
+    }
 }
 
 #bgVideo {

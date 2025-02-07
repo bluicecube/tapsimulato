@@ -3,9 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Samsung Galaxy A11 Simulator">
     <title>Samsung Galaxy A11 Simulator</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <script>
+        // Dynamically adjust simulator scale based on screen size
+        function adjustSimulatorScale() {
+            const root = document.documentElement;
+            const screenHeight = window.innerHeight;
+            const deviceHeight = 720; // Device height in pixels
+            const padding = 100; // Padding for controls
+
+            let scale = Math.min(1, (screenHeight - padding) / deviceHeight);
+            root.style.setProperty('--device-scale', scale);
+        }
+
+        window.addEventListener('load', adjustSimulatorScale);
+        window.addEventListener('resize', adjustSimulatorScale);
+    </script>
 </head>
 <body>
     <div class="container-fluid">
