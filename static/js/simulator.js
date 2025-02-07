@@ -183,6 +183,17 @@ function addTapBlock(parentLoopIndex = null, region = null) {
 
     updateTaskDisplay();
     logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
+
+    // Auto-enable drawing mode for the new block
+    setTimeout(() => {
+        const lastBlockDiv = document.querySelector('.tap-block:last-child');
+        if (lastBlockDiv) {
+            startTapRegionSelection(lastBlockDiv);
+            if (region) {
+                showSelectionBox(region);
+            }
+        }
+    }, 100);
 }
 
 function addLoopBlock(iterations = 1, blocks = []) {
@@ -238,6 +249,16 @@ function updateTaskDisplay() {
                 <small class="text-muted">Region: ${regionText}</small>
             `;
 
+            // Add click handler to show region when block is clicked
+            blockDiv.addEventListener('click', (e) => {
+                if (!e.target.closest('.btn')) {
+                    if (block.region) {
+                        showSelectionBox(block.region);
+                    }
+                    startTapRegionSelection(blockDiv);
+                }
+            });
+
             const nameInput = blockDiv.querySelector('.block-name-input');
             nameInput.addEventListener('change', () => {
                 block.name = nameInput.value;
@@ -246,6 +267,9 @@ function updateTaskDisplay() {
 
             blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
                 startTapRegionSelection(blockDiv);
+                if (block.region) {
+                    showSelectionBox(block.region);
+                }
             });
         } else if (block.type === 'loop') {
             blockDiv.innerHTML = `
@@ -536,3 +560,15 @@ document.getElementById('deleteTaskBtn').addEventListener('click', () => {
 
 let isSelecting = false;
 let selectionStartX, selectionStartY;
+
+// Add new function to show selection box for existing region
+function showSelectionBox(region) {
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) return;
+
+    selectionBox.style.left = `${region.x1}px`;
+    selectionBox.style.top = `${region.y1}px`;
+    selectionBox.style.width = `${region.x2 - region.x1}px`;
+    selectionBox.style.height = `${region.y2 - region.y1}px`;
+    selectionBox.classList.remove('d-none');
+}
