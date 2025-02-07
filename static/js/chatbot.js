@@ -1,22 +1,8 @@
-// Chat interface state
-const chatState = {
-    messages: [],
-    isThinking: false
-};
-
-// System prompt for the AI assistant
+// System prompt for task automation
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
 
 1. Tap Block: Defines a single tap action in a specific region of the screen
 2. Loop Block: Repeats its nested blocks a specified number of times
-
-Interpret natural language to create these sequences.
-Examples:
-- "tap in each corner" → Add corner tap blocks
-- "tap bottom 5 times" → Add loop with bottom taps
-- "tap the screen 3 times" → Create a loop block with iterations=3 containing a tap block
-- "tap top of screen" → Create a tap block with region set to the top portion
-- "run" or "execute" → Execute the current sequence
 
 Your responses should be in JSON format:
 {
@@ -41,14 +27,7 @@ Your responses should be in JSON format:
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
-    const chatMessages = document.getElementById('chatMessages');
 
-    if (!chatMessages) return;
-
-    // Clear previous messages
-    chatMessages.innerHTML = '';
-
-    // Set up event listeners
     if (chatInput && sendButton) {
         sendButton.addEventListener('click', handleChatMessage);
         chatInput.addEventListener('keypress', (e) => {
@@ -57,93 +36,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Add a message to the chat interface
-function addChatMessage(role, content) {
+// Add message to chat
+function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-message ${role}`;
-    messageDiv.innerHTML = `
-        ${content}
-        <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-    `;
-    chatMessages.appendChild(messageDiv);
+    const messageEl = document.createElement('div');
+    messageEl.className = `chat-message ${role}`;
+    messageEl.textContent = content;
+    chatMessages.appendChild(messageEl);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    // Store message in state
-    chatState.messages.push({ role, content });
 }
 
-// Show thinking indicator
-function showThinking() {
+// Add thinking indicator
+function addThinkingIndicator() {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
-
-    const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'chat-thinking';
-    thinkingDiv.id = 'thinkingIndicator';
-    thinkingDiv.innerHTML = `
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-    `;
-    chatMessages.appendChild(thinkingDiv);
+    const thinkingEl = document.createElement('div');
+    thinkingEl.className = 'chat-thinking';
+    thinkingEl.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+    chatMessages.appendChild(thinkingEl);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    chatState.isThinking = true;
-}
-
-// Hide thinking indicator
-function hideThinking() {
-    const thinkingDiv = document.getElementById('thinkingIndicator');
-    if (thinkingDiv) {
-        thinkingDiv.remove();
-    }
-    chatState.isThinking = false;
+    return thinkingEl;
 }
 
 // Process blocks from AI response
 function processBlocks(blocks) {
     if (!window.state || !window.state.currentTask) {
-        logToConsole('No active task to add blocks to', 'error');
+        console.error('No active task to add blocks to');
         return;
     }
 
-    try {
-        const newBlocks = blocks.map(block => {
-            if (block.type === 'loop') {
-                return {
-                    type: 'loop',
-                    name: 'Loop Block',
-                    iterations: block.iterations || 1,
-                    blocks: block.blocks ? processBlocks(block.blocks) : []
-                };
-            } else if (block.type === 'tap') {
-                const region = calculateTapRegion(block.location);
-                return {
-                    type: 'tap',
-                    name: 'Tap Block',
-                    region: region,
-                    description: block.location || 'Center tap'
-                };
-            }
-            return null;
-        }).filter(block => block !== null);
-
-        window.state.currentTask.blocks.push(...newBlocks);
-
-        // Update display and save
-        if (typeof window.updateTaskDisplay === 'function') {
-            window.updateTaskDisplay();
+    const newBlocks = blocks.map(block => {
+        if (block.type === 'loop') {
+            return {
+                type: 'loop',
+                name: 'Loop Block',
+                iterations: block.iterations || 1,
+                blocks: block.blocks ? processBlocks(block.blocks) : []
+            };
+        } else if (block.type === 'tap') {
+            const region = calculateTapRegion(block.location);
+            return {
+                type: 'tap',
+                name: 'Tap Block',
+                region: region,
+                description: block.location || 'Center tap'
+            };
         }
-        if (typeof window.scheduleAutosave === 'function') {
-            window.scheduleAutosave();
-        }
+        return null;
+    }).filter(block => block !== null);
 
-        logToConsole('Added new blocks to task', 'success');
-    } catch (error) {
-        console.error('Error processing blocks:', error);
-        logToConsole('Failed to process blocks', 'error');
+    window.state.currentTask.blocks.push(...newBlocks);
+
+    // Update display and save
+    if (typeof window.updateTaskDisplay === 'function') {
+        window.updateTaskDisplay();
+    }
+    if (typeof window.scheduleAutosave === 'function') {
+        window.scheduleAutosave();
     }
 }
 
@@ -192,37 +142,41 @@ function calculateTapRegion(description) {
         }
     }
 
-    // Default to center if no match
+    // Default to middle if no match
     return locations.middle;
 }
 
 // Handle chat messages
 async function handleChatMessage() {
     const chatInput = document.getElementById('chatInput');
-    if (!chatInput) return;
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatInput || !chatMessages) return;
 
     const message = chatInput.value.trim();
     if (!message) return;
 
-    // Clear input and show message
+    // Clear input
     chatInput.value = '';
-    addChatMessage('user', message);
+
+    // Add user message
+    addMessage('user', message);
 
     // Check for direct commands
     if (['run', 'execute'].includes(message.toLowerCase())) {
         if (typeof window.executeTask === 'function') {
-            addChatMessage('assistant', 'Executing current sequence...');
+            addMessage('assistant', 'Executing current sequence...');
             window.executeTask();
         } else {
-            addChatMessage('assistant', 'Sorry, I cannot execute tasks at the moment.');
+            addMessage('assistant', 'Sorry, I cannot execute tasks at the moment.');
         }
         return;
     }
 
     // Show thinking indicator
-    showThinking();
+    const thinkingEl = addThinkingIndicator();
 
     try {
+        // Send request to OpenAI API
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -234,24 +188,19 @@ async function handleChatMessage() {
             })
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to get response from server');
-        }
-
+        if (!response.ok) throw new Error('Failed to get AI response');
         const data = await response.json();
-        hideThinking();
 
-        if (data.error) {
-            throw new Error(data.error);
-        }
+        // Remove thinking indicator
+        thinkingEl.remove();
 
-        // Parse and handle response
         try {
-            const assistantMessage = data.choices[0].message.content;
-            const responseData = JSON.parse(assistantMessage);
+            // Parse AI response
+            const aiMessage = data.choices[0].message.content;
+            const responseData = JSON.parse(aiMessage);
 
-            // Add assistant's message to chat
-            addChatMessage('assistant', responseData.message);
+            // Add AI response to chat
+            addMessage('assistant', responseData.message);
 
             // Handle commands
             if (responseData.command === 'add_blocks' && responseData.params.blocks) {
@@ -262,28 +211,38 @@ async function handleChatMessage() {
                 }
             }
         } catch (parseError) {
-            console.error('Error parsing response:', parseError);
-            addChatMessage('assistant', data.choices[0].message.content);
+            console.error('Error parsing AI response:', parseError);
+            addMessage('assistant', 'I had trouble understanding that. Could you rephrase it?');
         }
     } catch (error) {
         console.error('Chat error:', error);
-        hideThinking();
-        addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+        thinkingEl.remove();
+        addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
     }
 }
 
-// Log messages to the console
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    if (!console) return;
 
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
-}
+// Chat interface state
+const chatState = {
+    messages: [],
+    isThinking: false
+};
 
+// Make functions available to simulator
+window.addMessage = addMessage;
+window.handleChatMessage = handleChatMessage;
+window.processBlocks = processBlocks;
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
+window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
+window.enableDrawingMode = window.enableDrawingMode || function() { console.warn('enableDrawingMode not loaded'); };
+const AUTOSAVE_DELAY = 2000; 
+const state = {
+    tasks: [],
+    currentTask: null,
+    autoSaveTimeout: null
+};
 
 // Task Management Functions
 async function loadTasks() {
@@ -514,20 +473,16 @@ function updateTaskDisplay() {
 }
 
 // Initialize when DOM is ready
-
 // Export functions for external use
-window.addMessage = addChatMessage; 
-window.handleMessage = handleChatMessage; 
-window.state = state;
-window.processBlocks = processBlocks; 
 
-// Make the simulator's functions available to chatbot.js
-window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
-window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
-window.enableDrawingMode = window.enableDrawingMode || function() { console.warn('enableDrawingMode not loaded'); };
-const AUTOSAVE_DELAY = 2000; 
-const state = {
-    tasks: [],
-    currentTask: null,
-    autoSaveTimeout: null
-};
+// Log messages to the console
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    if (!console) return;
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
