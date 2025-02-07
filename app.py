@@ -79,6 +79,17 @@ def delete_task(task_id):
     db.session.commit()
     return jsonify({'success': True})
 
+@app.route('/api/tasks/all', methods=['DELETE'])
+def delete_all_tasks():
+    try:
+        # Soft delete all tasks
+        Task.query.update({Task.is_active: False})
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error deleting all tasks: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/tasks/<int:task_id>/blocks', methods=['POST'])
 def save_blocks(task_id):
     task = Task.query.get_or_404(task_id)

@@ -132,9 +132,7 @@ function updateTaskList() {
             <span>${task.name}</span>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-danger delete-task-btn" 
-                        onclick="deleteTask(${task.id})" title="Delete task">
-                    <i class="bi bi-trash"></i>
-                </button>
+                        onclick="deleteTask(${task.id})" title="Delete task">×</button>
             </div>
         </div>
     `).join('');
@@ -142,13 +140,42 @@ function updateTaskList() {
     // Add click handlers for task selection
     taskList.querySelectorAll('.task-list-item').forEach(item => {
         item.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn-group')) {
+            if (!e.target.closest('.btn')) {
                 const taskId = parseInt(item.dataset.taskId);
                 loadTask(taskId);
             }
         });
     });
 }
+
+// Add delete all tasks functionality
+document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete all tasks?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/tasks/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all tasks');
+
+        // Clear tasks from state
+        state.tasks = [];
+        state.currentTask = null;
+        updateTaskList();
+        updateTaskDisplay();
+
+        logToConsole('All tasks deleted successfully', 'success');
+
+        // Create a new task since all are deleted
+        await createNewTask();
+    } catch (error) {
+        logToConsole('Error deleting all tasks', 'error');
+    }
+});
+
 
 // Block Management
 function startTapRegionSelection(blockElement) {
@@ -510,7 +537,6 @@ function removeBlock(blockElement) {
     updateTaskDisplay();
     scheduleAutosave();
 }
-
 
 async function deleteTask(taskId) {
     if (!taskId) {
