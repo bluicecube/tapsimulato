@@ -120,36 +120,56 @@ function processBlocks(blocks) {
     }
 }
 
-// Basic chat functionality
+// Simple chat interface implementation
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing chat...');
+
+    // Get chat elements
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
 
-    // Function to add a message to the chat
-    function addMessage(message, isUser = false) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message ${isUser ? 'user' : 'assistant'}`;
-        messageDiv.textContent = message;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+    console.log('Chat elements:', {
+        messages: chatMessages,
+        input: chatInput,
+        button: sendButton
+    });
+
+    if (!chatMessages || !chatInput || !sendButton) {
+        console.error('Missing chat elements!');
+        return;
     }
 
-    // Add initial greeting
-    addMessage("Hello! How can I help you today?");
+    // Clear any existing messages
+    chatMessages.innerHTML = '';
 
-    // Function to send message
-    async function sendMessage() {
+    // Add greeting message
+    const greeting = document.createElement('div');
+    greeting.className = 'chat-message assistant';
+    greeting.textContent = 'Hello! I can help you create tap sequences. What would you like to do?';
+    chatMessages.appendChild(greeting);
+
+    // Send message handler
+    async function handleSendMessage() {
         const message = chatInput.value.trim();
         if (!message) return;
 
-        // Clear input and add user message
-        chatInput.value = '';
-        addMessage(message, true);
+        console.log('Sending message:', message);
 
-        // Add loading message
-        const loadingId = 'loading-' + Date.now();
-        addMessage('Thinking...', false);
+        // Add user message
+        const userMessage = document.createElement('div');
+        userMessage.className = 'chat-message user';
+        userMessage.textContent = message;
+        chatMessages.appendChild(userMessage);
+
+        // Clear input
+        chatInput.value = '';
+
+        // Show thinking message
+        const thinkingMessage = document.createElement('div');
+        thinkingMessage.className = 'chat-message assistant';
+        thinkingMessage.textContent = 'Thinking...';
+        chatMessages.appendChild(thinkingMessage);
 
         try {
             const response = await fetch('/api/chat', {
@@ -168,37 +188,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const data = await response.json();
 
-            // Remove last message (loading indicator)
-            chatMessages.removeChild(chatMessages.lastChild);
+            // Remove thinking message
+            chatMessages.removeChild(thinkingMessage);
+
+            // Add response message
+            const responseMessage = document.createElement('div');
+            responseMessage.className = 'chat-message assistant';
 
             if (data.error) {
-                addMessage('Sorry, there was an error. Please try again.');
-                return;
+                responseMessage.textContent = 'Sorry, there was an error. Please try again.';
+            } else {
+                responseMessage.textContent = data.choices[0].message.content;
             }
 
-            const aiResponse = data.choices[0].message.content;
-            addMessage(aiResponse);
-
+            chatMessages.appendChild(responseMessage);
         } catch (error) {
             console.error('Chat error:', error);
-            // Remove last message (loading indicator)
-            chatMessages.removeChild(chatMessages.lastChild);
-            addMessage('Sorry, I encountered an error. Please try again.');
+            chatMessages.removeChild(thinkingMessage);
+
+            const errorMessage = document.createElement('div');
+            errorMessage.className = 'chat-message assistant error';
+            errorMessage.textContent = 'Sorry, I encountered an error. Please try again.';
+            chatMessages.appendChild(errorMessage);
         }
+
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // Attach event listeners
-    if (sendButton) {
-        sendButton.onclick = sendMessage;
-    }
+    // Event listeners
+    sendButton.addEventListener('click', handleSendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    });
 
-    if (chatInput) {
-        chatInput.onkeypress = (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        };
-    }
+    console.log('Chat initialization complete');
 });
 
 // Make add message available to other modules
@@ -209,120 +236,6 @@ window.processBlocks = processBlocks;
 window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
 window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
 window.enableDrawingMode = window.enableDrawingMode || function() { console.warn('enableDrawingMode not loaded'); };
-const AUTOSAVE_DELAY = 2000; 
-const state = {
-    tasks: [],
-    currentTask: null,
-    autoSaveTimeout: null
-};
-
-// Task Management Functions
-async function loadTasks() {
-    try {
-        const response = await fetch('/api/tasks');
-        if (!response.ok) throw new Error('Failed to load tasks');
-
-        state.tasks = await response.json();
-        updateTaskSelect();
-
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
-    } catch (error) {
-        console.error('Error loading tasks:', error);
-        logLiveConsole('Error loading tasks', 'error');
-    }
-}
-
-async function createNewTask() {
-    try {
-        const response = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: `Task ${state.tasks.length + 1}`
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to create task');
-
-        const task = await response.json();
-        state.tasks.push(task);
-        updateTaskSelect();
-        await loadTask(task.id);
-
-        logLiveConsole('New task created', 'success');
-    } catch (error) {
-        console.error('Error creating task:', error);
-        logLiveConsole('Error creating task', 'error');
-    }
-}
-
-async function loadTask(taskId) {
-    try {
-        const response = await fetch(`/api/tasks/${taskId}/blocks`);
-        if (!response.ok) throw new Error('Failed to load task blocks');
-
-        const blocks = await response.json();
-        state.currentTask = {
-            id: taskId,
-            blocks: blocks
-        };
-
-        updateTaskDisplay();
-        logLiveConsole(`Loaded task ${taskId}`, 'success');
-    } catch (error) {
-        console.error('Error loading task:', error);
-        logLiveConsole('Error loading task blocks', 'error');
-    }
-}
-
-function updateTaskSelect() {
-    const select = document.getElementById('taskSelect');
-    select.innerHTML = '<option value="">Select a task...</option>' +
-        state.tasks.map(task =>
-            `<option value="${task.id}">${task.name}</option>`
-        ).join('');
-}
-
-// Autosave functionality
-function scheduleAutosave() {
-    if (state.autoSaveTimeout) {
-        clearTimeout(state.autoSaveTimeout);
-    }
-
-    state.autoSaveTimeout = setTimeout(async () => {
-        if (state.currentTask) {
-            try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        blocks: state.currentTask.blocks
-                    })
-                });
-
-                if (!response.ok) throw new Error('Failed to save blocks');
-                logLiveConsole('Task autosaved', 'success');
-            } catch (error) {
-                console.error('Autosave error:', error);
-                logLiveConsole('Failed to autosave task', 'error');
-            }
-        }
-    }, AUTOSAVE_DELAY);
-}
-
-function logLiveConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    if (!console) return;
-
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
-}
-
 
 function calculateRegionFromDescription(description) {
     const normalized = description.toLowerCase().trim();
@@ -437,14 +350,13 @@ function updateTaskDisplay() {
         return blockDiv;
     }
 
-    if (state.currentTask && state.currentTask.blocks) {
-        state.currentTask.blocks.forEach(block => {
+    if (window.state && window.state.currentTask && window.state.currentTask.blocks) {
+        window.state.currentTask.blocks.forEach(block => {
             currentTaskElement.appendChild(renderBlock(block));
         });
     }
 }
 
-// Log messages to the console
 function logToConsole(message, type = 'info') {
     const console = document.getElementById('liveConsole');
     if (!console) return;
@@ -455,6 +367,3 @@ function logToConsole(message, type = 'info') {
     console.appendChild(messageEl);
     console.scrollTop = console.scrollHeight;
 }
-
-//Initialise tasks on load
-document.addEventListener('DOMContentLoaded', loadTasks);
