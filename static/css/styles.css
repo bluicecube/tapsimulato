@@ -1,10 +1,10 @@
 /* Device dimensions */
 :root {
-    /* TCL 508 screen dimensions */
-    --device-physical-width: 67.8mm;  /* Physical width in mm */
-    --device-physical-height: 147.7mm; /* Physical height in mm */
+    /* Samsung Galaxy A11 screen dimensions */
+    --device-physical-width: 76.3mm;  /* Physical width in mm */
+    --device-physical-height: 161.4mm; /* Physical height in mm */
     --device-pixel-width: 720px;     /* Screen width in pixels */
-    --device-pixel-height: 1600px;   /* Screen height in pixels */
+    --device-pixel-height: 1560px;   /* Screen height in pixels */
     --device-pixel-ratio: 1;         /* Will be set by JS */
 }
 
