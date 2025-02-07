@@ -181,6 +181,17 @@ def delete_task(task_id):
         app.logger.error(f"Error deleting task: {str(e)}")
         return jsonify({'error': 'Failed to delete task'}), 500
 
+@app.route('/api/tasks/all', methods=['DELETE'])
+def delete_all_tasks():
+    try:
+        Task.query.filter_by(is_active=True).update({'is_active': False})
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting all tasks: {str(e)}")
+        return jsonify({'error': 'Failed to delete all tasks'}), 500
+
 @app.route('/api/tasks/<int:task_id>/blocks', methods=['POST'])
 def save_blocks(task_id):
     try:

@@ -919,9 +919,9 @@ function setupVideoSharing() {
             logToConsole('Screen sharing error: ' + error.message, 'error');
         }
     });
-}}
+}
 
-function logToConsole(message, type = 'info') {
+function logToConsole(message, type= 'info') {
     const console = document.getElementById('liveConsole');
     const messageEl = document.createElement('div');
     messageEl.className = `text-${type}`;
