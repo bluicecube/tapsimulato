@@ -1,5 +1,8 @@
-from flask import Flask, render_template, request, jsonify
 import os
+import cv2
+import numpy as np
+import base64
+from flask import Flask, render_template, request, jsonify
 from extensions import db
 import logging
 from datetime import datetime
@@ -27,9 +30,28 @@ db.init_app(app)
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 with app.app_context():
-    # Import models after db initialization to avoid circular imports
     from models import Task, Block, Function
     db.create_all()
+
+def compare_images(img1_data, img2_data):
+    """Compare two images and return similarity percentage"""
+    # Convert base64 strings to numpy arrays
+    img1 = cv2.imdecode(np.frombuffer(base64.b64decode(img1_data), np.uint8), cv2.IMREAD_COLOR)
+    img2 = cv2.imdecode(np.frombuffer(base64.b64decode(img2_data), np.uint8), cv2.IMREAD_COLOR)
+
+    # Resize images to same size
+    img1 = cv2.resize(img1, (300, 300))
+    img2 = cv2.resize(img2, (300, 300))
+
+    # Convert images to grayscale
+    gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+    # Calculate structural similarity index
+    score, _ = cv2.compareHist(gray1, gray2, cv2.HISTCMP_CORREL)
+
+    # Convert to percentage and ensure it's between 0 and 100
+    return max(0, min(100, (score + 1) * 50))
 
 @app.route('/')
 def index():
@@ -223,6 +245,51 @@ def chat():
         error_msg = f"Error in chat endpoint: {str(e)}"
         logger.error(error_msg)
         return jsonify({'error': error_msg}), 500
+
+
+@app.route('/api/blocks/<int:block_id>/reference-image', methods=['POST'])
+def save_reference_image(block_id):
+    """Save reference image for a conditional block"""
+    block = Block.query.get_or_404(block_id)
+    if block.type != 'conditional':
+        return jsonify({'error': 'Block is not a conditional block'}), 400
+
+    image_data = request.json.get('image')
+    if not image_data:
+        return jsonify({'error': 'No image data provided'}), 400
+
+    try:
+        # Store base64 encoded image
+        block.reference_image = image_data.encode('utf-8')
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f'Error saving reference image: {str(e)}')
+        return jsonify({'error': 'Failed to save reference image'}), 500
+
+@app.route('/api/blocks/<int:block_id>/compare-image', methods=['POST'])
+def compare_current_image(block_id):
+    """Compare current frame with reference image"""
+    block = Block.query.get_or_404(block_id)
+    if block.type != 'conditional':
+        return jsonify({'error': 'Block is not a conditional block'}), 400
+
+    current_image = request.json.get('image')
+    if not current_image or not block.reference_image:
+        return jsonify({'error': 'Missing image data'}), 400
+
+    try:
+        similarity = compare_images(
+            block.reference_image.decode('utf-8'),
+            current_image
+        )
+        return jsonify({
+            'similarity': similarity,
+            'threshold': block.data.get('threshold', 90)
+        })
+    except Exception as e:
+        logger.error(f'Error comparing images: {str(e)}')
+        return jsonify({'error': 'Failed to compare images'}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

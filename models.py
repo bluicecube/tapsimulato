@@ -1,6 +1,6 @@
 from extensions import db
 from datetime import datetime
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.dialects.postgresql import JSON, BYTEA
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -13,9 +13,10 @@ class Task(db.Model):
 class Block(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-    type = db.Column(db.String(20), nullable=False)  # 'tap', 'loop', or 'function'
+    type = db.Column(db.String(20), nullable=False)  # 'tap', 'loop', 'function', or 'conditional'
     name = db.Column(db.String(100))
     data = db.Column(JSON)  # Store block-specific data
+    reference_image = db.Column(BYTEA, nullable=True)  # Store reference image for conditional blocks
     parent_id = db.Column(db.Integer, db.ForeignKey('block.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

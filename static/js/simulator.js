@@ -8,7 +8,9 @@ window.state = {
     tasks: [],
     autoSaveTimeout: null,
     pendingBlockConfiguration: null,
-    focusedBlock: null  // Track currently focused block
+    focusedBlock: null,  // Track currently focused block
+    lastTaskId: localStorage.getItem('lastTaskId'), // Track last opened task
+    currentFrame: null  // Store current video frame
 };
 
 // Selection state
@@ -134,14 +136,23 @@ async function loadTasks() {
         updateTaskList();
 
         if (state.tasks.length > 0) {
-            // Load the most recently updated task
-            const mostRecentTask = state.tasks.reduce((latest, current) => {
-                const latestDate = new Date(latest.updated_at);
-                const currentDate = new Date(current.updated_at);
-                return currentDate > latestDate ? current : latest;
-            }, state.tasks[0]);
+            let taskToLoad;
 
-            await loadTask(mostRecentTask.id);
+            // Try to load last opened task
+            if (state.lastTaskId) {
+                taskToLoad = state.tasks.find(t => t.id === parseInt(state.lastTaskId));
+            }
+
+            // If no last task or it doesn't exist, load most recent
+            if (!taskToLoad) {
+                taskToLoad = state.tasks.reduce((latest, current) => {
+                    const latestDate = new Date(latest.updated_at);
+                    const currentDate = new Date(current.updated_at);
+                    return currentDate > latestDate ? current : latest;
+                }, state.tasks[0]);
+            }
+
+            await loadTask(taskToLoad.id);
         } else {
             // Only create a new task if there are no existing tasks
             await createNewTask();
@@ -154,11 +165,21 @@ async function loadTasks() {
 
 async function createNewTask() {
     try {
+        // Find highest task number
+        const taskNumbers = state.tasks
+            .map(t => {
+                const match = t.name.match(/^Task (\d+)$/);
+                return match ? parseInt(match[1]) : 0;
+            })
+            .filter(n => !isNaN(n));
+
+        const nextNumber = taskNumbers.length > 0 ? Math.max(...taskNumbers) + 1 : 1;
+
         const response = await fetch('/api/tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: `Task ${state.tasks.length + 1}`
+                name: `Task ${nextNumber}`
             })
         });
 
@@ -191,6 +212,10 @@ async function loadTask(taskId) {
             id: taskId,
             blocks: blocks
         };
+
+        // Save last opened task ID
+        state.lastTaskId = taskId;
+        localStorage.setItem('lastTaskId', taskId);
 
         taskTitle.value = state.tasks.find(t => t.id === taskId)?.name || '';
         updateTaskDisplay();
@@ -651,6 +676,94 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
+    } else if (block.type === 'conditional') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Conditional Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary capture-reference-btn">
+                        ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
+                    </button>
+                    <input type="number" class="form-control form-control-sm threshold-input" 
+                           value="${block.data.threshold}" min="0" max="100" style="width: 70px">
+                    <span class="ms-2 me-2">% similar</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="nested-blocks then-blocks">
+                    <p class="mb-2">If similar enough:</p>
+                    <div class="btn-group w-100 mb-2">
+                        <button class="btn btn-sm btn-outline-primary add-then-tap-btn">Add Tap</button>
+                        <button class="btn btn-sm btn-outline-success add-then-loop-btn">Add Loop</button>
+                    </div>
+                </div>
+                <div class="nested-blocks else-blocks">
+                    <p class="mb-2">If not similar enough:</p>
+                    <div class="btn-group w-100 mb-2">
+                        <button class="btn btn-sm btn-outline-primary add-else-tap-btn">Add Tap</button>
+                        <button class="btn btn-sm btn-outline-success add-else-loop-btn">Add Loop</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        const captureBtn = blockDiv.querySelector('.capture-reference-btn');
+        captureBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const imageData = captureVideoFrame();
+
+            try {
+                const response = await fetch(`/api/blocks/${block.id}/reference-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                if (!response.ok) throw new Error('Failed to save reference image');
+
+                block.data.referenceImage = imageData;
+                captureBtn.textContent = 'Update Reference';
+                scheduleAutosave();
+                logToConsole('Reference image captured', 'success');
+            } catch (error) {
+                logToConsole('Failed to save reference image', 'error');
+            }
+        });
+
+        // Add threshold change handler
+        const thresholdInput = blockDiv.querySelector('.threshold-input');
+        thresholdInput.addEventListener('change', (e) => {
+            block.data.threshold = parseInt(e.target.value) || 90;
+            scheduleAutosave();
+        });
+
+        // Add buttons for then/else blocks
+        ['then', 'else'].forEach(section => {
+            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
+                addTapBlock(index, `${section}Blocks`);
+            });
+
+            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
+                addLoopBlock(index, `${section}Blocks`);
+            });
+        });
+
+        // Render nested blocks
+        if (block.data.thenBlocks) {
+            const thenContainer = blockDiv.querySelector('.then-blocks');
+            block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
+                thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
+            });
+        }
+
+        if (block.data.elseBlocks) {
+            const elseContainer = blockDiv.querySelector('.else-blocks');
+            block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
+                elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
+            });
+        }
     }
 
     return blockDiv;
@@ -682,20 +795,20 @@ function executeTask() {
     let delay = 0;
     const delayIncrement = 800; // Increased delay between actions for better visibility
 
-    function executeBlocks(blocks) {
-        blocks.forEach(block => {
+    async function executeBlocks(blocks) {
+        for (const block of blocks) {
             if (block.type === 'function') {
                 // Find the function definition
                 const func = functions.find(f => f.name === block.name);
                 if (func && func.blocks) {
                     // Execute the function's blocks
-                    executeBlocks(func.blocks);
+                    await executeBlocks(func.blocks);
                 } else {
                     logToConsole(`Function "${block.name}" not found`, 'error');
                 }
             } else if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
-                    executeBlocks(block.blocks);
+                    await executeBlocks(block.blocks);
                 }
             } else if (block.type === 'tap' && block.region) {
                 delay += delayIncrement;
@@ -703,11 +816,31 @@ function executeTask() {
                     showTapFeedback(block.region);
                     logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
                 }, delay);
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
             }
-        });
+        }
     }
 
-    executeBlocks(state.currentTask.blocks);
+    await executeBlocks(state.currentTask.blocks);
 
     setTimeout(() => {
         logToConsole('Task execution completed', 'success');
@@ -777,7 +910,7 @@ async function deleteTask(taskId) {
     if (!taskId) {
         logToConsole('No task selected to delete', 'error');
         return;
-    }
+        }
 
     try {
         const response = await fetch(`/api/tasks/${taskId}`, {
@@ -911,7 +1044,7 @@ function addBlockToFunction(type, parentElement = null) {
 
         decreaseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
+            const currentValue= parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
                 iterationsInput.value = currentValue - 1;
                 block.iterations = currentValue - 1;
@@ -937,14 +1070,14 @@ function addBlockToFunction(type, parentElement = null) {
         });
     } else { // Tap block
         blockElement.innerHTML = `
-            <div class="d-flexjustify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Tap Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
-            <small class="textmuted">No region set</small>
+            <small class="text-muted">No region set</small>
         `;
 
         blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
@@ -1078,6 +1211,13 @@ function collectBlockData(block) {
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
+    } else if (block.type === 'conditional') {
+        data.data = {
+            threshold: block.data.threshold,
+            referenceImage: block.data.referenceImage,
+            thenBlocks: block.data.thenBlocks.map(b => collectBlockData(b)),
+            elseBlocks: block.data.elseBlocks.map(b => collectBlockData(b))
+        };
     }
 
     return data;
@@ -1102,3 +1242,108 @@ async function saveBlocks(taskId, blocks) {
         logToConsole('Error saving blocks: ' + error.message, 'error');
     }
 }
+
+// Add new function to capture video frame
+function captureVideoFrame() {
+    const video = document.getElementById('bgVideo');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
+}
+
+// Add new function to add conditional block
+function addConditionalBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'conditional',
+        name: 'Conditional Block',
+        data: {
+            threshold: 90,  // Default similarity threshold
+            referenceImage: null,
+            thenBlocks: [],  // Blocks to execute if similarity >= threshold
+            elseBlocks: []   // Blocks to execute if similarity < threshold
+        }
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Conditional block added', 'success');
+}
+
+// Update executeTask to handle conditional blocks
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800; // Increased delay between actions for better visibility
+
+    async function executeBlocks(blocks) {
+        for (const block of blocks) {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    await executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                setTimeout(() => {
+                    showTapFeedback(block.region);
+                    logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
+                }, delay);
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
+            }
+        }
+    }
+
+    await executeBlocks(state.currentTask.blocks);
+
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + delayIncrement);
+}
+
+// Add button to UI
+document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
+    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
+`);
+
+document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);

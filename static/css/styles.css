@@ -94,7 +94,7 @@ body {
 }
 
 .function-block {
-    border-left: 4px solid var(--bs-warning);
+    border-left: 4px solid var(--bs-light);
 }
 
 .nested-blocks {
