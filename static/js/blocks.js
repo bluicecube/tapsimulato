@@ -124,7 +124,6 @@ function addPrintBlock(parent) {
     const messageInput = blockDiv.querySelector('.message-input');
     messageInput.addEventListener('input', (e) => {
         printBlock.message = e.target.value;
-        console.log('Print block message updated:', printBlock.message); // Debug log
     });
 
     blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
@@ -185,6 +184,17 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+function logLiveConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    if (!console) return;
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
 function enableDrawingMode(tapBlock, tapDiv) {
     currentTapBlock = tapBlock;
     tapDiv.classList.add('active-block');
@@ -199,9 +209,17 @@ function disableDrawingMode() {
     currentTapBlock = null;
 }
 
+
 // Event listeners for drawing mode
 document.addEventListener('keydown', (e) => {
     if ((e.key === 'Enter' || e.key === ' ') && currentTapBlock) {
         disableDrawingMode();
     }
 });
+
+// Export necessary functions
+window.addTapBlock = addTapBlock;
+window.addLoopBlock = addLoopBlock;
+window.addPrintBlock = addPrintBlock;
+window.setupDragAndDrop = setupDragAndDrop;
+window.logLiveConsole = logLiveConsole;

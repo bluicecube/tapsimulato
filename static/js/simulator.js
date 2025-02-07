@@ -935,8 +935,7 @@ async function executeTask() {
 
     async function executeBlocks(blocks) {
         for (const block of blocks) {
-            if (block.type === 'function') {
-                // Find the function definition
+            if (block.type === 'function') {                // Find the function definition
                 const func = functions.find(f => f.name === block.name);
                 if (func && func.blocks) {
                     // Execute the function's blocks
