@@ -37,7 +37,7 @@ body {
 /* Simulator styles */
 .simulator-header {
     position: relative;
-    padding-top: 1rem;
+    padding: 1rem;
     min-height: 400px;
 }
 
