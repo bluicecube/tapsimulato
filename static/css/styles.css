@@ -29,14 +29,14 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 0.5rem;
+    padding: 1.5rem;
     height: calc(100vh - 60px);
 }
 
 .simulator {
     position: relative;
-    width: min(calc(90vh / var(--device-aspect-ratio)), 90%);
-    height: min(90vh, calc(90% * var(--device-aspect-ratio)));
+    width: min(calc(85vh / var(--device-aspect-ratio)), 85%);
+    height: min(85vh, calc(85% * var(--device-aspect-ratio)));
     border: 2px solid var(--bs-secondary);
     border-radius: 20px;
     background-color: var(--bs-dark);
