@@ -16,6 +16,9 @@ let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
 
+// Functions state
+let functions = [];
+
 // State management
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
@@ -28,6 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
+    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
+    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
+
 
     // Add task title change handler
     taskTitle.addEventListener('change', async () => {
@@ -64,6 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Setup video sharing
     setupVideoSharing();
+
+    // Load functions
+    loadFunctions();
 
     // Create initial task and load tasks
     createNewTask().then(() => {
@@ -315,7 +325,34 @@ function renderBlock(block, index) {
     blockDiv.className = `block ${block.type}-block`;
     blockDiv.dataset.index = index;
 
-    if (block.type === 'tap') {
+    if (block.type === 'function') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${block.name}</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-light edit-function-btn">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">${block.description || ''}</small>
+            <div class="nested-blocks mt-2"></div>
+        `;
+
+        const editBtn = blockDiv.querySelector('.edit-function-btn');
+        editBtn.addEventListener('click', () => {
+            // Implementation for editing function
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'tap') {
         const regionText = block.region ?
             `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set';
@@ -498,7 +535,9 @@ function executeTask() {
 
     function executeBlocks(blocks) {
         blocks.forEach(block => {
-            if (block.type === 'loop') {
+            if (block.type === 'function') {
+                executeBlocks(block.blocks);
+            } else if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
                     executeBlocks(block.blocks);
                 }
@@ -506,7 +545,7 @@ function executeTask() {
                 delay += 500;
                 setTimeout(() => {
                     showTapFeedback(block.region);
-                    logToConsole(`Executed ${block.description}`, 'success');
+                    logToConsole(`Executed ${block.description || 'tap'}`, 'success');
                 }, delay);
             }
         });
@@ -588,7 +627,6 @@ function scheduleAutosave() {
     }, 2000);
 }
 
-
 async function deleteTask(taskId) {
     if (!taskId) {
         logToConsole('No task selected to delete', 'error');
@@ -629,7 +667,6 @@ document.getElementById('deleteTaskBtn').addEventListener('click', () => {
     deleteTask(taskId);
 });
 
-
 // Add new function to show selection box for existing region
 function showSelectionBox(region) {
     const selectionBox = document.getElementById('selectionBox');
@@ -640,4 +677,105 @@ function showSelectionBox(region) {
     selectionBox.style.width = `${region.x2 - region.x1}px`;
     selectionBox.style.height = `${region.y2 - region.y1}px`;
     selectionBox.classList.remove('d-none');
+}
+
+// Add these new functions for function management
+async function loadFunctions() {
+    try {
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
+
+        functions = await response.json();
+        updateFunctionsList();
+    } catch (error) {
+        logToConsole('Error loading functions', 'error');
+    }
+}
+
+function updateFunctionsList() {
+    const functionsList = document.getElementById('functionsList');
+    functionsList.innerHTML = functions.map(func => `
+        <li>
+            <a class="dropdown-item" href="#" onclick="addFunctionBlock(${func.id})">${func.name}</a>
+        </li>
+    `).join('') || '<li><span class="dropdown-item">No functions available</span></li>';
+}
+
+async function saveFunction() {
+    const nameInput = document.getElementById('functionName');
+    const descriptionInput = document.getElementById('functionDescription');
+    const blocksContainer = document.getElementById('functionBlocks');
+
+    const functionData = {
+        name: nameInput.value.trim(),
+        description: descriptionInput.value.trim(),
+        blocks: [] // We'll need to gather blocks from the container
+    };
+
+    if (!functionData.name) {
+        logToConsole('Function name is required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/functions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(functionData)
+        });
+
+        if (!response.ok) throw new Error('Failed to save function');
+
+        const savedFunction = await response.json();
+        functions.push(savedFunction);
+        updateFunctionsList();
+
+        // Close modal and reset form
+        const modal = bootstrap.Modal.getInstance(document.getElementById('functionModal'));
+        modal.hide();
+        nameInput.value = '';
+        descriptionInput.value = '';
+        blocksContainer.innerHTML = '';
+
+        logToConsole('Function saved successfully', 'success');
+    } catch (error) {
+        logToConsole('Error saving function', 'error');
+    }
+}
+
+function addBlockToFunction(type) {
+    const blocksContainer = document.getElementById('functionBlocks');
+    const block = {
+        type: type,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
+    };
+
+    const blockElement = renderBlock(block, blocksContainer.children.length.toString());
+    blocksContainer.appendChild(blockElement);
+}
+
+async function addFunctionBlock(functionId) {
+    const func = functions.find(f => f.id === functionId);
+    if (!func) {
+        logToConsole('Function not found', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description,
+        functionId: func.id,
+        blocks: func.blocks || []
+    };
+
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
 }

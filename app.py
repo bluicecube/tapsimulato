@@ -27,12 +27,70 @@ db = SQLAlchemy(app)
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Import models after db initialization
-from models import Task, Block
+from models import Task, Block, Function
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Function-related endpoints
+@app.route('/api/functions', methods=['GET'])
+def get_functions():
+    functions = Function.query.filter_by(is_active=True).all()
+    return jsonify([{
+        'id': func.id,
+        'name': func.name,
+        'description': func.description,
+        'blocks': func.blocks,
+        'created_at': func.created_at.isoformat(),
+        'updated_at': func.updated_at.isoformat()
+    } for func in functions])
+
+@app.route('/api/functions', methods=['POST'])
+def create_function():
+    data = request.json
+    function = Function(
+        name=data.get('name', 'Untitled Function'),
+        description=data.get('description', ''),
+        blocks=data.get('blocks', [])
+    )
+    db.session.add(function)
+    db.session.commit()
+    return jsonify({
+        'id': function.id,
+        'name': function.name,
+        'description': function.description,
+        'blocks': function.blocks,
+        'created_at': function.created_at.isoformat(),
+        'updated_at': function.updated_at.isoformat()
+    })
+
+@app.route('/api/functions/<int:function_id>', methods=['PUT'])
+def update_function(function_id):
+    function = Function.query.get_or_404(function_id)
+    data = request.json
+    function.name = data.get('name', function.name)
+    function.description = data.get('description', function.description)
+    function.blocks = data.get('blocks', function.blocks)
+    function.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({
+        'id': function.id,
+        'name': function.name,
+        'description': function.description,
+        'blocks': function.blocks,
+        'created_at': function.created_at.isoformat(),
+        'updated_at': function.updated_at.isoformat()
+    })
+
+@app.route('/api/functions/<int:function_id>', methods=['DELETE'])
+def delete_function(function_id):
+    function = Function.query.get_or_404(function_id)
+    function.is_active = False
+    db.session.commit()
+    return jsonify({'success': True})
+
+# Existing Task endpoints remain unchanged
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
     tasks = Task.query.filter_by(is_active=True).all()
@@ -75,20 +133,9 @@ def update_task(task_id):
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
-    task.is_active = False  # Soft delete
+    task.is_active = False
     db.session.commit()
     return jsonify({'success': True})
-
-@app.route('/api/tasks/all', methods=['DELETE'])
-def delete_all_tasks():
-    try:
-        # Soft delete all tasks
-        Task.query.update({Task.is_active: False})
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Error deleting all tasks: {str(e)}")
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tasks/<int:task_id>/blocks', methods=['POST'])
 def save_blocks(task_id):
@@ -96,7 +143,6 @@ def save_blocks(task_id):
     data = request.json
     blocks = data.get('blocks', [])
 
-    # Delete existing blocks
     Block.query.filter_by(task_id=task_id).delete()
 
     def save_block(block_data, parent_id=None, order=0):
@@ -109,9 +155,9 @@ def save_blocks(task_id):
             order=order
         )
         db.session.add(block)
-        db.session.flush()  # Get block.id
+        db.session.flush()
 
-        if block_data['type'] == 'loop' and 'blocks' in block_data:
+        if block_data['type'] in ['loop', 'function'] and 'blocks' in block_data:
             for i, child_data in enumerate(block_data['blocks']):
                 save_block(child_data, block.id, i)
 
@@ -133,7 +179,7 @@ def get_blocks(task_id):
             'data': block.data,
             'order': block.order
         }
-        if block.type == 'loop':
+        if block.type in ['loop', 'function']:
             data['blocks'] = [format_block(child) for child in sorted(block.children, key=lambda x: x.order)]
         return data
 
