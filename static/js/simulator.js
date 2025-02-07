@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.style.width = `${DEVICE_WIDTH}px`;
     simulator.style.height = `${DEVICE_HEIGHT}px`;
 
+    // Initialize manual block building controls
+    initializeBlockControls();
+
     // Initialize video stream functionality
     const setVideoSourceBtn = document.getElementById('setVideoSource');
     const video = document.getElementById('bgVideo');
@@ -53,8 +56,83 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+function initializeBlockControls() {
+    const blockType = document.getElementById('blockType');
+    const tapControls = document.getElementById('tapControls');
+    const loopControls = document.getElementById('loopControls');
+    const startTapSelect = document.getElementById('startTapSelect');
+    const addBlock = document.getElementById('addBlock');
+
+    if (!blockType || !tapControls || !loopControls || !startTapSelect || !addBlock) return;
+
+    // Toggle controls based on block type
+    blockType.addEventListener('change', () => {
+        if (blockType.value === 'tap') {
+            tapControls.style.display = 'block';
+            loopControls.style.display = 'none';
+        } else {
+            tapControls.style.display = 'none';
+            loopControls.style.display = 'block';
+        }
+    });
+
+    // Start tap region selection
+    startTapSelect.addEventListener('click', () => {
+        currentBlock = { type: 'tap', name: 'Tap Block' };
+        logLiveConsole('Select tap region on the simulator', 'info');
+    });
+
+    // Add block button handler
+    addBlock.addEventListener('click', () => {
+        if (!window.state || !window.state.currentTask) {
+            logLiveConsole('Please create or select a task first', 'error');
+            return;
+        }
+
+        if (blockType.value === 'tap') {
+            if (!currentBlock || !currentBlock.region) {
+                logLiveConsole('Please select a tap region first', 'error');
+                return;
+            }
+            addTapBlock(currentBlock.region);
+        } else {
+            const iterations = parseInt(document.getElementById('loopIterations').value) || 1;
+            addLoopBlock(iterations);
+        }
+    });
+}
+
+function addTapBlock(region) {
+    const block = {
+        type: 'tap',
+        name: 'Tap Block',
+        region: region,
+        description: `Tap at (${Math.round(region.x1)}, ${Math.round(region.y1)})`
+    };
+
+    window.state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    currentBlock = null;
+    scheduleAutosave();
+    logLiveConsole('Tap block added', 'success');
+}
+
+function addLoopBlock(iterations) {
+    const block = {
+        type: 'loop',
+        name: 'Loop Block',
+        iterations: iterations,
+        blocks: []
+    };
+
+    window.state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logLiveConsole('Loop block added', 'success');
+}
+
 function executeSelectedTask() {
-    const task = window.state && window.state.task;
+    const task = window.state && window.state.currentTask;
     if (!task || !task.blocks || task.blocks.length === 0) {
         logLiveConsole('No blocks to execute', 'error');
         return;
@@ -174,6 +252,10 @@ function setBlockFocus(block, element) {
 function showSelectionBox(tapBlock) {
     if (!tapBlock.region) return;
 
+    // Remove any existing selection boxes
+    const existingBoxes = document.querySelectorAll('.active-selection-box');
+    existingBoxes.forEach(box => box.remove());
+
     const selectionBox = document.createElement('div');
     selectionBox.className = 'active-selection-box';
     selectionBox.style.left = `${tapBlock.region.x1}px`;
@@ -216,3 +298,7 @@ window.executeSelectedTask = executeSelectedTask;
 window.setBlockFocus = setBlockFocus;
 window.showSelectionBox = showSelectionBox;
 window.enableDrawingMode = enableDrawingMode;
+window.scheduleAutosave = window.scheduleAutosave || function() { console.warn('scheduleAutosave not loaded'); };
+window.addTapBlock = addTapBlock; // Added for external access
+window.addLoopBlock = addLoopBlock; // Added for external access
+window.initializeBlockControls = initializeBlockControls; //Added for external access
