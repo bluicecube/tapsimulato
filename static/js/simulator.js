@@ -68,6 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.addEventListener('mousedown', startSelection);
     simulator.addEventListener('mousemove', updateSelection);
     simulator.addEventListener('mouseup', stopSelection);
+    simulator.addEventListener('mouseleave', () => {
+        if (isSelecting) {
+            isSelecting = false;
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.classList.add('d-none');
+        }
+    });
 
     // Setup video sharing
     setupVideoSharing();
@@ -432,8 +439,9 @@ function renderBlock(block, index) {
 
 // Selection Handling
 function startSelection(event) {
-    if (!isSelecting) return;
+    if (!state.pendingBlockConfiguration) return;
 
+    isSelecting = true;
     const rect = event.target.getBoundingClientRect();
     selectionStartX = event.clientX - rect.left;
     selectionStartY = event.clientY - rect.top;
@@ -499,11 +507,6 @@ function stopSelection(event) {
     scheduleAutosave();
     logToConsole('Region updated', 'success');
 }
-
-// Click handlers for simulator
-document.getElementById('simulator').addEventListener('mousedown', startSelection);
-document.getElementById('simulator').addEventListener('mousemove', updateSelection);
-document.getElementById('simulator').addEventListener('mouseup', stopSelection);
 
 
 // Add these utility functions for block interaction
