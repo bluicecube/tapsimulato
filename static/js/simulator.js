@@ -80,6 +80,18 @@ document.addEventListener('DOMContentLoaded', () => {
         loadTasks();
         console.log('Initial state setup complete:', window.state);
     });
+
+    // Initialize function modal
+    const functionModal = document.getElementById('functionModal');
+    if (functionModal) {
+        new bootstrap.Modal(functionModal);
+    }
+
+    // Add save function button handler
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    if (saveFunctionBtn) {
+        saveFunctionBtn.addEventListener('click', saveFunction);
+    }
 });
 
 // Make functions available globally
@@ -750,17 +762,15 @@ async function saveFunction() {
         };
     });
 
-    const functionData = {
-        name,
-        description,
-        blocks
-    };
-
     try {
         const response = await fetch('/api/functions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(functionData)
+            body: JSON.stringify({
+                name,
+                description,
+                blocks
+            })
         });
 
         if (!response.ok) throw new Error('Failed to save function');
@@ -770,15 +780,22 @@ async function saveFunction() {
         updateFunctionsList();
 
         // Close modal and reset form
-        const modal = bootstrap.Modal.getInstance(document.getElementById('functionModal'));
-        modal.hide();
+        const modal = document.getElementById('functionModal');
+        const bsModal = bootstrap.Modal.getInstance(modal);
+        if (bsModal) {
+            bsModal.hide();
+        } else {
+            const newModal = new bootstrap.Modal(modal);
+            newModal.hide();
+        }
+
         nameInput.value = '';
         descriptionInput.value = '';
         blocksContainer.innerHTML = '';
 
         logToConsole('Function saved successfully', 'success');
     } catch (error) {
-        logToConsole('Error saving function', 'error');
+        logToConsole('Error saving function: ' + error.message, 'error');
     }
 }
 
