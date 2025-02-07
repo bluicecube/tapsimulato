@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
     const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
     const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    const addConditionalBtn = document.getElementById('addConditionalBtn'); // Added from edited snippet
+    const addFunctionBtn = document.getElementById('addFunctionBtn');     //Added from edited snippet
 
 
     if (executeTaskBtn) {
@@ -179,6 +181,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
     if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
+
+    // Add conditional button event listener (from edited snippet)
+    if (addConditionalBtn) {
+        addConditionalBtn.addEventListener('click', () => {
+            if (!state.currentTask) {
+                logToConsole('Please create or select a task first', 'error');
+                return;
+            }
+            const block = {
+                type: 'conditional',
+                data: {
+                    threshold: 90,
+                    referenceImage: null,
+                    thenBlocks: [],
+                    elseBlocks: []
+                }
+            };
+            state.currentTask.blocks.push(block);
+            updateTaskDisplay();
+            scheduleAutosave();
+            logToConsole('Conditional block added', 'success');
+        });
+    }
 });
 
 // Make functions available globally
