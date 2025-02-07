@@ -97,10 +97,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (newTaskBtn) {
-        newTaskBtn.addEventListener('click', () => {
-            createNewTask().catch(error => {
+        newTaskBtn.addEventListener('click', async () => {
+            try {
+                await createNewTask();
+                logToConsole('New task created successfully', 'success');
+            } catch (error) {
                 logToConsole('Failed to create new task: ' + error.message, 'error');
-            });
+            }
         });
     }
 
@@ -266,6 +269,7 @@ async function loadTasks() {
     }
 }
 
+// Update createNewTask function to properly handle task creation and state updates
 async function createNewTask() {
     try {
         // Find highest task number
@@ -289,7 +293,11 @@ async function createNewTask() {
         if (!response.ok) throw new Error('Failed to create task');
 
         const task = await response.json();
+
+        // Update state with the new task
         state.tasks.push(task);
+
+        // Set the new task as current
         state.currentTask = {
             id: task.id,
             blocks: []
@@ -299,13 +307,20 @@ async function createNewTask() {
         state.lastTaskId = task.id;
         localStorage.setItem('lastTaskId', task.id);
 
+        // Update UI
         updateTaskList();
         updateTaskDisplay();
+
+        const taskTitle = document.getElementById('taskTitle');
+        if (taskTitle) {
+            taskTitle.value = `Task ${nextNumber}`;
+        }
 
         logToConsole('New task created', 'success');
         return task;
     } catch (error) {
         logToConsole('Error creating task', 'error');
+        console.error('Error creating task:', error);
         throw error;
     }
 }
@@ -922,7 +937,7 @@ function renderBlock(block, index) {
         if (addThenLoopBtn) {
             addThenLoopBtn.addEventListener('click', () => {
                 const loopBlock = {
-                    type: 'loop',
+                                        type: 'loop',
                     iterations: 1,
                     blocks: [],
                     name: 'Loop Block'
@@ -934,7 +949,7 @@ function renderBlock(block, index) {
             });
         }
 
-        if (<addElseTapBtn) {
+        if (addElseTapBtn) {
             addElseTapBtn.addEventListener('click', () => {
                 const tapBlock = {
                     type: 'tap',
