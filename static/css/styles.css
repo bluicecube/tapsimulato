@@ -35,14 +35,32 @@ body {
 }
 
 /* Simulator styles */
+.simulator-header {
+    position: relative;
+    padding-top: 1rem;
+    min-height: 400px;
+}
+
+.title-controls {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 10;
+    background: rgba(33, 37, 41, 0.8);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+}
+
 .simulator {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
     width: calc(var(--device-physical-width) * var(--simulator-scale));
     height: calc(var(--device-physical-height) * var(--simulator-scale));
     border: 2px solid var(--bs-secondary);
     border-radius: 20px;
-    position: relative;
     background-color: var(--bs-dark);
-    margin: 0 auto;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
     overflow: hidden;
@@ -60,6 +78,16 @@ body {
 .btn-group .btn {
     padding: 0.25rem 0.75rem;
 }
+
+/* Remove previous zoom-controls styles */
+.zoom-controls.mb-2.px-3 {
+    display: none;
+}
+
+.zoom-controls {
+    margin-top: 0.5rem;
+}
+
 
 /* Scale adjustment for different screen sizes */
 @media (max-height: 800px) {
