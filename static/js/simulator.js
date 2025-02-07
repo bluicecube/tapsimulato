@@ -249,13 +249,10 @@ function updateTaskDisplay() {
                 <small class="text-muted">Region: ${regionText}</small>
             `;
 
-            // Add click handler to show region when block is clicked
+            // Add click handler to show region and enable drawing mode
             blockDiv.addEventListener('click', (e) => {
                 if (!e.target.closest('.btn')) {
-                    if (block.region) {
-                        showSelectionBox(block.region);
-                    }
-                    startTapRegionSelection(blockDiv);
+                    setBlockFocus(block, blockDiv);
                 }
             });
 
@@ -266,10 +263,7 @@ function updateTaskDisplay() {
             });
 
             blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-                startTapRegionSelection(blockDiv);
-                if (block.region) {
-                    showSelectionBox(block.region);
-                }
+                enableDrawingMode(block, blockDiv);
             });
         } else if (block.type === 'loop') {
             blockDiv.innerHTML = `
@@ -572,3 +566,23 @@ function showSelectionBox(region) {
     selectionBox.style.height = `${region.y2 - region.y1}px`;
     selectionBox.classList.remove('d-none');
 }
+
+// Add these utility functions for block interaction
+function setBlockFocus(block, blockDiv) {
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+    enableDrawingMode(block, blockDiv);
+}
+
+function enableDrawingMode(block, blockDiv) {
+    startTapRegionSelection(blockDiv);
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+}
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
