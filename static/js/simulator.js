@@ -622,7 +622,16 @@ function executeTask() {
 
     function executeBlocks(blocks) {
         blocks.forEach(block => {
-            if (block.type === 'loop') {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
                     executeBlocks(block.blocks);
                 }
@@ -923,7 +932,7 @@ async function saveFunction() {
     } catch (error) {
         logToConsole('Error saving function: ' + error.message, 'error');
     }
-}
+}}
 
 async function addFunctionBlock(functionId) {
     const func = functions.find(f => f.id === functionId);
@@ -937,32 +946,11 @@ async function addFunctionBlock(functionId) {
         return;
     }
 
-    // Deep clone the function's blocks to maintain structure
-    function cloneBlock(block) {
-        if (block.type === 'tap') {            return {
-                type: 'tap',
-                name: block.name || 'Tap Block',
-                description: 'Click to set region',                region: null // Region will be set by user
-            };
-        } else if (block.type === 'loop') {
-            return {
-                type: 'loop',
-                name: block.name || 'Loop Block',
-                iterations: block.iterations || 1,
-                blocks: (block.blocks || []).map(cloneBlock)
-            };
-        }
-        return block;
-    }
-
-    const blocks = func.blocks.map(cloneBlock);
-
     const block = {
         type: 'function',
         name: func.name,
-        description: func.description,
-        functionId: func.id,
-        blocks: blocks
+        description: func.description || '',
+        blocks: func.blocks // Store the function's blocks for reference
     };
 
     state.currentTask.blocks.push(block);
