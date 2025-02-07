@@ -1,8 +1,11 @@
 /* Device dimensions */
 :root {
-    --device-width: 320px;  /* Physical width in pixels */
-    --device-height: 720px; /* Physical height in pixels */
-    --device-scale: 1;      /* Base scale factor */
+    /* TCL 508 screen dimensions */
+    --device-physical-width: 67.8mm;  /* Physical width in mm */
+    --device-physical-height: 147.7mm; /* Physical height in mm */
+    --device-pixel-width: 720px;     /* Screen width in pixels */
+    --device-pixel-height: 1600px;   /* Screen height in pixels */
+    --device-pixel-ratio: 1;         /* Will be set by JS */
 }
 
 /* Basic styles */
@@ -32,8 +35,8 @@ body {
 
 /* Simulator styles */
 .simulator {
-    width: var(--device-width);
-    height: var(--device-height);
+    width: calc(var(--device-physical-width));
+    height: calc(var(--device-physical-height));
     border: 2px solid var(--bs-secondary);
     border-radius: 20px;
     position: relative;
@@ -42,8 +45,6 @@ body {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
     cursor: crosshair;
     overflow: hidden;
-    transform-origin: top left;
-    transform: scale(var(--device-scale));
 }
 
 /* Scale adjustment for different screen sizes */

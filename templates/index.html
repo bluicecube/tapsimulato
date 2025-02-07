@@ -3,24 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Samsung Galaxy A11 Simulator">
-    <title>Samsung Galaxy A11 Simulator</title>
+    <meta name="description" content="TCL 508 Simulator">
+    <title>TCL 508 Simulator</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
     <script>
-        // Dynamically adjust simulator scale based on screen size
-        function adjustSimulatorScale() {
+        // Accurately calculate and maintain physical size
+        function setupPhysicalSize() {
             const root = document.documentElement;
-            const screenHeight = window.innerHeight;
-            const deviceHeight = 720; // Device height in pixels
-            const padding = 100; // Padding for controls
 
-            let scale = Math.min(1, (screenHeight - padding) / deviceHeight);
-            root.style.setProperty('--device-scale', scale);
+            // Get device pixel ratio
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            root.style.setProperty('--device-pixel-ratio', devicePixelRatio);
+
+            // Create a test element to measure physical mm
+            const testElement = document.createElement('div');
+            testElement.style.width = '1mm';
+            testElement.style.height = '1mm';
+            testElement.style.position = 'absolute';
+            testElement.style.visibility = 'hidden';
+            document.body.appendChild(testElement);
+
+            // Get actual pixels per mm
+            const pixelsPerMm = testElement.offsetWidth;
+            document.body.removeChild(testElement);
+
+            // Calculate screen dimensions
+            const physicalWidth = 67.8; // TCL 508 width in mm
+            const physicalHeight = 147.7; // TCL 508 height in mm
+
+            // Set pixel dimensions based on physical size
+            const simulator = document.querySelector('.simulator');
+            if (simulator) {
+                simulator.style.width = `${physicalWidth}mm`;
+                simulator.style.height = `${physicalHeight}mm`;
+            }
         }
 
-        window.addEventListener('load', adjustSimulatorScale);
-        window.addEventListener('resize', adjustSimulatorScale);
+        window.addEventListener('load', setupPhysicalSize);
+        window.addEventListener('resize', setupPhysicalSize);
     </script>
 </head>
 <body>
