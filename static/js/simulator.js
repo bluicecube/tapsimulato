@@ -155,14 +155,15 @@ function updateTaskList() {
             </div>
         `;
 
-        // Make the entire task item clickable except for delete button
-        taskItem.addEventListener('click', (e) => {
-            if (!e.target.closest('.delete-task-btn')) {
-                loadTask(task);
-                // Update active state
-                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-                taskItem.classList.add('active');
-            }
+        // Add click handler to the entire task item except delete button
+        const taskSpan = taskItem.querySelector('span');
+        taskSpan.style.cursor = 'pointer';
+        taskSpan.addEventListener('click', () => {
+            loadTask(task);
+            // Update active state
+            document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
+            taskItem.classList.add('active');
+            logLiveConsole(`Loaded task: ${task.name}`, 'info');
         });
 
         // Add delete functionality
@@ -818,7 +819,7 @@ function generateGCode() {
         // Convert pixel coordinates to physical coordinates (mm)
         const physicalX = (pixelX / DEVICE_WIDTH) * PHYSICAL_WIDTH;
         const physicalY = (pixelY / DEVICE_HEIGHT) * PHYSICAL_HEIGHT;
-        return { 
+        return {
             x: Math.max(0, Math.min(PHYSICAL_WIDTH, physicalX)),  // Clamp to physical boundaries
             y: Math.max(0, Math.min(PHYSICAL_HEIGHT, physicalY))
         };
@@ -887,7 +888,7 @@ function handleMessage(message) {
 
     switch (message.command) {
         case 'create_task_with_blocks':
-            // Create new task
+            // Create new task with proper initialization
             const task = {
                 id: `task-${Date.now()}`,
                 name: message.params.taskName || 'New Task',
@@ -898,7 +899,7 @@ function handleMessage(message) {
 
             // Add the task to tasks array
             tasks.push(task);
-            currentTask = task; // Set as current task immediately
+            currentTask = task;
 
             // Add blocks if provided
             if (message.params.blocks && Array.isArray(message.params.blocks)) {
@@ -906,7 +907,7 @@ function handleMessage(message) {
                     if (blockData.type === 'tap') {
                         const tapBlock = {
                             type: 'tap',
-                            region: null, // Will be set during selection
+                            region: null,
                             name: 'Tap Block'
                         };
                         task.blocks.push(tapBlock);
@@ -922,53 +923,11 @@ function handleMessage(message) {
                 });
             }
 
-            // Update UI
-            loadTask(task); // Use loadTask instead of manual UI update
+            // Update UI and save
+            loadTask(task);
             saveTasksToStorage();
             updateTaskList();
             logLiveConsole(`Created new task: ${task.name} with ${task.blocks.length} blocks`, 'success');
-            break;
-
-        case 'add_blocks':
-            if (!currentTask) {
-                logLiveConsole('No task selected to add blocks to', 'error');
-                return;
-            }
-
-            if (message.params.blocks && Array.isArray(message.params.blocks)) {
-                message.params.blocks.forEach(blockData => {
-                    if (blockData.type === 'tap') {
-                        const tapBlock = {
-                            type: 'tap',
-                            region: null,
-                            name: 'Tap Block'
-                        };
-                        currentTask.blocks.push(tapBlock);
-                    } else if (blockData.type === 'loop') {
-                        const loopBlock = {
-                            type: 'loop',
-                            iterations: blockData.iterations || 1,
-                            blocks: [],
-                            name: 'Loop Block'
-                        };
-                        currentTask.blocks.push(loopBlock);
-                    }
-                });
-
-                // Refresh the task display using`loadTask`
-                loadTask(currentTask);
-                saveTasksToStorage();
-                updateTaskList();
-                logLiveConsole(`Added ${message.params.blocks.length} blocks to task: ${currentTask.name}`, 'success');
-            }
-            break;
-
-        case 'execute':
-            if (currentTask) {
-                executeSelectedTask();
-            } else {
-                logLiveConsole('No task selected to execute', 'error');
-            }
             break;
 
         case 'load_task':
@@ -980,51 +939,13 @@ function handleMessage(message) {
                 logLiveConsole(`Task '${message.params.taskName}' not found`, 'error');
             }
             break;
-    }
-}
 
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    taskList.innerHTML = '';
-
-    tasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = 'task-list-item';
-        if (currentTask && currentTask.id === task.id) {
-            taskItem.classList.add('active');
-        }
-
-        taskItem.innerHTML = `
-            <span>${task.name}</span>
-            <div>
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">
-                    <i data-feather="trash-2"></i>
-                </button>
-            </div>
-        `;
-
-        // Make the entire task item clickable except for delete button
-        taskItem.addEventListener('click', (e) => {
-            if (!e.target.closest('.delete-task-btn')) {
-                loadTask(task);
-                // Update active state
-                document.querySelectorAll('.task-list-item').forEach(item => item.classList.remove('active'));
-                taskItem.classList.add('active');
+        case 'execute':
+            if (currentTask) {
+                executeSelectedTask();
+            } else {
+                logLiveConsole('No task selected to execute', 'error');
             }
-        });
-
-        // Add delete functionality
-        const deleteBtn = taskItem.querySelector('.delete-task-btn');
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteTask(task);
-        });
-
-        taskList.appendChild(taskItem);
-    });
-
-    // Initialize Feather icons for the new elements
-    if (window.feather) {
-        feather.replace();
+            break;
     }
 }
