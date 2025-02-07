@@ -374,35 +374,6 @@ function updateTaskList() {
     });
 }
 
-// Add delete all tasks functionality
-document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to delete all tasks?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/tasks/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all tasks');
-
-        // Clear tasks from state
-        state.tasks = [];
-        state.currentTask = null;
-
-        // Create a new task
-        const newTask = await createNewTask();
-        await loadTask(newTask.id);
-
-        updateTaskList();
-        updateTaskDisplay();
-        logToConsole('All tasks deleted and new task created', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all tasks', 'error');
-    }
-});
-
 
 // Block Management
 function startTapRegionSelection(blockElement) {
@@ -830,10 +801,10 @@ function renderBlock(block, index) {
                 <h6 class="mb-0">Conditional Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
-                        ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
+                        ${block.data?.referenceImage ? 'Update Reference' : 'Capture Reference'}
                     </button>
                     <input type="number" class="form-control form-control-sm threshold-input" 
-                           value="${block.data.threshold}" min="0" max="100" style="width: 70px">
+                           value="${block.data?.threshold || 90}" min="0" max="100" style="width: 70px">
                     <span class="ms-2 me-2">% similar</span>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
@@ -856,57 +827,76 @@ function renderBlock(block, index) {
             </div>
         `;
 
-        // Add event listeners
+        // Add delete functionality
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Rest of conditional block event handlers remain unchanged...
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
-        captureBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const imageData = captureVideoFrame();
+        if (captureBtn) {
+            captureBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const imageData = captureVideoFrame();
 
-            try {
-                const response = await fetch(`/api/blocks/${block.id}/reference-image`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageData })
-                });
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/reference-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: imageData })
+                    });
 
-                if (!response.ok) throw new Error('Failed to save reference image');
+                    if (!response.ok) throw new Error('Failed to save reference image');
 
-                block.data.referenceImage = imageData;
-                captureBtn.textContent = 'Update Reference';
-                scheduleAutosave();
-                logToConsole('Reference image captured', 'success');
-            } catch (error) {
-                logToConsole('Failed to save reference image', 'error');
-            }
-        });
+                    block.data.referenceImage = imageData;
+                    captureBtn.textContent = 'Update Reference';
+                    scheduleAutosave();
+                    logToConsole('Reference image captured', 'success');
+                } catch (error) {
+                    logToConsole('Failed to save reference image', 'error');
+                }
+            });
+        }
 
-        // Add threshold change handler
         const thresholdInput = blockDiv.querySelector('.threshold-input');
-        thresholdInput.addEventListener('change', (e) => {
-            block.data.threshold = parseInt(e.target.value) || 90;
-            scheduleAutosave();
-        });
+        if (thresholdInput) {
+            thresholdInput.addEventListener('change', (e) => {
+                block.data.threshold = parseInt(e.target.value) || 90;
+                scheduleAutosave();
+            });
+        }
 
         // Add buttons for then/else blocks
         ['then', 'else'].forEach(section => {
-            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
-                addTapBlock(index, `${section}Blocks`);
-            });
+            const tapBtn = blockDiv.querySelector(`.add-${section}-tap-btn`);
+            const loopBtn = blockDiv.querySelector(`.add-${section}-loop-btn`);
 
-            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
-                addLoopBlock(index, `${section}Blocks`);
-            });
+            if (tapBtn) {
+                tapBtn.addEventListener('click', () => {
+                    addTapBlock(index, `${section}Blocks`);
+                });
+            }
+
+            if (loopBtn) {
+                loopBtn.addEventListener('click', () => {
+                    addLoopBlock(index, `${section}Blocks`);
+                });
+            }
         });
 
         // Render nested blocks
-        if (block.data.thenBlocks) {
+        if (block.data?.thenBlocks) {
             const thenContainer = blockDiv.querySelector('.then-blocks');
             block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
                 thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
             });
         }
 
-        if (block.data.elseBlocks) {
+        if (block.data?.elseBlocks) {
             const elseContainer = blockDiv.querySelector('.else-blocks');
             block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
