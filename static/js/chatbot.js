@@ -103,7 +103,7 @@ async function loadTask(taskId) {
 function updateTaskSelect() {
     const select = document.getElementById('taskSelect');
     select.innerHTML = '<option value="">Select a task...</option>' +
-        state.tasks.map(task => 
+        state.tasks.map(task =>
             `<option value="${task.id}">${task.name}</option>`
         ).join('');
 }
@@ -199,7 +199,7 @@ async function handleMessage(event) {
     showThinking();
 
     try {
-        if (!state.currentTask) {
+        if (!window.state.currentTask) {
             await createNewTask();
         }
 
@@ -279,7 +279,7 @@ function hideThinking() {
 }
 
 function processBlocks(blocks) {
-    if (!state.currentTask) return;
+    if (!window.state.currentTask) return;
 
     function createBlocks(blockDefs) {
         return blockDefs.map(def => {
@@ -303,7 +303,7 @@ function processBlocks(blocks) {
     }
 
     const newBlocks = createBlocks(blocks);
-    state.currentTask.blocks.push(...newBlocks);
+    window.state.currentTask.blocks.push(...newBlocks);
     updateTaskDisplay();
     scheduleAutosave();
 }
