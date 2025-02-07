@@ -42,16 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendChatBtn');
     const chatMessages = document.getElementById('chatMessages');
-    const newTaskBtn = document.getElementById('newTaskBtn');
-    const taskSelect = document.getElementById('taskSelect');
 
     if (!chatMessages) return;
 
     // Clear previous messages
     chatMessages.innerHTML = '';
-
-    // Initialize task selection
-    loadTasks();
 
     // Set up event listeners
     if (chatInput && sendButton) {
@@ -60,23 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') handleChatMessage();
         });
     }
-
-    if (newTaskBtn) {
-        newTaskBtn.addEventListener('click', createNewTask);
-    }
-
-    if (taskSelect) {
-        taskSelect.addEventListener('change', (e) => {
-            if (e.target.value) {
-                loadTask(parseInt(e.target.value));
-            }
-        });
-    }
-
-    // Show welcome message
-    setTimeout(() => {
-        addChatMessage('assistant', 'Hi! I can help you create tap sequences using tap and loop blocks. What would you like to do?');
-    }, 500);
 });
 
 // Add a message to the chat interface
@@ -536,19 +514,18 @@ function updateTaskDisplay() {
 }
 
 // Initialize when DOM is ready
-//document.addEventListener('DOMContentLoaded', initializeChat); // This is now handled in the new init
 
 // Export functions for external use
-window.addMessage = addChatMessage; // Use the new addChatMessage function
-window.handleMessage = handleChatMessage; // Use the new handleChatMessage function
+window.addMessage = addChatMessage; 
+window.handleMessage = handleChatMessage; 
 window.state = state;
-window.processBlocks = processBlocks; // Make processBlocks available externally
+window.processBlocks = processBlocks; 
 
 // Make the simulator's functions available to chatbot.js
 window.setBlockFocus = window.setBlockFocus || function() { console.warn('setBlockFocus not loaded'); };
 window.showSelectionBox = window.showSelectionBox || function() { console.warn('showSelectionBox not loaded'); };
 window.enableDrawingMode = window.enableDrawingMode || function() { console.warn('enableDrawingMode not loaded'); };
-const AUTOSAVE_DELAY = 2000; // 2 seconds
+const AUTOSAVE_DELAY = 2000; 
 const state = {
     tasks: [],
     currentTask: null,
