@@ -29,14 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('sendChatBtn');
 
     if (chatInput && sendButton) {
-        sendButton.addEventListener('click', handleChatMessage);
+        sendButton.addEventListener('click', () => handleChatMessage());
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleChatMessage();
         });
     }
 });
 
-// Add message to chat
+// Add message to chat interface
 function addMessage(role, content) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
@@ -48,15 +48,25 @@ function addMessage(role, content) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Add thinking indicator
-function addThinkingIndicator() {
+// Show thinking indicator
+function showThinking() {
     const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+
     const thinkingEl = document.createElement('div');
     thinkingEl.className = 'chat-thinking';
-    thinkingEl.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+    thinkingEl.id = 'thinkingIndicator';
+    thinkingEl.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
     chatMessages.appendChild(thinkingEl);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    return thinkingEl;
+}
+
+// Hide thinking indicator
+function hideThinking() {
+    const thinkingEl = document.getElementById('thinkingIndicator');
+    if (thinkingEl) {
+        thinkingEl.remove();
+    }
 }
 
 // Process blocks from AI response
@@ -72,7 +82,7 @@ function processBlocks(blocks) {
                 type: 'loop',
                 name: 'Loop Block',
                 iterations: block.iterations || 1,
-                blocks: block.blocks ? processBlocks(block.blocks) : []
+                blocks: block.blocks ? block.blocks : []
             };
         } else if (block.type === 'tap') {
             const region = calculateTapRegion(block.location);
@@ -142,15 +152,13 @@ function calculateTapRegion(description) {
         }
     }
 
-    // Default to middle if no match
     return locations.middle;
 }
 
 // Handle chat messages
 async function handleChatMessage() {
     const chatInput = document.getElementById('chatInput');
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatInput || !chatMessages) return;
+    if (!chatInput) return;
 
     const message = chatInput.value.trim();
     if (!message) return;
@@ -161,19 +169,8 @@ async function handleChatMessage() {
     // Add user message
     addMessage('user', message);
 
-    // Check for direct commands
-    if (['run', 'execute'].includes(message.toLowerCase())) {
-        if (typeof window.executeTask === 'function') {
-            addMessage('assistant', 'Executing current sequence...');
-            window.executeTask();
-        } else {
-            addMessage('assistant', 'Sorry, I cannot execute tasks at the moment.');
-        }
-        return;
-    }
-
     // Show thinking indicator
-    const thinkingEl = addThinkingIndicator();
+    showThinking();
 
     try {
         // Send request to OpenAI API
@@ -190,14 +187,11 @@ async function handleChatMessage() {
 
         if (!response.ok) throw new Error('Failed to get AI response');
         const data = await response.json();
-
-        // Remove thinking indicator
-        thinkingEl.remove();
+        hideThinking();
 
         try {
-            // Parse AI response
-            const aiMessage = data.choices[0].message.content;
-            const responseData = JSON.parse(aiMessage);
+            const assistantMessage = data.choices[0].message.content;
+            const responseData = JSON.parse(assistantMessage);
 
             // Add AI response to chat
             addMessage('assistant', responseData.message);
@@ -212,23 +206,16 @@ async function handleChatMessage() {
             }
         } catch (parseError) {
             console.error('Error parsing AI response:', parseError);
-            addMessage('assistant', 'I had trouble understanding that. Could you rephrase it?');
+            addMessage('assistant', data.choices[0].message.content);
         }
     } catch (error) {
         console.error('Chat error:', error);
-        thinkingEl.remove();
+        hideThinking();
         addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
     }
 }
 
-
-// Chat interface state
-const chatState = {
-    messages: [],
-    isThinking: false
-};
-
-// Make functions available to simulator
+// Export functions for simulator
 window.addMessage = addMessage;
 window.handleChatMessage = handleChatMessage;
 window.processBlocks = processBlocks;
@@ -473,7 +460,6 @@ function updateTaskDisplay() {
 }
 
 // Initialize when DOM is ready
-// Export functions for external use
 
 // Log messages to the console
 function logToConsole(message, type = 'info') {
