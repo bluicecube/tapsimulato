@@ -6,7 +6,7 @@ const state = {
     }
 };
 
-// Update the system prompt to reflect single task functionality
+// Update the system prompt to include execute command examples
 const SYSTEM_PROMPT = `You are a touchscreen task automation assistant. Help users create sequences using only two types of blocks:
 
 1. Tap Block: Defines a single tap action in a specific region of the screen
@@ -18,6 +18,7 @@ Examples:
 - "tap bottom 5 times" → Add loop with bottom taps
 - "tap the screen 3 times" → Create a loop block with iterations=3 containing a tap block
 - "tap top of screen" → Create a tap block with region set to the top portion
+- "run" or "execute" → Execute the current sequence
 
 Your responses should be in JSON format:
 {
@@ -105,6 +106,14 @@ async function handleMessage(event) {
     showThinking();
 
     try {
+        // Handle direct execute commands
+        if (['run', 'execute'].includes(message.toLowerCase())) {
+            hideThinking();
+            addMessage('assistant', 'Executing current sequence...');
+            window.executeSelectedTask && window.executeSelectedTask();
+            return;
+        }
+
         const messages = [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: message }
