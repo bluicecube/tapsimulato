@@ -862,23 +862,27 @@ async function addFunctionBlock(functionId) {
         return;
     }
 
-    // When adding function to task, initialize empty blocks with default values
-    const blocks = func.blocks.map(block => {
+    // Deep clone the function's blocks to maintain structure
+    function cloneBlock(block) {
         if (block.type === 'tap') {
             return {
-                ...block,
-                region: null, // Region will be set by user
-                description: 'Click to set region'
+                type: 'tap',
+                name: block.name || 'Tap Block',
+                description: 'Click to set region',
+                region: null // Region will be set by user
             };
         } else if (block.type === 'loop') {
             return {
-                ...block,
-                iterations: 1,
-                blocks: [] // Empty blocks array for nested blocks
+                type: 'loop',
+                name: block.name || 'Loop Block',
+                iterations: block.iterations || 1,
+                blocks: (block.blocks || []).map(cloneBlock)
             };
         }
         return block;
-    });
+    }
+
+    const blocks = func.blocks.map(cloneBlock);
 
     const block = {
         type: 'function',
