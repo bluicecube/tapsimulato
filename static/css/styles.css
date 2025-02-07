@@ -26,6 +26,9 @@ body {
     width: var(--device-width);
     flex: 0 0 var(--device-width);
     padding: 0 5px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
 }
 
 .control-column {
@@ -334,7 +337,7 @@ body {
 }
 
 .card-body {
-    padding: 0.5rem;
+    padding: 1rem;
 }
 
 .zoom-controls {
@@ -343,7 +346,6 @@ body {
     align-items: center;
     padding-top: 0.5rem;
 }
-
 
 .task-block {
     background-color: var(--bs-dark);
@@ -369,17 +371,7 @@ body {
     transform: scale(1.2);
 }
 
-.task-container {
-    display: flex;
-    gap: 1rem;
-}
-
-.task-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
+/* Task List Styles */
 .task-list-item {
     padding: 0.5rem;
     margin-bottom: 0.5rem;
