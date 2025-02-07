@@ -490,27 +490,38 @@ function renderBlock(block, index) {
             </div>
         `;
 
+        // Add event listeners with stopPropagation
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        addTapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
+        addLoopBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
         if (removeBtn) {
-            removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
         }
 
-        // Add event listeners for nested block buttons
-        blockDiv.querySelector('.add-tap-to-function-btn').addEventListener('click', () => {
-            addBlockToFunction('tap', blockDiv);
-        });
-
-        blockDiv.querySelector('.add-loop-to-function-btn').addEventListener('click', () => {
-            addBlockToFunction('loop', blockDiv);
-        });
-
+        // Render nested blocks
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
         if (block.blocks) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
-
     } else if (block.type === 'tap') {
         const regionText = block.region ?
             `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
@@ -537,17 +548,21 @@ function renderBlock(block, index) {
 
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
         if (removeBtn) {
-            removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
         }
 
-        blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+        blockDiv.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
             enableDrawingMode(block, blockDiv);
         });
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls"> <!-- New wrapper div -->
+                <div class="iteration-controls">
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
                         <input type="number" class="form-control iterations-input"
@@ -565,7 +580,8 @@ function renderBlock(block, index) {
         const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
         const increaseBtn = blockDiv.querySelector('.increase-iterations');
 
-        decreaseBtn.addEventListener('click', () => {
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
                 iterationsInput.value = currentValue - 1;
@@ -574,7 +590,8 @@ function renderBlock(block, index) {
             }
         });
 
-        increaseBtn.addEventListener('click', () => {
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             iterationsInput.value = currentValue + 1;
             block.iterations = currentValue + 1;
@@ -582,6 +599,7 @@ function renderBlock(block, index) {
         });
 
         iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
             const value = parseInt(e.target.value) || 1;
             if (value < 1) {
                 e.target.value = 1;
@@ -594,7 +612,10 @@ function renderBlock(block, index) {
 
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
         if (removeBtn) {
-            removeBtn.addEventListener('click', () => removeBlock(blockDiv));
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
         }
 
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
@@ -814,12 +835,21 @@ function addBlockToFunction(type, parentElement = null) {
         parentElement.querySelector('.nested-blocks') : 
         document.getElementById('functionBlocks');
 
+    if (!container) {
+        logToConsole('Error: Could not find container for new block', 'error');
+        return;
+    }
+
     const block = {
         type: type,
         name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
-        // For function creation, we don't set region or iterations initially
         data: {} // Empty data object for now
     };
+
+    if (type === 'loop') {
+        block.iterations = 1;
+        block.blocks = [];
+    }
 
     const blockElement = document.createElement('div');
     blockElement.className = `block ${type}-block`;
@@ -828,121 +858,907 @@ function addBlockToFunction(type, parentElement = null) {
         blockElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
-                <div class="input-group" style="width: auto;">
-                    <input type="number" class="form-control form-control-sm iterations-input" 
-                           value="1" min="1" style="width: 70px">
-                    <span class="input-group-text">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input" 
+                               value="1" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
                 </div>
             </div>
             <div class="nested-blocks mt-2"></div>
             <div class="btn-group mt-2 w-100">
-                <button class="btn btn-sm btn-outline-primary add-tap-to-loop-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-to-loop-btn">Add Loop</button>
+                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
             </div>
         `;
 
         // Add event listeners for nested block buttons
-        blockElement.querySelector('.add-tap-to-loop-btn').addEventListener('click', () => {
+        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
             addBlockToFunction('tap', blockElement);
         });
-        blockElement.querySelector('.add-loop-to-loop-btn').addEventListener('click', () => {
+
+        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
             addBlockToFunction('loop', blockElement);
         });
 
-        // Add event listener for iterations input
+        // Add event listeners for iterations
         const iterationsInput = blockElement.querySelector('.iterations-input');
-        iterationsInput.addEventListener('change', (e) => {
-            block.data.iterations = parseInt(e.target.value) || 1;
+        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
+        const increaseBtn = blockElement.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+            }
         });
-    } else {
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+        });
+    } else { // Tap block
         blockElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Tap Block</h6>
-                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
+                    <button<button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
             </div>
+            <small class="text-muted">No region set</small>
         `;
+
+        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            enableDrawingMode(block, blockElement);
+        });
     }
 
-    blockElement.querySelector('.remove-block-btn').addEventListener('click', () => {
+    // Add remove button handler
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
         blockElement.remove();
     });
 
     container.appendChild(blockElement);
 }
 
-async function saveFunction() {
-    const nameInput = document.getElementById('functionName');
-    const descriptionInput = document.getElementById('functionDescription');
-    const blocksContainer = document.getElementById('functionBlocks');
+// Update the renderBlock function's function block section
+function renderBlock(block, index) {
+    const blockDiv = document.createElement('div');
+    blockDiv.className = `block ${block.type}-block`;
+    blockDiv.dataset.index = index;
 
-    const name = nameInput.value.trim();
-    const description = descriptionInput.value.trim();
+    if (block.type === 'function') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${block.name}</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">${block.description || ''}</small>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
+        `;
 
-    if (!name) {
-        logToConsole('Function name is required', 'error');
+        // Add event listeners with stopPropagation
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        addTapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
+        addLoopBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Render nested blocks
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'tap') {
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            'No region set';
+
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">Region: ${regionText}</small>
+        `;
+
+        blockDiv.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                setBlockFocus(block, blockDiv);
+            }
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        blockDiv.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            enableDrawingMode(block, blockDiv);
+        });
+    } else if (block.type === 'loop') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input"
+                            value="${block.iterations}" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+        `;
+
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+                scheduleAutosave();
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+            scheduleAutosave();
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    }
+
+    return blockDiv;
+}
+
+function enableDrawingMode(block, blockDiv) {
+    startTapRegionSelection(blockDiv);
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+}
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
+
+// Task Execution
+function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
         return;
     }
 
-    // Collect blocks from the container with nested structure
-    function collectBlocks(container) {
-        return Array.from(container.children).map(blockElement => {
-            const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
-            const block = {
-                type,
-                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
-            };
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800; // Increased delay between actions for better visibility
 
-            if (type === 'loop') {
-                const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.iterations = parseInt(iterationsInput.value) || 1;
-
-                const nestedContainer = blockElement.querySelector('.nested-blocks');
-                if (nestedContainer) {
-                    block.blocks = collectBlocks(nestedContainer);
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
                 }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                setTimeout(() => {
+                    showTapFeedback(block.region);
+                    logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
+                }, delay);
             }
-            return block;
         });
     }
 
-    const blocks = collectBlocks(blocksContainer);
+    executeBlocks(state.currentTask.blocks);
+
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + delayIncrement);
+}
+
+// Utilities
+function showTapFeedback(region) {
+    const centerX = (region.x1 + region.x2) / 2;
+    const centerY = (region.y1 + region.y2) / 2;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${centerX}px`;
+    feedback.style.top = `${centerY}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+
+    // Remove the feedback element after animation completes
+    feedback.addEventListener('animationend', () => feedback.remove());
+}
+
+function setupVideoSharing() {
+    const video = document.getElementById('bgVideo');
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
+        try {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Screen sharing error: ' + error.message, 'error');
+        }
+    });
+}
+
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        blocks: state.currentTask.blocks
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save blocks');
+                logToConsole('Task autosaved', 'success');
+            } catch (error) {
+                logToConsole('Failed to autosave task', 'error');
+            }
+        }
+    }, 2000);
+}
+
+async function deleteTask(taskId) {
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');
+        return;
+    }
 
     try {
-        const response = await fetch('/api/functions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name,
-                description,
-                blocks
-            })
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
         });
 
-        if (!response.ok) throw new Error('Failed to save function');
+        if (!response.ok) throw new Error('Failed to delete task');
 
-        const savedFunction = await response.json();
-        functions.push(savedFunction);
-        updateFunctionsList();
+        // Remove task from state
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskList();
 
-        // Close modal and reset form
-        const modal = document.getElementById('functionModal');
-        const bsModal = bootstrap.Modal.getInstance(modal);
-        if (bsModal) {
-            bsModal.hide();
-        } else {
-            const newModal = new bootstrap.Modal(modal);
-            newModal.hide();        }
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
         }
 
-        nameInput.value = '';
-        descriptionInput.value = '';
-        blocksContainer.innerHTML = '';
+        logToConsole('Task deleted successfully', 'success');
 
-        logToConsole('Function saved successfully', 'success');
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
     } catch (error) {
-        logToConsole('Error saving function: ' + error.message, 'error');
+        logToConsole('Error deleting task', 'error');
     }
+}
+
+// Add delete button event listener 
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
+    deleteTask(taskId);
+});
+
+// Add new function to show selection box for existing region
+function showSelectionBox(region) {
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) return;
+
+    selectionBox.style.left = `${region.x1}px`;
+    selectionBox.style.top = `${region.y1}px`;
+    selectionBox.style.width = `${region.x2 - region.x1}px`;
+    selectionBox.style.height = `${region.y2 - region.y1}px`;
+    selectionBox.classList.remove('d-none');
+}
+
+// Add these new functions for function management
+async function loadFunctions() {
+    try {
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
+
+        functions = await response.json();
+        updateFunctionsList();
+    } catch (error) {
+        logToConsole('Error loading functions', 'error');
+    }
+}
+
+function updateFunctionsList() {
+    const functionsList = document.getElementById('functionsList');
+    functionsList.innerHTML = functions.map(func => `
+        <li>
+            <a class="dropdown-item" href="#" onclick="addFunctionBlock(${func.id})">${func.name}</a>
+        </li>
+    `).join('') || '<li><span class="dropdown-item">No functions available</span></li>';
+}
+
+// Function creation handling
+function addBlockToFunction(type, parentElement = null) {
+    const container = parentElement ? 
+        parentElement.querySelector('.nested-blocks') : 
+        document.getElementById('functionBlocks');
+
+    if (!container) {
+        logToConsole('Error: Could not find container for new block', 'error');
+        return;
+    }
+
+    const block = {
+        type: type,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`,
+        data: {} // Empty data object for now
+    };
+
+    if (type === 'loop') {
+        block.iterations = 1;
+        block.blocks = [];
+    }
+
+    const blockElement = document.createElement('div');
+    blockElement.className = `block ${type}-block`;
+
+    if (type === 'loop') {
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input" 
+                               value="1" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners for nested block buttons
+        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockElement);
+        });
+
+        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockElement);
+        });
+
+        // Add event listeners for iterations
+        const iterationsInput = blockElement.querySelector('.iterations-input');
+        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
+        const increaseBtn = blockElement.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+        });
+    } else { // Tap block
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">No region set</small>
+        `;
+
+        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            enableDrawingMode(block, blockElement);
+        });
+    }
+
+    // Add remove button handler
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        blockElement.remove();
+    });
+
+    container.appendChild(blockElement);
+}
+
+// Update the renderBlock function's function block section
+function renderBlock(block, index) {
+    const blockDiv = document.createElement('div');
+    blockDiv.className = `block ${block.type}-block`;
+    blockDiv.dataset.index = index;
+
+    if (block.type === 'function') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${block.name}</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">${block.description || ''}</small>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners with stopPropagation
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        addTapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
+        addLoopBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Render nested blocks
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'tap') {
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            'No region set';
+
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">Region: ${regionText}</small>
+        `;
+
+        blockDiv.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                setBlockFocus(block, blockDiv);
+            }
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        blockDiv.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            enableDrawingMode(block, blockDiv);
+        });
+    } else if (block.type === 'loop') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input"
+                            value="${block.iterations}" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+        `;
+
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+                scheduleAutosave();
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+            scheduleAutosave();
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    }
+
+    return blockDiv;
+}
+
+function enableDrawingMode(block, blockDiv) {
+    startTapRegionSelection(blockDiv);
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+}
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
+
+// Task Execution
+function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800; // Increased delay between actions for better visibility
+
+    function executeBlocks(blocks) {
+        blocks.forEach(block => {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                setTimeout(() => {
+                    showTapFeedback(block.region);
+                    logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
+                }, delay);
+            }
+        });
+    }
+
+    executeBlocks(state.currentTask.blocks);
+
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + delayIncrement);
+}
+
+// Utilities
+function showTapFeedback(region) {
+    const centerX = (region.x1 + region.x2) / 2;
+    const centerY = (region.y1 + region.y2) / 2;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${centerX}px`;
+    feedback.style.top = `${centerY}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+
+    // Remove the feedback element after animation completes
+    feedback.addEventListener('animationend', () => feedback.remove());
+}
+
+function setupVideoSharing() {
+    const video = document.getElementById('bgVideo');
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
+        try {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Screen sharing error: ' + error.message, 'error');
+        }
+    });
+}
+
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        blocks: state.currentTask.blocks
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save blocks');
+                logToConsole('Task autosaved', 'success');
+            } catch (error) {
+                logToConsole('Failed to autosave task', 'error');
+            }
+        }
+    }, 2000);
+}
+
+async function deleteTask(taskId) {
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete task');
+
+        // Remove task from state
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskList();
+
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
+        }
+
+        logToConsole('Task deleted successfully', 'success');
+
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
+    } catch (error) {
+        logToConsole('Error deleting task', 'error');
+    }
+}
+
+// Add delete button event listener 
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
+    deleteTask(taskId);
+});
+
+// Add new function to show selection box for existing region
+function showSelectionBox(region) {
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) return;
+
+    selectionBox.style.left = `${region.x1}px`;
+    selectionBox.style.top = `${region.y1}px`;
+    selectionBox.style.width = `${region.x2 - region.x1}px`;
+    selectionBox.style.height = `${region.y2 - region.y1}px`;
+    selectionBox.classList.remove('d-none');
+}
+
+// Add these new functions for function management
+async function loadFunctions() {
+    try {
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
+
+        functions = await response.json();
+        updateFunctionsList();
+    } catch (error) {
+        logToConsole('Error loading functions', 'error');
+    }
+}
+
+function updateFunctionsList() {
+    const functionsList = document.getElementById('functionsList');
+    functionsList.innerHTML = functions.map(func => `
+        <li>
+            <a class="dropdown-item" href="#" onclick="addFunctionBlock(${func.id})">${func.name}</a>
+        </li>
+    `).join('') || '<li><span class="dropdown-item">No functions available</span></li>';
 }
 
 async function addFunctionBlock(functionId) {
