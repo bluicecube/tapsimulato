@@ -919,8 +919,10 @@ async function executeTask() {
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
                 }, delay);
             } else if (block.type === 'conditional') {
-                const currentImage = captureVideoFrame();                try {
-                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {                    method: 'POST',
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: currentImage })
                 });
@@ -1024,4 +1026,21 @@ async function addFunctionToTask(func) {
     updateTaskDisplay();
     scheduleAutosave();
     logToConsole(`Added function: ${func.name}`, 'success');
+}
+
+// Add autosave functionality
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                await saveCurrentTask();
+            } catch (error) {
+                console.error('Autosave failed:', error);
+            }
+        }
+    }, 1000);
 }
