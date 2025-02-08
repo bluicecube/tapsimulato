@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
     document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
     document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
     document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
@@ -702,7 +701,7 @@ function renderBlock(block, index) {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="header-clickable d-flex align-items-center" style="flex: 1">
-                    <h6 class="mb-0">${block.name}</h6>
+                    <h6 class="mb-0">${block.name || 'Function Block'}</h6>
                     <span class="collapse-indicator">▼</span>
                 </div>
                 <div class="btn-group">
@@ -720,11 +719,18 @@ function renderBlock(block, index) {
         // Add click handler for collapse
         const header = blockDiv.querySelector('.header-clickable');
         const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+        const indicator = blockDiv.querySelector('.collapse-indicator');
 
         header.addEventListener('click', (e) => {
             if (!e.target.closest('.btn')) {
                 blockDiv.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
+                if (blockDiv.classList.contains('collapsed')) {
+                    nestedBlocks.style.maxHeight = '0';
+                    indicator.style.transform = 'rotate(-90deg)';
+                } else {
+                    nestedBlocks.style.maxHeight = nestedBlocks.scrollHeight + 'px';
+                    indicator.style.transform = 'rotate(0)';
+                }
             }
         });
 
@@ -756,7 +762,7 @@ function renderBlock(block, index) {
 
         // Render nested blocks
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
+        if (block.blocks && block.blocks.length > 0) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
@@ -774,7 +780,7 @@ function renderBlock(block, index) {
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
                         <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
+                            value="${block.iterations || 1}" min="1">
                         <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
                     </div>
                     <span class="ms-2">times</span>
@@ -787,11 +793,18 @@ function renderBlock(block, index) {
         // Add click handler for collapse
         const header = blockDiv.querySelector('.header-clickable');
         const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+        const indicator = blockDiv.querySelector('.collapse-indicator');
 
         header.addEventListener('click', (e) => {
             if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
                 blockDiv.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
+                if (blockDiv.classList.contains('collapsed')) {
+                    nestedBlocks.style.maxHeight = '0';
+                    indicator.style.transform = 'rotate(-90deg)';
+                } else {
+                    nestedBlocks.style.maxHeight = nestedBlocks.scrollHeight + 'px';
+                    indicator.style.transform = 'rotate(0)';
+                }
             }
         });
 
@@ -834,7 +847,7 @@ function renderBlock(block, index) {
 
         // Render nested blocks
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
+        if (block.blocks && block.blocks.length > 0) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
@@ -931,7 +944,7 @@ function renderBlock(block, index) {
         }
 
         if (block.data.elseBlocks) {
-            const elseContainer = blockDiv.querySelector('..else-blocks');
+            const elseContainer = blockDiv.querySelector('.else-blocks');
             block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
