@@ -16,6 +16,98 @@ window.state = {
 // Functions state
 let functions = [];
 
+// Add serialization functions
+function serializeBlock(block) {
+    const serializedBlock = {
+        type: block.type,
+        name: block.name || null,
+        data: {},
+        order: block.order || 0
+    };
+
+    // Save type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.region) {
+                serializedBlock.data.region = block.region;
+            }
+            break;
+        case 'loop':
+            serializedBlock.data.iterations = block.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'function':
+            serializedBlock.data.functionId = block.functionId;
+            serializedBlock.data.description = block.description;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'conditional':
+            serializedBlock.data.threshold = block.data.threshold;
+            if (block.data.referenceImage) {
+                serializedBlock.data.referenceImage = block.data.referenceImage;
+            }
+            if (block.data.thenBlocks && block.data.thenBlocks.length > 0) {
+                serializedBlock.data.thenBlocks = block.data.thenBlocks.map(serializeBlock);
+            }
+            if (block.data.elseBlocks && block.data.elseBlocks.length > 0) {
+                serializedBlock.data.elseBlocks = block.data.elseBlocks.map(serializeBlock);
+            }
+            break;
+        case 'url':
+            serializedBlock.data.url = block.url;
+            break;
+
+    }
+
+    return serializedBlock;
+}
+
+function deserializeBlock(block) {
+    const deserializedBlock = {
+        ...block,
+        type: block.type,
+    };
+
+    // Restore type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.data && block.data.region) {
+                deserializedBlock.region = block.data.region;
+            }
+            break;
+        case 'loop':
+            deserializedBlock.iterations = block.data?.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'function':
+            deserializedBlock.functionId = block.data?.functionId;
+            deserializedBlock.description = block.data?.description;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'conditional':
+            deserializedBlock.data = {
+                threshold: block.data.threshold,
+                referenceImage: block.data.referenceImage,
+                thenBlocks: block.data.thenBlocks ? block.data.thenBlocks.map(deserializeBlock) : [],
+                elseBlocks: block.data.elseBlocks ? block.data.elseBlocks.map(deserializeBlock) : []
+            };
+            break;
+        case 'url':
+            deserializedBlock.url = block.data.url;
+            break;
+    }
+
+    return deserializedBlock;
+}
+
 // State management
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
@@ -236,10 +328,11 @@ async function loadTask(taskId) {
         if (!response.ok) throw new Error('Failed to load task blocks');
 
         const blocks = await response.json();
+        console.log('Loaded blocks:', blocks);
 
         state.currentTask = {
             id: taskId,
-            blocks: blocks || []
+            blocks: blocks.map(deserializeBlock)
         };
 
         // Save last opened task ID
@@ -248,7 +341,7 @@ async function loadTask(taskId) {
 
         const taskTitle = document.getElementById('taskTitle');
         const currentTask = state.tasks.find(t => t.id === taskId);
-        if (currentTask) {
+        if (currentTask && taskTitle) {
             taskTitle.value = currentTask.name || '';
         }
 
@@ -265,7 +358,10 @@ async function loadTask(taskId) {
 // UI Updates
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
-    if (!taskList) return;
+    if (!taskList) {
+        console.warn('Task list element not found');
+        return;
+    }
 
     taskList.innerHTML = state.tasks.map(task => `
         <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
@@ -273,7 +369,7 @@ function updateTaskList() {
             <span>${task.name}</span>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-danger delete-task-btn" 
-                        onclick="deleteTask(${task.id})" title="Delete task">×</button>
+                        data-task-id="${task.id}">×</button>
             </div>
         </div>
     `).join('');
@@ -285,6 +381,15 @@ function updateTaskList() {
                 const taskId = parseInt(item.dataset.taskId);
                 loadTask(taskId);
             }
+        });
+    });
+
+    // Add delete handlers
+    taskList.querySelectorAll('.delete-task-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const taskId = parseInt(btn.dataset.taskId);
+            deleteTask(taskId);
         });
     });
 }
@@ -826,7 +931,7 @@ function renderBlock(block, index) {
         }
 
         if (block.data.elseBlocks) {
-            const elseContainer = blockDiv.querySelector('.else-blocks');
+            const elseContainer = blockDiv.querySelector('..else-blocks');
             block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
@@ -925,7 +1030,7 @@ async function executeTask() {
                 if (func && func.blocks) {
                     // Execute the function's blocks
                     await executeBlocks(func.blocks);
-                } else{
+                } else {
                     logToConsole(`Function "${block.name}" not found`, 'error');
                 }
             } else if (block.type === 'loop') {
@@ -1091,7 +1196,10 @@ function showSelectionBox(region) {
 // Update task list with active task highlighting
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
-    if (!taskList) return;
+    if (!taskList) {
+        console.warn('Task list element not found');
+        return;
+    }
 
     taskList.innerHTML = state.tasks.map(task => `
         <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
@@ -1099,7 +1207,7 @@ function updateTaskList() {
             <span>${task.name}</span>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-danger delete-task-btn" 
-                        onclick="deleteTask(${task.id})" title="Delete task">×</button>
+                        data-task-id="${task.id}">×</button>
             </div>
         </div>
     `).join('');
@@ -1113,6 +1221,15 @@ function updateTaskList() {
             }
         });
     });
+
+    // Add delete handlers
+    taskList.querySelectorAll('.delete-task-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const taskId = parseInt(btn.dataset.taskId);
+            deleteTask(taskId);
+        });
+    });
 }
 
 // Save current task function
@@ -1120,7 +1237,7 @@ async function saveCurrentTask() {
     if (!state.currentTask) return;
 
     try {
-        const blocks = state.currentTask.blocks;
+        const blocks = state.currentTask.blocks.map(serializeBlock);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
@@ -1475,6 +1592,17 @@ function collectBlockData(block) {
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
+    } else if (block.type === 'conditional') {
+        data.threshold = block.data.threshold;
+        data.referenceImage = block.data.referenceImage;
+        if (block.data.thenBlocks) {
+            data.thenBlocks = block.data.thenBlocks.map(b => collectBlockData(b));
+        }
+        if (block.data.elseBlocks) {
+            data.elseBlocks = block.data.elseBlocks.map(b => collectBlockData(b));
+        }
+    } else if (block.type === 'url') {
+        data.url = block.url;
     }
 
     return data;
