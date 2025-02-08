@@ -727,6 +727,10 @@ function renderBlock(block, index) {
             </div>
             <small class="text-muted">${block.description || ''}</small>
             <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
         `;
 
         // Add collapse button handler
@@ -738,8 +742,25 @@ function renderBlock(block, index) {
             scheduleAutosave();
         });
 
-        // Add delete handler
+        // Add event listeners for function block buttons
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
+
+        if (addTapBtn) {
+            addTapBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addBlockToFunction('tap', blockDiv);
+            });
+        }
+
+        if (addLoopBtn) {
+            addLoopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addBlockToFunction('loop', blockDiv);
+            });
+        }
+
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -920,8 +941,7 @@ function enableDrawingMode(block, blockDiv) {
     if (block.type === 'tap') {
         startTapRegionSelection(blockDiv);
         if (block.region) {
-            showSelectionBox(block.region);
-        }
+            showSelectionBox(block.region);        }
     }
 }
 
