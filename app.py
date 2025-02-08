@@ -192,29 +192,12 @@ def delete_all_tasks():
         app.logger.error(f"Error deleting all tasks: {str(e)}")
         return jsonify({'error': 'Failed to delete all tasks'}), 500
 
-@app.route('/api/tasks/<int:task_id>/blocks', methods=['GET', 'POST', 'PUT'])
+@app.route('/api/tasks/<int:task_id>/blocks', methods=['POST'])
 def save_blocks(task_id):
     try:
         task = Task.query.get_or_404(task_id)
-
-        if request.method == 'GET':
-            def format_block(block):
-                data = {
-                    'id': block.id,
-                    'type': block.type,
-                    'name': block.name,
-                    'data': block.data,
-                    'order': block.order
-                }
-                if block.type in ['loop', 'function']:
-                    data['blocks'] = [format_block(child) for child in sorted(block.children, key=lambda x: x.order)]
-                return data
-
-            blocks = Block.query.filter_by(task_id=task_id, parent_id=None).order_by(Block.order).all()
-            return jsonify([format_block(block) for block in blocks])
-
         data = request.json
-        blocks = data if isinstance(data, list) else data.get('blocks', [])
+        blocks = data.get('blocks', [])
 
         # Delete existing blocks
         Block.query.filter_by(task_id=task_id).delete()
@@ -245,6 +228,29 @@ def save_blocks(task_id):
         db.session.rollback()
         app.logger.error(f"Error saving blocks: {str(e)}")
         return jsonify({'error': 'Failed to save blocks'}), 500
+
+@app.route('/api/tasks/<int:task_id>/blocks', methods=['GET'])
+def get_blocks(task_id):
+    try:
+        task = Task.query.get_or_404(task_id)
+
+        def format_block(block):
+            data = {
+                'id': block.id,
+                'type': block.type,
+                'name': block.name,
+                'data': block.data,
+                'order': block.order
+            }
+            if block.type in ['loop', 'function']:
+                data['blocks'] = [format_block(child) for child in sorted(block.children, key=lambda x: x.order)]
+            return data
+
+        blocks = Block.query.filter_by(task_id=task_id, parent_id=None).order_by(Block.order).all()
+        return jsonify([format_block(block) for block in blocks])
+    except Exception as e:
+        app.logger.error(f"Error getting blocks: {str(e)}")
+        return jsonify({'error': 'Failed to load blocks'}), 500
 
 @app.route('/api/chat', methods=['POST'])
 def chat():

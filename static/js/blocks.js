@@ -1,95 +1,97 @@
-// Blocks management
-function addTapBlock() {
-    if (!window.state || !window.state.currentTask) {
-        console.error('No active task available');
-        return;
-    }
-
+function addTapBlock(parent) {
     const tapBlock = {
         type: 'tap',
-        name: 'Tap Block',
-        region: null
+        region: null,
+        name: 'Tap Block'
     };
+    parent.blocks.push(tapBlock);
 
-    if (!window.state.currentTask.blocks) {
-        window.state.currentTask.blocks = [];
-    }
-
-    window.state.currentTask.blocks.push(tapBlock);
-    if (typeof window.updateTaskDisplay === 'function') {
-        window.updateTaskDisplay();
-    }
-    if (typeof window.scheduleAutosave === 'function') {
-        window.scheduleAutosave();
-    }
-}
-
-function createTapBlockElement(tapBlock) {
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block tap-block';
+    blockDiv.draggable = true;
     blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Tap Block</h6>
-            <button class="btn btn-sm btn-outline-primary select-region-btn">
-                ${tapBlock.region ? 'Change Region' : 'Set Region'}
-            </button>
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${tapBlock.name}</h6>
         </div>
-        <small class="text-muted">Region: ${tapBlock.region ? JSON.stringify(tapBlock.region) : 'Not set'}</small>
     `;
 
-    blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
-        if (typeof window.enableDrawingMode === 'function') {
-            window.enableDrawingMode(tapBlock, blockDiv);
+    setupDragAndDrop(blockDiv);
+
+    blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
+        const index = parent.blocks.indexOf(tapBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Tap block removed', 'info');
         }
     });
+
+    // Click handler for the whole block to enable drawing mode
+    blockDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.delete-dot')) {
+            setBlockFocus(tapBlock, blockDiv);
+            enableDrawingMode(tapBlock, blockDiv);
+        }
+    });
+
+    // Auto-focus new tap block
+    setTimeout(() => {
+        setBlockFocus(tapBlock, blockDiv);
+        enableDrawingMode(tapBlock, blockDiv);
+    }, 0);
 
     return blockDiv;
 }
 
-function addLoopBlock() {
-    if (!window.state || !window.state.currentTask) {
-        console.error('No active task available');
-        return;
-    }
-
+function addLoopBlock(parent) {
     const loopBlock = {
         type: 'loop',
-        name: 'Loop Block',
         iterations: 1,
-        blocks: []
+        blocks: [],
+        name: 'Loop Block'
     };
+    parent.blocks.push(loopBlock);
 
-    if (!window.state.currentTask.blocks) {
-        window.state.currentTask.blocks = [];
-    }
-
-    window.state.currentTask.blocks.push(loopBlock);
-    if (typeof window.updateTaskDisplay === 'function') {
-        window.updateTaskDisplay();
-    }
-    if (typeof window.scheduleAutosave === 'function') {
-        window.scheduleAutosave();
-    }
-}
-
-function createLoopBlockElement(loopBlock) {
     const blockDiv = document.createElement('div');
     blockDiv.className = 'block loop-block';
     blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Loop Block</h6>
-            <input type="number" class="form-control form-control-sm iterations-input" 
-                value="${loopBlock.iterations}" min="1" style="width: 70px">
+        <div class="delete-dot"></div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="block-name" contenteditable="true">${loopBlock.name}</h6>
         </div>
-        <div class="nested-blocks mt-2"></div>
+        <div class="input-group mb-2">
+            <span class="input-group-text">Iterations</span>
+            <input type="number" class="form-control iterations-input" value="1" min="1">
+        </div>
+        <div class="nested-blocks"></div>
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+            <button class="btn btn-sm btn-outline-info add-print-btn">Add Print</button>
+        </div>
     `;
 
-    const iterationsInput = blockDiv.querySelector('.iterations-input');
-    iterationsInput.addEventListener('change', (e) => {
-        loopBlock.iterations = parseInt(e.target.value) || 1;
-        if (typeof window.scheduleAutosave === 'function') {
-            window.scheduleAutosave();
+    blockDiv.querySelector('.delete-dot').addEventListener('click', () => {
+        const index = parent.blocks.indexOf(loopBlock);
+        if (index > -1) {
+            parent.blocks.splice(index, 1);
+            blockDiv.remove();
+            logLiveConsole('Loop block removed', 'info');
         }
+    });
+
+    blockDiv.querySelector('.iterations-input').addEventListener('change', (e) => {
+        loopBlock.iterations = parseInt(e.target.value) || 1;
+    });
+
+    blockDiv.querySelector('.add-tap-btn').addEventListener('click', () => {
+        const tapDiv = addTapBlock(loopBlock);
+        blockDiv.querySelector('.nested-blocks').appendChild(tapDiv);
+    });
+
+    blockDiv.querySelector('.add-print-btn').addEventListener('click', () => {
+        const printDiv = addPrintBlock(loopBlock);
+        blockDiv.querySelector('.nested-blocks').appendChild(printDiv);
     });
 
     return blockDiv;
@@ -203,8 +205,3 @@ document.addEventListener('keydown', (e) => {
         disableDrawingMode();
     }
 });
-
-// Make functions available globally
-window.addTapBlock = addTapBlock;
-window.addLoopBlock = addLoopBlock;
-window.addPrintBlock = addPrintBlock;
