@@ -259,7 +259,6 @@ async function loadTask(taskId) {
                 case 'function':
                     deserializedBlock.functionId = block.data?.functionId;
                     deserializedBlock.description = block.data?.description;
-                    deserializedBlock.collapsed = block.data?.collapsed;
                     if (block.blocks && block.blocks.length > 0) {
                         deserializedBlock.blocks = block.blocks.map(deserializeBlock);
                     }
@@ -588,7 +587,6 @@ async function saveCurrentTask() {
                 case 'function':
                     serializedBlock.data.functionId = block.functionId;
                     serializedBlock.data.description = block.description;
-                    serializedBlock.data.collapsed = block.collapsed;
                     if (block.blocks && block.blocks.length > 0) {
                         serializedBlock.blocks = block.blocks.map(serializeBlock);
                     }
@@ -684,23 +682,22 @@ function renderBlock(block, index) {
 
     if (block.type === 'function') {
         blockDiv.innerHTML = `
-            <div class="block-header" onclick="toggleFunctionBlock(this)">
+            <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
-                <div class="btn-group ms-auto">
-                    <span class="collapse-arrow me-2">▼</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn" onclick="event.stopPropagation()">×</button>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
             <small class="text-muted">${block.description || ''}</small>
             <div class="nested-blocks mt-2"></div>
             <div class="btn-group mt-2 w-100">
-                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
             </div>
         `;
 
         // Add event listeners with stopPropagation
-        const addTapBtn = blockDiv.querySelector('.add-tap-btn');
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
         addTapBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             addBlockToFunction('tap', blockDiv);
@@ -708,7 +705,7 @@ function renderBlock(block, index) {
             scheduleAutosave();
         });
 
-        const addLoopBtn = blockDiv.querySelector('.add-loop-btn');
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
         addLoopBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             addBlockToFunction('loop', blockDiv);
@@ -730,11 +727,6 @@ function renderBlock(block, index) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
-        }
-
-        // Restore collapse state if it exists
-        if (block.collapsed) {
-            blockDiv.classList.add('collapsed');
         }
     } else if (block.type === 'tap') {
         return renderTapBlock(block, blockDiv, index);
@@ -931,7 +923,7 @@ function renderTapBlock(block, blockDiv, index) {
     });
 
     // Add dedicated button for region selection
-const setRegionBtn = blockDiv.querySelector('.set-region-btn');
+    const setRegionBtn = blockDiv.querySelector('.set-region-btn');
     setRegionBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startTapRegionSelection(blockDiv);
@@ -1033,22 +1025,7 @@ async function executeTask() {
     }, delay + delayIncrement);
 }
 
-// Add button to UI
-document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
-    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
-`);
-
-document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
-
-// Add beforeunload event listener
-window.addEventListener('beforeunload', async (e) => {
-    if (state.currentTask) {
-        e.preventDefault();
-        e.returnValue = '';
-        await saveCurrentTask();
-    }
-});
-
+// Utilities
 function showTapFeedback(region) {
     // Calculate random coordinates within the region
     const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
@@ -1066,216 +1043,95 @@ function showTapFeedback(region) {
     return { x, y };
 }
 
-function handleIterationsChange(block, value, iterationsInput) {
-    if (value < 1) {
-        iterationsInput.value = 1;
-        block.iterations = 1;
-    } else {
-        block.iterations = value;
-    }
-
-    // Save immediately after iterations change
-    saveCurrentTask().then(() => {
-        logToConsole('Iterations updated and saved', 'success');
-    }).catch(error => {
-        logToConsole('Failed to save iterations update', 'error');
-    });
-}
-
-async function addFunctionToTask(func) {
-    const block = {
-        type: 'function',
-        name: func.name,
-        description: func.description || '',
-        blocks: func.blocks,
-        functionId: func.id
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole(`Added function: ${func.name}`, 'success');
-}
-
-async function deleteFunction(functionId) {
-    try {
-        const response = await fetch(`/api/functions/${functionId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete function');
-
-        window.functions = window.functions.filter(f => f.id !== functionId);
-        updateFunctionsList();
-        logToConsole('Function deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting function', 'error');
-    }
-}
-
-async function deleteAllFunctions() {
-    if (!confirm('Are you sure you want to delete all functions?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/functions/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all functions');
-
-        window.functions = [];
-        updateFunctionsList();
-        logToConsole('All functions deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all functions', 'error');
-    }
-}
-
-// Add URL opening functionality at the end of the file
-function openUrlBlock(url) {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'url',
-        url: url || 'https://www.google.com',
-        description: 'Open URL'
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('URL block added', 'success');
-}
-
-function renderUrlBlock(block, blockDiv, index) {
-    blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">URL Block</h6>
-            <div class="btn-group">
-                <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
-                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-            </div>
-        </div>
-        <small class="text-muted url-text">${block.url || 'No URL set'}</small>
-    `;
-
-    // Add event handlers
-    const editUrlBtn = blockDiv.querySelector('.edit-url-btn');
-    editUrlBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const url = prompt('Enter URL:', block.url || 'https://www.google.com');
-        if (url) {
-            block.url = url;
-            blockDiv.querySelector('.url-text').textContent = url;
-            scheduleAutosave();
+// Fix the video sharing configuration
+function setupVideoSharing() {
+    const video = document.getElementById('bgVideo');
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
+        try {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
         }
     });
-
-    const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    removeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        removeBlock(blockDiv);
-    });
-
-    return blockDiv;
 }
 
-async function executeUrlBlock(block) {
-    if (!block.url) {
-        logToConsole('No URL specified for URL block', 'error');
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = message;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
+// Update scheduleAutosave to use the new save function
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                await saveCurrentTask();
+            } catch (error) {
+                console.error('Autosave failed:', error);
+            }
+        }
+    }, 1000);
+}
+
+async function deleteTask(taskId) {
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');
         return;
     }
 
     try {
-        window.open(block.url, '_blank');
-        logToConsole(`Opened URL: ${block.url}`, 'success');
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete task');
+
+        // Remove task from state
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskList();
+
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
+        }
+
+        logToConsole('Task deleted successfully', 'success');
+
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
     } catch (error) {
-        logToConsole(`Failed to open URL: ${error.message}`, 'error');
+        logToConsole('Error deleting task', 'error');
     }
 }
 
-function addUrlBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'url',
-        url: 'https://www.google.com'  // Default URL
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('URL block added', 'success');
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const addUrlBtn = document.createElement('button');
-    addUrlBtn.className = 'btn btn-outline-secondary';
-    addUrlBtn.textContent = 'Add URL';
-    addUrlBtn.id = 'addUrlBtn';
-
-    // Find the button group and add the new button
-    const btnGroup = document.querySelector('.btn-group.w-100.mb-3');
-    if (btnGroup) {
-        btnGroup.appendChild(addUrlBtn);
-        addUrlBtn.addEventListener('click', addUrlBlock);
-    }
+// Add delete button event listener 
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
+    deleteTask(taskId);
 });
 
-const originalRenderBlock = renderBlock;
-renderBlock = function(block, index) {
-    if (block.type === 'url') {
-        const blockDiv = document.createElement('div');
-        blockDiv.className = `block url-block`;
-        blockDiv.dataset.index = index;
-        return renderUrlBlock(block, blockDiv, index);
-    }
-    return originalRenderBlock(block, index);
-};
-
-const originalExecuteBlocks = executeBlocks;
-executeBlocks = async function(blocks) {
-    for (const block of blocks) {
-        if (block.type === 'url') {
-            await executeUrlBlock(block);
-        } else {
-            await originalExecuteBlocks([block]); // Execute single block using original function
-        }
-    }
-};
-
-// Add toggle function for function blocks
-window.toggleFunctionBlock = function(header) {
-    const blockDiv = header.closest('.function-block');
-    blockDiv.classList.toggle('collapsed');
-
-    // Update the block's collapsed state in the data model
-    const blockIndex = blockDiv.dataset.index;
-    const indices = blockIndex.split('.');
-    let currentBlocks = state.currentTask.blocks;
-
-    // Navigate to the correct block
-    for (let i = 0; i < indices.length; i++) {
-        const index = parseInt(indices[i]);
-        if (i === indices.length - 1) {
-            currentBlocks[index].collapsed = blockDiv.classList.contains('collapsed');
-        } else {
-            currentBlocks = currentBlocks[index].blocks;
-        }
-    }
-
-    // Save the state
-    scheduleAutosave();
-};
-
+// Add new function to show selection box for existing region
 function showSelectionBox(region) {
     const selectionBox = document.getElementById('selectionBox');
     if (!selectionBox) return;
@@ -1287,6 +1143,7 @@ function showSelectionBox(region) {
     selectionBox.classList.remove('d-none');
 }
 
+// Remove the current dropdown implementation and replace with new version
 function updateFunctionsList() {
     const functionsList = document.getElementById('functionsList');
     if (!functionsList) return;
@@ -1607,7 +1464,6 @@ function collectBlockData(block) {
     } else if (block.type === 'function') {
         data.description = block.description;
         data.functionId = block.functionId;
-        data.collapsed = block.collapsed;
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
@@ -1740,88 +1596,221 @@ async function executeTask() {
     }, delay + delayIncrement);
 }
 
-function setupVideoSharing() {
-    const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
+// Add button to UI
+document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
+    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
+`);
+
+document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+
+// Add beforeunload event listener
+window.addEventListener('beforeunload', async (e) => {
+    if (state.currentTask) {
+        e.preventDefault();
+        e.returnValue = '';
+        await saveCurrentTask();
+    }
+});
+
+function showTapFeedback(region) {
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+    feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
+}
+
+function handleIterationsChange(block, value, iterationsInput) {
+    if (value < 1) {
+        iterationsInput.value = 1;
+        block.iterations = 1;
+    } else {
+        block.iterations = value;
+    }
+
+    // Save immediately after iterations change
+    saveCurrentTask().then(() => {
+        logToConsole('Iterations updated and saved', 'success');
+    }).catch(error => {
+        logToConsole('Failed to save iterations update', 'error');
     });
 }
 
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = message;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
+async function addFunctionToTask(func) {
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: func.blocks,
+        functionId: func.id
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
 }
 
-function scheduleAutosave() {
-    if (state.autoSaveTimeout) {
-        clearTimeout(state.autoSaveTimeout);
+async function deleteFunction(functionId) {
+    try {
+        const response = await fetch(`/api/functions/${functionId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete function');
+
+        window.functions = window.functions.filter(f => f.id !== functionId);
+        updateFunctionsList();
+        logToConsole('Function deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting function', 'error');
     }
-
-    state.autoSaveTimeout = setTimeout(async () => {
-        if (state.currentTask) {
-            try {
-                await saveCurrentTask();
-            } catch (error) {
-                console.error('Autosave failed:', error);
-            }
-        }
-    }, 1000);
 }
 
-async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
+async function deleteAllFunctions() {
+    if (!confirm('Are you sure you want to delete all functions?')) {
         return;
     }
 
     try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
+        const response = await fetch('/api/functions/all', {
             method: 'DELETE'
         });
 
-        if (!response.ok) throw new Error('Failed to delete task');
+        if (!response.ok) throw new Error('Failed to delete all functions');
 
-        // Remove task from state
-        state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
-        logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
+        window.functions = [];
+        updateFunctionsList();
+        logToConsole('All functions deleted successfully', 'success');
     } catch (error) {
-        logToConsole('Error deleting task', 'error');
+        logToConsole('Error deleting all functions', 'error');
     }
 }
 
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
+// Add URL opening functionality at the end of the file
+function openUrlBlock(url) {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'url',
+        url: url || 'https://www.google.com',
+        description: 'Open URL'
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('URL block added', 'success');
+}
+
+function renderUrlBlock(block, blockDiv, index) {
+    blockDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">URL Block</h6>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
+                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+            </div>
+        </div>
+        <small class="text-muted url-text">${block.url || 'No URL set'}</small>
+    `;
+
+    // Add event handlers
+    const editUrlBtn = blockDiv.querySelector('.edit-url-btn');
+    editUrlBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = prompt('Enter URL:', block.url || 'https://www.google.com');
+        if (url) {
+            block.url = url;
+            blockDiv.querySelector('.url-text').textContent = url;
+            scheduleAutosave();
+        }
+    });
+
+    const removeBtn = blockDiv.querySelector('.remove-block-btn');
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeBlock(blockDiv);
+    });
+
+    return blockDiv;
+}
+
+async function executeUrlBlock(block) {
+    if (!block.url) {
+        logToConsole('No URL specified for URL block', 'error');
+        return;
+    }
+
+    try {
+        window.open(block.url, '_blank');
+        logToConsole(`Opened URL: ${block.url}`, 'success');
+    } catch (error) {
+        logToConsole(`Failed to open URL: ${error.message}`, 'error');
+    }
+}
+
+function addUrlBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'url',
+        url: 'https://www.google.com'  // Default URL
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('URL block added', 'success');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const addUrlBtn = document.createElement('button');
+    addUrlBtn.className = 'btn btn-outline-secondary';
+    addUrlBtn.textContent = 'Add URL';
+    addUrlBtn.id = 'addUrlBtn';
+
+    // Find the button group and add the new button
+    const btnGroup = document.querySelector('.btn-group.w-100.mb-3');
+    if (btnGroup) {
+        btnGroup.appendChild(addUrlBtn);
+        addUrlBtn.addEventListener('click', addUrlBlock);
+    }
 });
+
+const originalRenderBlock = renderBlock;
+renderBlock = function(block, index) {
+    if (block.type === 'url') {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `block url-block`;
+        blockDiv.dataset.index = index;
+        return renderUrlBlock(block, blockDiv, index);
+    }
+    return originalRenderBlock(block, index);
+};
+
+const originalExecuteBlocks = executeBlocks;
+executeBlocks = async function(blocks) {
+    for (const block of blocks) {
+        if (block.type === 'url') {
+            await executeUrlBlock(block);
+        } else {
+            await originalExecuteBlocks([block]); // Execute single block using original function
+        }
+    }
+};
