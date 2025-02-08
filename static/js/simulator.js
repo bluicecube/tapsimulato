@@ -11,7 +11,8 @@ window.state = {
     focusedBlock: null,
     lastTaskId: localStorage.getItem('lastTaskId'),
     currentFrame: null,
-    functionOverlaysEnabled: true // New state for function overlays
+    functionOverlaysEnabled: true,
+    executingBlocks: new Set() // Track executing blocks
 };
 
 // Functions state
@@ -266,15 +267,17 @@ document.addEventListener('DOMContentLoaded', () => {
         saveFunctionBtn.addEventListener('click', saveFunction);
     }
 
-    // Add function overlay control
-    const taskSection = document.getElementById('currentTask').parentElement;
-    const overlayControl = document.createElement('div');
-    overlayControl.className = 'function-overlay-control';
-    overlayControl.innerHTML = `
-        <input type="checkbox" id="functionOverlayToggle" checked>
-        <label for="functionOverlayToggle">Collapse Function Blocks</label>
-    `;
-    taskSection.insertBefore(overlayControl, taskSection.firstChild);
+    // Add function overlay control next to the function button
+    const functionBtn = document.querySelector('[data-bs-target="#functionModal"]');
+    if (functionBtn) {
+        const overlayControl = document.createElement('div');
+        overlayControl.className = 'function-overlay-control';
+        overlayControl.innerHTML = `
+            <input type="checkbox" id="functionOverlayToggle" checked>
+            <label for="functionOverlayToggle">Collapse Function Blocks</label>
+        `;
+        functionBtn.parentNode.insertBefore(overlayControl, functionBtn);
+    }
 
     // Add event listener for overlay toggle
     document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
@@ -739,6 +742,7 @@ function renderBlock(block, index) {
                 <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
             </div>
             <div class="function-overlay">
+                <div class="execution-indicator"></div>
                 <div class="function-overlay-text">${block.name}</div>
             </div>
         `;
@@ -1042,27 +1046,33 @@ async function executeTask() {
     let delay = 0;
     const delayIncrement = 800;
 
-    async function executeBlocks(blocks) {
-        for (const block of blocks) {
+    async function executeBlocks(blocks, parentIndex = null) {
+        for (const [index, block] of blocks.entries()) {
+            const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+            const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+
+            if (blockElement) {
+                blockElement.classList.add('executing');
+            }
+
             if (block.type === 'function') {
-                // Find the function definition
                 const func = functions.find(f => f.name === block.name);
                 if (func && func.blocks) {
-                    // Execute the function's blocks
-                    await executeBlocks(func.blocks);
+                    await executeBlocks(func.blocks, blockIndex);
                 } else {
                     logToConsole(`Function "${block.name}" not found`, 'error');
                 }
             } else if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
-                    await executeBlocks(block.blocks);
+                    await executeBlocks(block.blocks, blockIndex);
                 }
             } else if (block.type === 'tap' && block.region) {
                 delay += delayIncrement;
-                setTimeout(() => {
+                await new Promise(resolve => setTimeout(() => {
                     const coords = showTapFeedback(block.region);
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                }, delay);
+                    resolve();
+                }, delayIncrement));
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
                 try {
@@ -1079,20 +1089,22 @@ async function executeTask() {
                         block.data.thenBlocks : block.data.elseBlocks;
 
                     logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
-                    await executeBlocks(blocksToExecute);
+                    await executeBlocks(blocksToExecute, blockIndex);
                 } catch (error) {
                     logToConsole('Error executing conditional block: ' + error.message, 'error');
                 }
             } else if (block.type === 'url') {
                 await executeUrlBlock(block);
             }
+
+            if (blockElement) {
+                blockElement.classList.remove('executing');
+            }
         }
     }
 
     await executeBlocks(state.currentTask.blocks);
-    setTimeout(() => {
-        logToConsole('Task execution completed', 'success');
-    }, delay + delayIncrement);
+    logToConsole('Task execution completed', 'success');
 }
 
 // Utilities
@@ -1676,27 +1688,33 @@ async function executeTask() {
     let delay = 0;
     const delayIncrement = 800;
 
-    async function executeBlocks(blocks) {
-        for (const block of blocks) {
+    async function executeBlocks(blocks, parentIndex = null) {
+        for (const [index, block] of blocks.entries()) {
+            const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+            const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+
+            if (blockElement) {
+                blockElement.classList.add('executing');
+            }
+
             if (block.type === 'function') {
-                // Find the function definition
                 const func = functions.find(f => f.name === block.name);
                 if (func && func.blocks) {
-                    // Execute the function's blocks
-                    await executeBlocks(func.blocks);
+                    await executeBlocks(func.blocks, blockIndex);
                 } else {
                     logToConsole(`Function "${block.name}" not found`, 'error');
                 }
             } else if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
-                    await executeBlocks(block.blocks);
+                    await executeBlocks(block.blocks, blockIndex);
                 }
             } else if (block.type === 'tap' && block.region) {
                 delay += delayIncrement;
-                setTimeout(() => {
+                await new Promise(resolve => setTimeout(() => {
                     const coords = showTapFeedback(block.region);
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                }, delay);
+                    resolve();
+                }, delayIncrement));
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
                 try {
@@ -1713,20 +1731,22 @@ async function executeTask() {
                         block.data.thenBlocks : block.data.elseBlocks;
 
                     logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
-                    await executeBlocks(blocksToExecute);
+                    await executeBlocks(blocksToExecute, blockIndex);
                 } catch (error) {
                     logToConsole('Error executing conditional block: ' + error.message, 'error');
                 }
             } else if (block.type === 'url') {
                 await executeUrlBlock(block);
             }
+
+            if (blockElement) {
+                blockElement.classList.remove('executing');
+            }
         }
     }
 
     await executeBlocks(state.currentTask.blocks);
-    setTimeout(() => {
-        logToConsole('Task execution completed', 'success');
-    }, delay + delayIncrement);
+    logToConsole('Task execution completed', 'success');
 }
 
 // Add button to UI
