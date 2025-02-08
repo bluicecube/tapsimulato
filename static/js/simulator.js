@@ -941,7 +941,7 @@ function renderBlock(block, index) {
         if (block.data.thenBlocks) {
             const thenContainer = blockDiv.querySelector('.thenblocks');
             block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
-                thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
+                thenContainer.appendChild(renderBlock(`nestedBlock, `${index}.then.${nestedIndex}`));
             });
         }
 
@@ -1239,7 +1239,6 @@ function showSelectionBox(region) {
     selectionBox.classList.remove('d-none');
 }
 
-// Update task list with active task highlighting
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
     if (!taskList) {
@@ -1890,7 +1889,7 @@ function openUrlBlock(url) {
 
 function renderUrlBlock(block, blockDiv, index) {
     blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
+        <<div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">URL Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>

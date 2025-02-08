@@ -147,38 +147,6 @@ body {
     padding: 10px;
     font-family: monospace;
     font-size: 0.875rem;
-    transition: height 0.3s ease;
-}
-
-.live-console.collapsed {
-    height: 38px;
-}
-
-.console-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.console-header:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.console-content {
-    margin-top: 5px;
-    padding-top: 5px;
-    border-top: 1px solid var(--bs-secondary);
-}
-
-.console-collapse-icon {
-    transition: transform 0.3s ease;
-}
-
-.live-console.collapsed .console-collapse-icon {
-    transform: rotate(-90deg);
 }
 
 /* Selection box */
