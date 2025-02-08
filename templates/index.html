@@ -38,6 +38,12 @@
                             </div>
                         </div>
                         <div class="card-body">
+                            <!-- Function Overlay Control -->
+                            <div class="function-overlay-control mb-3">
+                                <input type="checkbox" id="functionOverlayToggle" checked>
+                                <label for="functionOverlayToggle">Collapse Function Blocks</label>
+                            </div>
+
                             <!-- Task Title -->
                             <div class="mb-3">
                                 <input type="text" id="taskTitle" class="form-control" placeholder="Task Name">
@@ -48,10 +54,6 @@
                                 <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
                                 <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
                                 <button class="btn btn-outline-info" id="addConditionalBtn">Add Logic</button>
-                                <div class="function-overlay-control">
-                                    <input type="checkbox" id="functionOverlayToggle" checked>
-                                    <label for="functionOverlayToggle">Collapse Function Blocks</label>
-                                </div>
                                 <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#functionModal">
                                     Create New Function
                                 </button>
