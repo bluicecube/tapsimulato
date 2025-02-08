@@ -924,7 +924,7 @@ async function executeTask() {
 
                     if (!response.ok) throw new Error('Failed to compare images');
 
-                    const result = await response.json();
+                                        const result = await response.json();
                     const blocksToExecute = result.similarity >= result.threshold ?
                         block.data.thenBlocks : block.data.elseBlocks;
 
@@ -1061,61 +1061,45 @@ function showSelectionBox(region) {
     selectionBox.classList.remove('d-none');
 }
 
-// Add these new functions for function management
-async function loadFunctions() {
-    try {
-        const response = await fetch('/api/functions');
-        if (!response.ok) throw new Error('Failed to load functions');
-
-        functions = await response.json();
-        updateFunctionsList();
-    } catch (error) {
-        logToConsole('Error loading functions', 'error');
-    }
-}
-
+// Remove the current dropdown implementation and replace with new version
 function updateFunctionsList() {
     const functionsList = document.getElementById('functionsList');
-    const addFunctionBtn = document.getElementById('addFunctionBtn');
-
     if (!functionsList) return;
 
-    // Clear existing items
+    // Clear existing content
     functionsList.innerHTML = '';
 
-    // Add delete all functions option if there are functions
-    if (window.functions && window.functions.length > 0) {
+    // Add "Delete All" option if there are functions
+    if (functions && functions.length > 0) {
+        // Add delete all button
         const deleteAllItem = document.createElement('li');
         deleteAllItem.innerHTML = `
-            <button class="dropdown-item text-danger" type="button">
-                <i class="fas fa-trash-alt"></i> Delete All Functions
-            </button>
+            <div class="dropdown-item">
+                <button class="btn btn-danger btn-sm w-100" id="deleteAllFunctionsBtn">
+                    Delete All Functions
+                </button>
+            </div>
         `;
-        deleteAllItem.addEventListener('click', deleteAllFunctions);
         functionsList.appendChild(deleteAllItem);
 
         // Add divider
         const divider = document.createElement('li');
         divider.innerHTML = '<hr class="dropdown-divider">';
         functionsList.appendChild(divider);
-    }
 
-    // Add function items
-    if (window.functions && window.functions.length > 0) {
-        window.functions.forEach(func => {
+        // Add each function with its delete button
+        functions.forEach(func => {
             const item = document.createElement('li');
-            item.className = 'd-flex justify-content-between align-items-center px-2';
             item.innerHTML = `
-                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
-                    ${func.name}
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
-                        data-function-id="${func.id}" title="Delete function">×</button>
+                <div class="dropdown-item d-flex justify-content-between align-items-center">
+                    <span class="function-name" style="cursor: pointer">${func.name}</span>
+                    <button class="btn btn-danger btn-sm delete-function-btn ms-2">×</button>
+                </div>
             `;
 
-            // Add function to task
-            const functionBtn = item.querySelector('.function-item');
-            functionBtn.addEventListener('click', () => {
+            // Add function to task when name is clicked
+            const nameSpan = item.querySelector('.function-name');
+            nameSpan.addEventListener('click', () => {
                 if (!state.currentTask) {
                     logToConsole('Please create or select a task first', 'error');
                     return;
@@ -1123,7 +1107,7 @@ function updateFunctionsList() {
                 addFunctionToTask(func);
             });
 
-            // Delete function
+            // Delete function when delete button is clicked
             const deleteBtn = item.querySelector('.delete-function-btn');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1133,47 +1117,38 @@ function updateFunctionsList() {
             functionsList.appendChild(item);
         });
     } else {
+        // Show "No functions" message if no functions exist
         const emptyItem = document.createElement('li');
-        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
+        emptyItem.innerHTML = '<span class="dropdown-item text-muted">No functions available</span>';
         functionsList.appendChild(emptyItem);
     }
+
+    // Add delete all functions event handler
+    const deleteAllBtn = document.getElementById('deleteAllFunctionsBtn');
+    if (deleteAllBtn) {
+        deleteAllBtn.addEventListener('click', deleteAllFunctions);
+    }
 }
 
-async function deleteFunction(functionId) {
+// Update the functions array and refresh the list
+async function loadFunctions() {
     try {
-        const response = await fetch(`/api/functions/${functionId}`, {
-            method: 'DELETE'
-        });
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
 
-        if (!response.ok) throw new Error('Failed to delete function');
-
-        window.functions = window.functions.filter(f => f.id !== functionId);
+        functions = await response.json();
         updateFunctionsList();
-        logToConsole('Function deleted successfully', 'success');
     } catch (error) {
-        logToConsole('Error deleting function', 'error');
+        console.error('Error loading functions:', error);
+        logToConsole('Failed to load functions', 'error');
     }
 }
 
-async function deleteAllFunctions() {
-    if (!confirm('Are you sure you want to delete all functions?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/functions/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all functions');
-
-        window.functions = [];
-        updateFunctionsList();
-        logToConsole('All functions deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all functions', 'error');
-    }
-}
+// Make sure to call loadFunctions when the page loads and after any function changes
+document.addEventListener('DOMContentLoaded', () => {
+    // Add to existing DOMContentLoaded event listener
+    loadFunctions();
+});
 
 // Previous code remains unchanged
 
@@ -1604,4 +1579,40 @@ async function addFunctionToTask(func) {
     updateTaskDisplay();
     scheduleAutosave();
     logToConsole(`Added function: ${func.name}`, 'success');
+}
+
+async function deleteFunction(functionId) {
+    try {
+        const response = await fetch(`/api/functions/${functionId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete function');
+
+        window.functions = window.functions.filter(f => f.id !== functionId);
+        updateFunctionsList();
+        logToConsole('Function deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting function', 'error');
+    }
+}
+
+async function deleteAllFunctions() {
+    if (!confirm('Are you sure you want to delete all functions?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/functions/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all functions');
+
+        window.functions = [];
+        updateFunctionsList();
+        logToConsole('All functions deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting all functions', 'error');
+    }
 }
