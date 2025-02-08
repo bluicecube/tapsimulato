@@ -918,25 +918,26 @@ async function executeTask() {
                     const coords = showTapFeedback(block.region);
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
                 }, delay);
-            } else if (block.type === 'conditional') {
+            } else if (block.type=== 'conditional') {
                 const currentImage = captureVideoFrame();
                 try {
                     const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: currentImage })
-                });
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
 
-                if (!response.ok) throw new Error('Failed to compare images');
+                    if (!response.ok) throw new Error('Failed to compare images');
 
-                const result = await response.json();
-                const blocksToExecute = result.similarity >= result.threshold ?
-                    block.data.thenBlocks : block.data.elseBlocks;
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
 
-                logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
-                await executeBlocks(blocksToExecute);
-            } catch (error) {
-                logToConsole('Error executing conditional block: ' + error.message, 'error');
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
             }
         }
     }
@@ -1043,4 +1044,41 @@ function scheduleAutosave() {
             }
         }
     }, 1000);
+}
+
+// Add back the task deletion functionality
+async function deleteTask(taskId) {
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete task');
+
+        // Remove task from state
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskList();
+
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
+        }
+
+        logToConsole('Task deleted successfully', 'success');
+
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        } else {
+            await createNewTask();
+        }
+    } catch (error) {
+        logToConsole('Error deleting task', 'error');
+    }
 }
