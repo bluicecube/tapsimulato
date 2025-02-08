@@ -335,13 +335,274 @@ function generateRandomCoordinates() {
     };
 }
 
-// Placeholder functions -  These need to be defined elsewhere in your actual code.
-function updateTaskList() {}
-function updateTaskDisplay() {}
-function scheduleAutosave() {}
-function executeTask() {}
-function addTapBlock() {}
-function addLoopBlock() {}
+// Implement the missing functions at the bottom of the file
+
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
+
+    taskList.innerHTML = '';
+    state.tasks.forEach(task => {
+        const taskElement = document.createElement('div');
+        taskElement.className = `task-list-item ${state.currentTask?.id === task.id ? 'active' : ''}`;
+        taskElement.innerHTML = `
+            <span class="task-name">${task.name}</span>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary load-task-btn">Load</button>
+                <button class="btn btn-sm btn-outline-danger delete-task-btn">Delete</button>
+            </div>
+        `;
+
+        taskElement.querySelector('.load-task-btn').addEventListener('click', async () => {
+            await loadTask(task.id);
+            const taskTitle = document.getElementById('taskTitle');
+            if (taskTitle) {
+                taskTitle.value = task.name;
+            }
+        });
+
+        taskElement.querySelector('.delete-task-btn').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete this task?')) {
+                // Remove task from local storage
+                localStorage.removeItem(`task_${task.id}_blocks`);
+                state.tasks = state.tasks.filter(t => t.id !== task.id);
+                localStorage.setItem('tasks', JSON.stringify(state.tasks));
+
+                // If this was the current task, create a new one
+                if (state.currentTask?.id === task.id) {
+                    createNewTask();
+                }
+                updateTaskList();
+            }
+        });
+
+        taskList.appendChild(taskElement);
+    });
+}
+
+function updateTaskDisplay() {
+    const currentTaskElement = document.getElementById('currentTask');
+    const taskTitle = document.getElementById('taskTitle');
+    if (!currentTaskElement || !state.currentTask) return;
+
+    // Update task title
+    if (taskTitle) {
+        const currentTask = state.tasks.find(t => t.id === state.currentTask.id);
+        taskTitle.value = currentTask ? currentTask.name : '';
+    }
+
+    currentTaskElement.innerHTML = '';
+
+    function renderBlock(block) {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `block ${block.type}-block`;
+
+        if (block.type === 'tap') {
+            const regionText = block.region ?
+                `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+                'No region set';
+
+            blockDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">${block.name || 'Tap Block'}</h6>
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">
+                        ${block.region ? 'Change Region' : 'Set Region'}
+                    </button>
+                </div>
+                <small class="text-muted">Region: ${regionText}</small>
+            `;
+
+            blockDiv.querySelector('.select-region-btn').addEventListener('click', () => {
+                enableDrawingMode(block, blockDiv);
+            });
+        } else if (block.type === 'loop') {
+            blockDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">${block.name || 'Loop Block'}</h6>
+                    <div class="d-flex align-items-center">
+                        <input type="number" class="form-control form-control-sm iterations-input"
+                            value="${block.iterations || 1}" min="1" style="width: 70px">
+                        <span class="ms-2">times</span>
+                    </div>
+                </div>
+                <div class="nested-blocks mt-2"></div>
+            `;
+
+            const iterationsInput = blockDiv.querySelector('.iterations-input');
+            iterationsInput.addEventListener('change', (e) => {
+                block.iterations = parseInt(e.target.value) || 1;
+                scheduleAutosave();
+            });
+
+            const nestedContainer = blockDiv.querySelector('.nested-blocks');
+            if (block.blocks) {
+                block.blocks.forEach(nestedBlock => {
+                    nestedContainer.appendChild(renderBlock(nestedBlock));
+                });
+            }
+        }
+
+        return blockDiv;
+    }
+
+    if (state.currentTask.blocks) {
+        state.currentTask.blocks.forEach(block => {
+            currentTaskElement.appendChild(renderBlock(block));
+        });
+    }
+
+    scheduleAutosave();
+}
+
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+    state.autoSaveTimeout = setTimeout(() => {
+        saveCurrentTask();
+    }, 1000);
+}
+
+function addTapBlock() {
+    if (!state.currentTask) return;
+
+    const tapBlock = {
+        type: 'tap',
+        name: 'Tap Block',
+        region: null
+    };
+
+    if (!state.currentTask.blocks) {
+        state.currentTask.blocks = [];
+    }
+
+    state.currentTask.blocks.push(tapBlock);
+    updateTaskDisplay();
+    scheduleAutosave();
+
+    // Enable drawing mode for the new block
+    setTimeout(() => {
+        const blockElements = document.querySelectorAll('.tap-block');
+        const lastBlock = blockElements[blockElements.length - 1];
+        if (lastBlock) {
+            enableDrawingMode(tapBlock, lastBlock);
+        }
+    }, 0);
+}
+
+function addLoopBlock() {
+    if (!state.currentTask) return;
+
+    const loopBlock = {
+        type: 'loop',
+        name: 'Loop Block',
+        iterations: 1,
+        blocks: []
+    };
+
+    if (!state.currentTask.blocks) {
+        state.currentTask.blocks = [];
+    }
+
+    state.currentTask.blocks.push(loopBlock);
+    updateTaskDisplay();
+    scheduleAutosave();
+}
+
+function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks) {
+        logToConsole('No task to execute', 'error');
+        return;
+    }
+
+    async function executeBlocks(blocks, iterations = 1) {
+        for (let i = 0; i < iterations; i++) {
+            for (const block of blocks) {
+                if (block.type === 'tap' && block.region) {
+                    const centerX = (block.region.x1 + block.region.x2) / 2;
+                    const centerY = (block.region.y1 + block.region.y2) / 2;
+
+                    // Create tap feedback animation
+                    const feedback = document.createElement('div');
+                    feedback.className = 'tap-feedback';
+                    feedback.style.left = `${centerX}px`;
+                    feedback.style.top = `${centerY}px`;
+                    simulator.appendChild(feedback);
+
+                    // Remove the feedback element after animation
+                    feedback.addEventListener('animationend', () => {
+                        feedback.remove();
+                    });
+
+                    logToConsole(`Tapping at (${Math.round(centerX)}, ${Math.round(centerY)})`, 'info');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else if (block.type === 'loop' && block.blocks) {
+                    await executeBlocks(block.blocks, block.iterations || 1);
+                }
+            }
+        }
+    }
+
+    executeBlocks(state.currentTask.blocks)
+        .then(() => {
+            logToConsole('Task execution completed', 'success');
+        })
+        .catch(error => {
+            logToConsole(`Error executing task: ${error.message}`, 'error');
+        });
+}
+
+// Update the global function declarations
+window.processBlocks = function(blocks) {
+    console.log('Processing blocks:', blocks);
+    if (!window.state?.currentTask) {
+        console.error('No active task to add blocks to');
+        return false;
+    }
+
+    const processedBlocks = blocks.map(block => {
+        if (block.type === 'loop') {
+            return {
+                type: 'loop',
+                name: 'Loop Block',
+                iterations: block.iterations || 1,
+                blocks: block.blocks ? processBlocks(block.blocks) : []
+            };
+        } else if (block.type === 'tap') {
+            const region = calculateTapRegion(block.location);
+            return {
+                type: 'tap',
+                name: 'Tap Block',
+                region: region,
+                description: `Tap at ${block.location}`
+            };
+        }
+        return null;
+    }).filter(block => block !== null);
+
+    if (processedBlocks.length > 0) {
+        if (!state.currentTask.blocks) {
+            state.currentTask.blocks = [];
+        }
+        state.currentTask.blocks.push(...processedBlocks);
+        updateTaskDisplay();
+        scheduleAutosave();
+    }
+
+    return processedBlocks.length > 0;
+};
+
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    if (!console) return;
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
 function setupVideoSharing() {}
 function loadFunctions() {}
 function saveFunction() {}
@@ -350,6 +611,5 @@ function startSelection() {}
 function updateSelection() {}
 function stopSelection() {}
 function finishSelection() {}
-function logToConsole(message, type) {
-    console.log(message); //Basic log for demonstration.  Replace with actual logging.
-}
+function enableDrawingMode(block, blockDiv) {}
+function calculateTapRegion(location) {}
