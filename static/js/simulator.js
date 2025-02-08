@@ -240,6 +240,16 @@ async function loadTask(taskId) {
                 // Ensure all block data is properly loaded
                 if (block.type === 'tap' && block.data && block.data.region) {
                     block.region = block.data.region;
+                } else if (block.type === 'loop') {
+                    block.iterations = block.data?.iterations || 1;
+                    if (block.blocks) {
+                        block.blocks = block.blocks.map(b => {
+                            if (b.type === 'tap' && b.data && b.data.region) {
+                                b.region = b.data.region;
+                            }
+                            return b;
+                        });
+                    }
                 }
                 return block;
             }) || []
@@ -535,9 +545,30 @@ async function saveCurrentTask() {
     try {
         const blocks = state.currentTask.blocks.map(block => {
             const blockData = { ...block };
-            // Ensure region data is saved in the block's data field
+
+            // Ensure all block properties are saved in the data field
             if (block.type === 'tap' && block.region) {
-                blockData.data = { ...blockData.data, region: block.region };
+                blockData.data = { 
+                    ...blockData.data,
+                    region: block.region 
+                };
+            } else if (block.type === 'loop') {
+                blockData.data = {
+                    ...blockData.data,
+                    iterations: block.iterations || 1
+                };
+                if (block.blocks) {
+                    blockData.blocks = block.blocks.map(b => {
+                        const nestedBlockData = { ...b };
+                        if (b.type === 'tap' && b.region) {
+                            nestedBlockData.data = {
+                                ...nestedBlockData.data,
+                                region: b.region
+                            };
+                        }
+                        return nestedBlockData;
+                    });
+                }
             }
             return blockData;
         });
@@ -900,9 +931,7 @@ async function executeTask() {
 
     logToConsole('Starting task execution', 'info');
     let delay = 0;
-    const delayIncrement = 800;
-
-    async function executeBlocks(blocks) {
+    const delayIncrement = 800;async function executeBlocks(blocks) {
         for (const block of blocks) {
             if (block.type === 'function') {
                 // Find the function definition
@@ -922,7 +951,7 @@ async function executeTask() {
                 setTimeout(() => {
                     const coords = showTapFeedback(block.region);
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                },delay);
+                }, delay);
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
                 try {
