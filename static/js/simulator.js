@@ -918,7 +918,7 @@ async function executeTask() {
                 try {
                     const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'ContentType': 'application/json' },
                         body: JSON.stringify({ image: currentImage })
                     });
 
@@ -1176,6 +1176,35 @@ async function deleteAllFunctions() {
 }
 
 // Previous code remains unchanged
+
+async function addFunctionToTask(func) {
+    // Deep clone the function's blocks to ensure we don't modify the original
+    function cloneBlocks(blocks) {
+        return blocks.map(block => {
+            const clonedBlock = { ...block };
+            if (block.blocks) {
+                clonedBlock.blocks = cloneBlocks(block.blocks);
+            }
+            // Ensure tap blocks retain their region data
+            if (block.type === 'tap' && block.data && block.data.region) {
+                clonedBlock.region = block.data.region;
+            }
+            return clonedBlock;
+        });
+    }
+
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: cloneBlocks(func.blocks || [])
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
+}
 
 function addBlockToFunction(type, parentElement = null) {
     const container = parentElement ?
@@ -1593,11 +1622,26 @@ function handleIterationsChange(block, value, iterationsInput) {
 
 // Add addFunctionToTask function
 async function addFunctionToTask(func) {
+    // Deep clone the function's blocks to ensure we don't modify the original
+    function cloneBlocks(blocks) {
+        return blocks.map(block => {
+            const clonedBlock = { ...block };
+            if (block.blocks) {
+                clonedBlock.blocks = cloneBlocks(block.blocks);
+            }
+            // Ensure tap blocks retain their region data
+            if (block.type === 'tap' && block.data && block.data.region) {
+                clonedBlock.region = block.data.region;
+            }
+            return clonedBlock;
+        });
+    }
+
     const block = {
         type: 'function',
         name: func.name,
         description: func.description || '',
-        blocks: func.blocks
+        blocks: cloneBlocks(func.blocks || [])
     };
 
     state.currentTask.blocks.push(block);
