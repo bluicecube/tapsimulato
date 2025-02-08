@@ -1965,13 +1965,51 @@ renderBlock = function(block, index) {
     return originalRenderBlock(block, index);
 };
 
-const originalExecuteBlocks = executeBlocks;
-executeBlocks = async function(blocks) {
-    for (const block of blocks) {
-        if (block.type === 'url') {
-            await executeUrlBlock(block);
-        } else {
-            await originalExecuteBlocks([block]); // Execute single block using original function
+async function executeBlocks(blocks, parentIndex = null) {
+    for (const [index, block] of blocks.entries()) {
+        const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+        const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+
+        if (blockElement) {
+            blockElement.classList.add('executing');
+            state.executingBlocks.add(blockElement);
+        }
+
+        try {
+            const region = block.region || (block.data && block.data.region);
+            const iterations = block.iterations || (block.data && block.data.iterations) || 1;
+            const nestedBlocks = block.blocks || (block.data && block.data.blocks) || [];
+
+            if (block.type === 'url') {
+                await executeUrlBlock(block);
+            } else if (block.type === 'function') {
+                const func = functions.find(f => f.id === block.functionId);
+                if (func && func.blocks) {
+                    await executeBlocks(func.blocks, `${blockIndex}.func`);
+                } else {
+                    logToConsole(`Function not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < iterations; i++) {
+                    logToConsole(`Loop iteration ${i + 1}/${iterations}`, 'info');
+                    await executeBlocks(nestedBlocks, `${blockIndex}.${i}`);
+                }
+            } else if (block.type === 'tap' && region) {
+                await new Promise(resolve => {
+                    setTimeout(() => {
+                        const coords = showTapFeedback(region);
+                        logToConsole(`Tapped at (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                        resolve();
+                    }, 800);
+                });
+            }
+        } catch (error) {
+            logToConsole(`Error executing block: ${error.message}`, 'error');
+        } finally {
+            if (blockElement) {
+                blockElement.classList.remove('executing');
+                state.executingBlocks.delete(blockElement);
+            }
         }
     }
-};
+}
