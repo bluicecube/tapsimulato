@@ -111,8 +111,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup video sharing
     setupVideoSharing();
 
-    // Load functions and tasks
+    // Load functions immediately
     loadFunctions();
+
+    // Load tasks
     loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
     });
@@ -127,6 +129,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveFunctionBtn = document.getElementById('saveFunctionBtn');
     if (saveFunctionBtn) {
         saveFunctionBtn.addEventListener('click', saveFunction);
+    }
+
+    // Initialize function dropdown
+    const addFunctionBtn = document.getElementById('addFunctionBtn');
+    if (addFunctionBtn) {
+        addFunctionBtn.addEventListener('click', () => {
+            console.log('Function button clicked');
+            updateFunctionsList();
+        });
     }
 });
 
@@ -922,7 +933,7 @@ async function executeTask() {
                 for (let i = 0; i < block.iterations; i++) {
                     await executeBlocks(block.blocks);
                 }
-            } else if (block.type === 'tap' && block.region) {
+            } else if (block.type === 'tap'` && block.region) {
                 delay += delayIncrement;
                 setTimeout(() => {
                     const coords = showTapFeedback(block.region);
@@ -1090,16 +1101,23 @@ async function loadFunctions() {
 }
 
 function updateFunctionsList() {
+    console.log('Updating functions list');
     const functionsList = document.getElementById('functionsList');
     const addFunctionBtn = document.getElementById('addFunctionBtn');
 
-    if (!functionsList) return;
+    if (!functionsList) {
+        console.error('Functions list element not found');
+        return;
+    }
+
+    console.log('Current functions:', window.functions);
 
     // Clear existing items
     functionsList.innerHTML = '';
 
     // Add delete all functions option if there are functions
     if (window.functions && window.functions.length > 0) {
+        console.log(`Found ${window.functions.length} functions`);
         const deleteAllItem = document.createElement('li');
         deleteAllItem.innerHTML = `
             <button class="dropdown-item text-danger" type="button">
@@ -1113,11 +1131,10 @@ function updateFunctionsList() {
         const divider = document.createElement('li');
         divider.innerHTML = '<hr class="dropdown-divider">';
         functionsList.appendChild(divider);
-    }
 
-    // Add function items
-    if (window.functions && window.functions.length > 0) {
+        // Add function items
         window.functions.forEach(func => {
+            console.log('Adding function to menu:', func.name);
             const item = document.createElement('li');
             item.className = 'd-flex justify-content-between align-items-center px-2';
             item.innerHTML = `
@@ -1130,7 +1147,8 @@ function updateFunctionsList() {
 
             // Add function to task
             const functionBtn = item.querySelector('.function-item');
-            functionBtn.addEventListener('click', () => {
+            functionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 if (!state.currentTask) {
                     logToConsole('Please create or select a task first', 'error');
                     return;
@@ -1148,6 +1166,7 @@ function updateFunctionsList() {
             functionsList.appendChild(item);
         });
     } else {
+        console.log('No functions available');
         const emptyItem = document.createElement('li');
         emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
         functionsList.appendChild(emptyItem);
