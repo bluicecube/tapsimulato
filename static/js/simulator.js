@@ -85,6 +85,10 @@ function serializeBlock(block) {
         order: block.order || 0
     };
 
+    if (block.collapsed !== undefined) {
+        serializedBlock.collapsed = block.collapsed;
+    }
+
     // Save type-specific data
     switch (block.type) {
         case 'tap':
@@ -130,6 +134,7 @@ function deserializeBlock(block) {
     const deserializedBlock = {
         ...block,
         type: block.type,
+        collapsed: block.collapsed || false
     };
 
     // Restore type-specific data
@@ -697,44 +702,45 @@ function setBlockFocus(block, blockDiv) {
 // Enhanced render block function with better iteration controls
 function renderBlock(block, index) {
     const blockDiv = document.createElement('div');
-    blockDiv.className = `block ${block.type}-block`;
+    blockDiv.className = `block ${block.type}-block ${block.collapsed ? 'collapsed' : ''}`;
     blockDiv.dataset.index = index;
 
     if (block.type === 'function') {
-        blockDiv.innerHTML = `
+        // Create overlay div
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.textContent = block.name;
+        overlay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            block.collapsed = false;
+            blockDiv.classList.remove('collapsed');
+            scheduleAutosave();
+        });
+        blockDiv.appendChild(overlay);
+
+        blockDiv.innerHTML += `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary collapse-block-btn">Collapse</button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
             <small class="text-muted">${block.description || ''}</small>
             <div class="nested-blocks mt-2"></div>
-            <div class="btn-group mt-2 w-100">
-                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
-            </div>
         `;
 
+        // Add collapse button handler
+        const collapseBtn = blockDiv.querySelector('.collapse-block-btn');
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            block.collapsed = true;
+            blockDiv.classList.add('collapsed');
+            scheduleAutosave();
+        });
+
         // Add event listeners
-        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
-        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
-
-        if (addTapBtn) {
-            addTapBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                addBlockToFunction('tap', blockDiv);
-            });
-        }
-
-        if (addLoopBtn) {
-            addLoopBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                addBlockToFunction('loop', blockDiv);
-            });
-        }
-
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1524,7 +1530,8 @@ async function addFunctionBlock(functionId) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks, // Store the function's blocks for reference
-        functionId: func.id
+        functionId: func.id,
+        collapsed: false // Initially not collapsed
     };
 
     state.currentTask.blocks.push(block);
@@ -1536,7 +1543,8 @@ async function addFunctionBlock(functionId) {
 function collectBlockData(block) {
     const data = {
         type: block.type,
-        name: block.name
+        name: block.name,
+        collapsed: block.collapsed
     };
 
     if (block.type === 'tap' && block.region) {
@@ -1738,7 +1746,8 @@ async function addFunctionToTask(func) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks,
-        functionId: func.id
+        functionId: func.id,
+        collapsed: false // Initially not collapsed
     };
 
     state.currentTask.blocks.push(block);
@@ -1900,3 +1909,68 @@ executeBlocks = async function(blocks) {
         }
     }
 };
+
+function renderLoopBlock(block, blockDiv, index) {
+    blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input"
+                            value="${block.iterations}" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+        `;
+
+        // Add event listeners
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+
+        if (iterationsInput && decreaseBtn && increaseBtn) {
+            decreaseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const currentValue = parseInt(iterationsInput.value) || 1;
+                if (currentValue > 1) {
+                    iterationsInput.value = currentValue - 1;
+                    handleIterationsChange(block, currentValue - 1, iterationsInput);
+                }
+            });
+
+            increaseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const currentValue = parseInt(iterationsInput.value) || 1;
+                iterationsInput.value = currentValue + 1;
+                handleIterationsChange(block, currentValue + 1, iterationsInput);
+            });
+
+            iterationsInput.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const value = parseInt(e.target.value) || 1;
+                handleIterationsChange(block, value, iterationsInput);
+            });
+        }
+
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Render nested blocks
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+        return blockDiv;
+}
