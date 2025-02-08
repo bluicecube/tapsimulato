@@ -114,6 +114,17 @@ def delete_function(function_id):
     db.session.commit()
     return jsonify({'success': True})
 
+@app.route('/api/functions/all', methods=['DELETE'])
+def delete_all_functions():
+    try:
+        Function.query.filter_by(is_active=True).update({'is_active': False})
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting all functions: {str(e)}")
+        return jsonify({'error': 'Failed to delete all functions'}), 500
+
 # Task endpoints with improved error handling
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
