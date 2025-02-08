@@ -705,6 +705,9 @@ function renderBlock(block, index) {
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary toggle-overlay-btn">
+                        Show Overview
+                    </button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
@@ -714,9 +717,22 @@ function renderBlock(block, index) {
                 <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
                 <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
             </div>
+            <div class="function-overlay">
+                <div class="function-overlay-text">${block.name}</div>
+            </div>
         `;
 
-        // Add event listeners
+        // Add toggle overlay handler
+        const toggleBtn = blockDiv.querySelector('.toggle-overlay-btn');
+        const overlay = blockDiv.querySelector('.function-overlay');
+
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            overlay.classList.toggle('active');
+            toggleBtn.textContent = overlay.classList.contains('active') ? 'Hide Overview' : 'Show Overview';
+        });
+
+        // Rest of the function block event handlers remain unchanged
         const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
         const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
@@ -920,14 +936,13 @@ function renderBlock(block, index) {
 function renderTapBlock(block, blockDiv, index) {
     const updateRegionDisplay = () => {
         const regionText = block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-            'No region set';
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :`No region set`;
 
         blockDiv.querySelector('.region-text').textContent = `Region: ${regionText}`;
     };
 
     blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-contentbetween align-items-center">
             <h6 class="mb-0">Tap Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary set-region-btn">Set Region</button>
@@ -1871,8 +1886,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addUrlBtn.textContent = 'Add URL';
     addUrlBtn.id = 'addUrlBtn';
 
-    // Find the button group and add the new button
-    const btnGroup = document.querySelector('.btn-group.w-100.mb-3');
+    // Find the button group and addconst btnGroup = document.querySelector('.btn-group.w-100.mb-3');
     if (btnGroup) {
         btnGroup.appendChild(addUrlBtn);
         addUrlBtn.addEventListener('click', addUrlBlock);
