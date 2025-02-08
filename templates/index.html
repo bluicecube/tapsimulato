@@ -10,8 +10,9 @@
 </head>
 <body>
     <div class="container-fluid">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
+        <div class="row">
+            <!-- Simulator Column -->
+            <div class="col-md-4">
                 <div class="card mb-3">
                     <div class="simulator-content">
                         <div id="simulator" class="simulator">
@@ -22,6 +23,103 @@
                             Share Screen
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Task Controls Column -->
+            <div class="col-md-5">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Task Controls</h4>
+                            <button class="btn btn-success" id="executeTaskBtn">Execute</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Task Title -->
+                        <div class="mb-3">
+                            <input type="text" id="taskTitle" class="form-control" placeholder="Task Name">
+                        </div>
+
+                        <!-- Block Controls -->
+                        <div class="btn-group w-100 mb-3">
+                            <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
+                            <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
+                            <button class="btn btn-outline-info" id="addConditionalBtn">Add Logic</button>
+                            <button class="btn btn-outline-light dropdown-toggle" id="addFunctionBtn" data-bs-toggle="dropdown">
+                                Add Function
+                            </button>
+                            <ul class="dropdown-menu" id="functionsList">
+                                <!-- Functions will be populated here -->
+                            </ul>
+                        </div>
+
+                        <!-- Function Creation Modal Button -->
+                        <div class="text-end mb-3">
+                            <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#functionModal">
+                                Create New Function
+                            </button>
+                        </div>
+
+                        <!-- Current Task Blocks -->
+                        <div id="currentTask" class="current-task"></div>
+
+                        <!-- Console Output -->
+                        <div id="liveConsole" class="live-console mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task List Column -->
+            <div class="col-md-3 pe-0">
+                <div class="card task-list-card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Tasks</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-danger" id="deleteAllTasksBtn">Delete All</button>
+                                <button class="btn btn-sm btn-outline-primary" id="newTaskBtn">New Task</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="taskList" class="task-list custom-scrollbar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Function Creation Modal -->
+    <div class="modal fade" id="functionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Function</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="functionName" class="form-label">Function Name</label>
+                        <input type="text" class="form-control" id="functionName" placeholder="Enter function name">
+                    </div>
+                    <div class="mb-3">
+                        <label for="functionDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="functionDescription" rows="3" placeholder="Describe what this function does"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Function Blocks</label>
+                        <div class="btn-group w-100">
+                            <button class="btn btn-outline-primary" id="addFunctionTapBtn">Add Tap</button>
+                            <button class="btn btn-outline-success" id="addFunctionLoopBtn">Add Loop</button>
+                            <button class="btn btn-outline-danger" id="deleteAllFunctionsBtn">Delete All Functions</button>
+                        </div>
+                        <div id="functionBlocks" class="mt-3"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveFunctionBtn">Save Function</button>
                 </div>
             </div>
         </div>
