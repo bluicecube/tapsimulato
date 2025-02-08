@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
     document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
     document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
     document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
     document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
     document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
@@ -701,10 +700,7 @@ function renderBlock(block, index) {
     if (block.type === 'function') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <div class="header-clickable d-flex align-items-center" style="flex: 1">
-                    <h6 class="mb-0">${block.name}</h6>
-                    <span class="collapse-indicator">▼</span>
-                </div>
+                <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
@@ -716,17 +712,6 @@ function renderBlock(block, index) {
                 <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
             </div>
         `;
-
-        // Add click handler for collapse
-        const header = blockDiv.querySelector('.header-clickable');
-        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
-
-        header.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn')) {
-                blockDiv.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
-            }
-        });
 
         // Add event listeners
         const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
@@ -766,10 +751,7 @@ function renderBlock(block, index) {
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <div class="header-clickable d-flex align-items-center" style="flex: 1">
-                    <h6 class="mb-0">Loop Block</h6>
-                    <span class="collapse-indicator">▼</span>
-                </div>
+                <h6 class="mb-0">Loop Block</h6>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
@@ -783,17 +765,6 @@ function renderBlock(block, index) {
             </div>
             <div class="nested-blocks mt-2"></div>
         `;
-
-        // Add click handler for collapse
-        const header = blockDiv.querySelector('.header-clickable');
-        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
-
-        header.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
-                blockDiv.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
-            }
-        });
 
         // Add event listeners
         const iterationsInput = blockDiv.querySelector('.iterations-input');
@@ -931,7 +902,7 @@ function renderBlock(block, index) {
         }
 
         if (block.data.elseBlocks) {
-            const elseContainer = blockDiv.querySelector('..else-blocks');
+            const elseContainer = blockDiv.querySelector('.else-blocks');
             block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
@@ -1369,10 +1340,7 @@ function addBlockToFunction(type, parentElement = null) {
     if (type === 'loop') {
         blockElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <div class="header-clickable d-flex align-items-center" style="flex: 1">
-                    <h6 class="mb-0">Loop Block</h6>
-                    <span class="collapse-indicator">▼</span>
-                </div>
+                <h6 class="mb-0">Loop Block</h6>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
@@ -1390,17 +1358,6 @@ function addBlockToFunction(type, parentElement = null) {
                 <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
             </div>
         `;
-
-        // Add click handler for collapse
-        const header = blockElement.querySelector('.header-clickable');
-        const nestedBlocks = blockElement.querySelector('.nested-blocks');
-
-        header.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
-                blockElement.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
-            }
-        });
 
         // Add event listeners for nested block buttons
         blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
