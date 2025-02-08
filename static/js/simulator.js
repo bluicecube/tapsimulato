@@ -833,13 +833,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Listen for mouseup on document to catch out-of-bounds releases
     document.addEventListener('mouseup', (event) => {
         if (isSelecting) {
+            const simulator = document.getElementById('simulator');
             const rect = simulator.getBoundingClientRect();
             const simulatorX = event.clientX - rect.left;
             const simulatorY = event.clientY - rect.top;
 
             // Clamp coordinates to simulator bounds
-            const endX = Math.max(0, Math.min(rect.width, simulatorX));
-            const endY = Math.max(0, Math.min(rect.height, simulatorY));
+            const endX = Math.max(0, Math.min(simulator.clientWidth, simulatorX));
+            const endY = Math.max(0, Math.min(simulator.clientHeight, simulatorY));
 
             finishSelection(endX, endY);
             isSelecting = false;
@@ -1156,10 +1157,16 @@ let selectionStartY = 0;
 function startSelection(event) {
     if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
 
+    const simulator = document.getElementById('simulator');
+    const rect = simulator.getBoundingClientRect();
+    
     isSelecting = true;
-    const rect = event.target.getBoundingClientRect();
     selectionStartX = event.clientX - rect.left;
     selectionStartY = event.clientY - rect.top;
+
+    // Clamp start coordinates to simulator bounds
+    selectionStartX = Math.max(0, Math.min(simulator.clientWidth, selectionStartX));
+    selectionStartY = Math.max(0, Math.min(simulator.clientHeight, selectionStartY));
 
     const selectionBox = document.getElementById('selectionBox');
     selectionBox.style.left = `${selectionStartX}px`;
