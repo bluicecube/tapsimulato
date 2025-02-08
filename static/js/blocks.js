@@ -1,32 +1,27 @@
 // Blocks management
-function addTapBlock(parent) {
-    const tapBlock = {
-        type: 'tap',
-        region: null,
-        name: 'Tap Block'
-    };
-
-    // If no parent provided, use current task
-    if (!parent) {
-        if (!window.state || !window.state.currentTask) {
-            console.error('No active task available');
-            return null;
-        }
-        if (!window.state.currentTask.blocks) {
-            window.state.currentTask.blocks = [];
-        }
-        parent = window.state.currentTask;
+function addTapBlock() {
+    if (!window.state || !window.state.currentTask) {
+        console.error('No active task available');
+        return;
     }
 
-    parent.blocks.push(tapBlock);
-    const blockDiv = createTapBlockElement(tapBlock);
+    const tapBlock = {
+        type: 'tap',
+        name: 'Tap Block',
+        region: null
+    };
+
+    if (!window.state.currentTask.blocks) {
+        window.state.currentTask.blocks = [];
+    }
+
+    window.state.currentTask.blocks.push(tapBlock);
     if (typeof window.updateTaskDisplay === 'function') {
         window.updateTaskDisplay();
     }
     if (typeof window.scheduleAutosave === 'function') {
         window.scheduleAutosave();
     }
-    return blockDiv;
 }
 
 function createTapBlockElement(tapBlock) {
@@ -51,35 +46,30 @@ function createTapBlockElement(tapBlock) {
     return blockDiv;
 }
 
-function addLoopBlock(parent) {
-    const loopBlock = {
-        type: 'loop',
-        iterations: 1,
-        blocks: [],
-        name: 'Loop Block'
-    };
-
-    // If no parent provided, use current task
-    if (!parent) {
-        if (!window.state || !window.state.currentTask) {
-            console.error('No active task available');
-            return null;
-        }
-        if (!window.state.currentTask.blocks) {
-            window.state.currentTask.blocks = [];
-        }
-        parent = window.state.currentTask;
+function addLoopBlock() {
+    if (!window.state || !window.state.currentTask) {
+        console.error('No active task available');
+        return;
     }
 
-    parent.blocks.push(loopBlock);
-    const blockDiv = createLoopBlockElement(loopBlock);
+    const loopBlock = {
+        type: 'loop',
+        name: 'Loop Block',
+        iterations: 1,
+        blocks: []
+    };
+
+    if (!window.state.currentTask.blocks) {
+        window.state.currentTask.blocks = [];
+    }
+
+    window.state.currentTask.blocks.push(loopBlock);
     if (typeof window.updateTaskDisplay === 'function') {
         window.updateTaskDisplay();
     }
     if (typeof window.scheduleAutosave === 'function') {
         window.scheduleAutosave();
     }
-    return blockDiv;
 }
 
 function createLoopBlockElement(loopBlock) {
@@ -217,3 +207,4 @@ document.addEventListener('keydown', (e) => {
 // Make functions available globally
 window.addTapBlock = addTapBlock;
 window.addLoopBlock = addLoopBlock;
+window.addPrintBlock = addPrintBlock;
