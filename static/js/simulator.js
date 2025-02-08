@@ -479,6 +479,8 @@ function updateSelection(event) {
 
 
 function finishSelection(endX, endY) {
+    if (!state.pendingBlockConfiguration) return;
+
     const region = {
         x1: Math.min(selectionStartX, endX),
         y1: Math.min(selectionStartY, endY),
@@ -502,6 +504,8 @@ function finishSelection(endX, endY) {
     }
 
     if (targetBlock) {
+        // Store the old region in case we need to revert
+        const oldRegion = targetBlock.region;
         targetBlock.region = region;
         state.pendingBlockConfiguration = null;
 
@@ -513,6 +517,12 @@ function finishSelection(endX, endY) {
         saveCurrentTask().then(() => {
             logToConsole('Region updated and saved', 'success');
         }).catch(error => {
+            // Revert to old region if save fails
+            targetBlock.region = oldRegion;
+            if (oldRegion) {
+                showSelectionBox(oldRegion);
+            }
+            updateTaskDisplay();
             logToConsole('Failed to save region', 'error');
         });
     }
@@ -912,7 +922,7 @@ async function executeTask() {
                 setTimeout(() => {
                     const coords = showTapFeedback(block.region);
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                }, delay);
+                },delay);
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
                 try {
@@ -924,7 +934,7 @@ async function executeTask() {
 
                     if (!response.ok) throw new Error('Failed to compare images');
 
-                                        const result = await response.json();
+                    const result = await response.json();
                     const blocksToExecute = result.similarity >= result.threshold ?
                         block.data.thenBlocks : block.data.elseBlocks;
 
@@ -1550,20 +1560,22 @@ function showTapFeedback(region) {
 }
 
 // Update iterations change handler to save immediately
-function handleIterationsChange(block, value, iterationsInput) {
-    if (value < 1) {
-        iterationsInput.value = 1;
-        block.iterations = 1;
-    } else {
-        block.iterations = value;
-    }
+async function handleIterationsChange(block, value, input) {
+    const newValue = Math.max(1, value);
+    block.iterations = newValue;
+    input.value = newValue;
 
-    // Save immediately after iterations change
-    saveCurrentTask().then(() => {
-        logToConsole('Iterations updated and saved', 'success');
-    }).catch(error => {
+    try {
+        await saveCurrentTask();
+        logToConsole(`Updated iterations to ${newValue}`, 'success');
+    } catch (error) {
         logToConsole('Failed to save iterations update', 'error');
-    });
+        // Revert to the last known good value if save fails
+        block.iterations = input.dataset.lastValue || 1;
+        input.value = block.iterations;
+    }
+    // Store the last successful value
+    input.dataset.lastValue = block.iterations;
 }
 
 // Add addFunctionToTask function
