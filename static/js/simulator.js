@@ -703,7 +703,10 @@ function renderBlock(block, index) {
     if (block.type === 'function') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">${block.name}</h6>
+                <div class="header-clickable">
+                    <h6 class="mb-0">${block.name}</h6>
+                    <span class="collapse-indicator">▼</span>
+                </div>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
@@ -715,6 +718,17 @@ function renderBlock(block, index) {
                 <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
             </div>
         `;
+
+        // Add collapsible functionality
+        const header = blockDiv.querySelector('.header-clickable');
+        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                blockDiv.classList.toggle('collapsed');
+                nestedBlocks.classList.toggle('collapsed');
+            }
+        });
 
         // Add event listeners
         const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
@@ -749,12 +763,13 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
-    } else if (block.type === 'tap') {
-        return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
+                <div class="header-clickable">
+                    <h6 class="mb-0">Loop Block</h6>
+                    <span class="collapse-indicator">▼</span>
+                </div>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
@@ -768,6 +783,17 @@ function renderBlock(block, index) {
             </div>
             <div class="nested-blocks mt-2"></div>
         `;
+
+        // Add collapsible functionality
+        const header = blockDiv.querySelector('.header-clickable');
+        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
+                blockDiv.classList.toggle('collapsed');
+                nestedBlocks.classList.toggle('collapsed');
+            }
+        });
 
         // Add event listeners
         const iterationsInput = blockDiv.querySelector('.iterations-input');
@@ -813,6 +839,8 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
+    } else if (block.type === 'tap') {
+        return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -918,8 +946,7 @@ function renderBlock(block, index) {
 }
 
 function renderTapBlock(block, blockDiv, index) {
-    const updateRegionDisplay = () => {
-        const regionText = block.region ?
+    const updateRegionDisplay = () => {        const regionText = block.region ?
             `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set';
 
@@ -1865,7 +1892,7 @@ function addUrlBlock() {
     logToConsole('URL block added', 'success');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded, () => {
     const addUrlBtn = document.createElement('button');
     addUrlBtn.className = 'btn btn-outline-secondary';
     addUrlBtn.textContent = 'Add URL';

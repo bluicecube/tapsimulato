@@ -102,7 +102,47 @@ body {
     padding-left: 10px;
     border-left: 2px solid var(--bs-gray);
     margin-top: 10px;
+    transition: max-height 0.3s ease-out;
+    overflow: hidden;
+    max-height: 1000px; /* Large enough to contain content */
 }
+
+.nested-blocks.collapsed {
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.block {
+    position: relative;
+}
+
+.block .header-clickable {
+    cursor: pointer;
+    padding: 8px;
+    margin: -8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.block .header-clickable:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.block .collapse-indicator {
+    margin-left: 8px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 0.8em;
+}
+
+.block.collapsed .collapse-indicator {
+    transform: rotate(-90deg);
+}
+
 
 /* Console output */
 .live-console {
