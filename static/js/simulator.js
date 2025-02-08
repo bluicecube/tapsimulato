@@ -685,9 +685,9 @@ function renderBlock(block, index) {
     if (block.type === 'function') {
         blockDiv.innerHTML = `
             <div class="block-header" onclick="toggleFunctionBlock(this)">
-                <span class="collapse-arrow">▼</span>
                 <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group ms-auto">
+                    <span class="collapse-arrow me-2">▼</span>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn" onclick="event.stopPropagation()">×</button>
                 </div>
             </div>
@@ -931,7 +931,7 @@ function renderTapBlock(block, blockDiv, index) {
     });
 
     // Add dedicated button for region selection
-    const setRegionBtn = blockDiv.querySelector('.set-region-btn');
+const setRegionBtn = blockDiv.querySelector('.set-region-btn');
     setRegionBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startTapRegionSelection(blockDiv);
