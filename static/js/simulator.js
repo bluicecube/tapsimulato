@@ -63,6 +63,7 @@ function serializeBlock(block) {
     return serializedBlock;
 }
 
+
 function deserializeBlock(block) {
     const deserializedBlock = {
         ...block,
@@ -161,97 +162,6 @@ async function saveCurrentTask() {
         console.error('Save task error:', error);
         throw error;
     }
-}
-
-function serializeBlock(block) {
-    const serializedBlock = {
-        type: block.type,
-        name: block.name || null,
-        data: {},
-        order: block.order || 0
-    };
-
-    // Save type-specific data
-    switch (block.type) {
-        case 'tap':
-            if (block.region) {
-                serializedBlock.data.region = block.region;
-            }
-            break;
-        case 'loop':
-            serializedBlock.data.iterations = block.iterations || 1;
-            if (block.blocks && block.blocks.length > 0) {
-                serializedBlock.blocks = block.blocks.map(serializeBlock);
-            }
-            break;
-        case 'function':
-            serializedBlock.data.functionId = block.functionId;
-            serializedBlock.data.description = block.description;
-            if (block.blocks && block.blocks.length > 0) {
-                serializedBlock.blocks = block.blocks.map(serializeBlock);
-            }
-            break;
-        case 'conditional':
-            serializedBlock.data.threshold = block.data.threshold;
-            if (block.data.referenceImage) {
-                serializedBlock.data.referenceImage = block.data.referenceImage;
-            }
-            if (block.data.thenBlocks && block.data.thenBlocks.length > 0) {
-                serializedBlock.data.thenBlocks = block.data.thenBlocks.map(serializeBlock);
-            }
-            if (block.data.elseBlocks && block.data.elseBlocks.length > 0) {
-                serializedBlock.data.elseBlocks = block.data.elseBlocks.map(serializeBlock);
-            }
-            break;
-        case 'url':
-            serializedBlock.data.url = block.url;
-            break;
-
-    }
-
-    return serializedBlock;
-}
-
-function deserializeBlock(block) {
-    const deserializedBlock = {
-        ...block,
-        type: block.type,
-    };
-
-    // Restore type-specific data
-    switch (block.type) {
-        case 'tap':
-            if (block.data && block.data.region) {
-                deserializedBlock.region = block.data.region;
-            }
-            break;
-        case 'loop':
-            deserializedBlock.iterations = block.data?.iterations || 1;
-            if (block.blocks && block.blocks.length > 0) {
-                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
-            }
-            break;
-        case 'function':
-            deserializedBlock.functionId = block.data?.functionId;
-            deserializedBlock.description = block.data?.description;
-            if (block.blocks && block.blocks.length > 0) {
-                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
-            }
-            break;
-        case 'conditional':
-            deserializedBlock.data = {
-                threshold: block.data.threshold,
-                referenceImage: block.data.referenceImage,
-                thenBlocks: block.data.thenBlocks ? block.data.thenBlocks.map(deserializeBlock) : [],
-                elseBlocks: block.data.elseBlocks ? block.data.elseBlocks.map(deserializeBlock) : []
-            };
-            break;
-        case 'url':
-            deserializedBlock.url = block.data.url;
-            break;
-    }
-
-    return deserializedBlock;
 }
 
 
@@ -971,7 +881,7 @@ function renderBlock(block, index) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
-                }
+        }
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -1146,14 +1056,12 @@ window.enableDrawingMode = enableDrawingMode;
 
 // Task Execution
 async function executeTask() {
-    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
-        logToConsole('No blocks to execute', 'error');
+    if (!state.currentTask || !state.currentTask.blocks) {
+        logToConsole('No task selected or task has no blocks', 'error');
         return;
     }
 
-    logToConsole('Starting task execution', 'info');
-    let delay = 0;
-    const delayIncrement = 800;
+    logToConsole('Starting task execution...', 'info');
 
     async function executeBlocks(blocks, parentIndex = null) {
         for (const [index, block] of blocks.entries()) {
@@ -1164,56 +1072,48 @@ async function executeTask() {
                 blockElement.classList.add('executing');
             }
 
-            if (block.type === 'function') {
-                const func = functions.find(f => f.name === block.name);
-                if (func && func.blocks) {
-                    await executeBlocks(func.blocks, blockIndex);
-                } else {
-                    logToConsole(`Function "${block.name}" not found`, 'error');
+            try {
+                if (block.type === 'function') {
+                    const func = functions.find(f => f.name === block.name);
+                    if (func && func.blocks) {
+                        await executeBlocks(func.blocks, blockIndex);
+                    } else {
+                        logToConsole(`Function "${block.name}" not found`, 'error');
+                    }
+                } else if (block.type === 'loop') {
+                    const iterations = block.iterations || block.data?.iterations || 1;
+                    for (let i = 0; i < iterations; i++) {
+                        logToConsole(`Loop iteration ${i + 1}/${iterations}`, 'info');
+                        if (block.blocks) {
+                            await executeBlocks(block.blocks, blockIndex);
+                        }
+                    }
+                } else if (block.type === 'tap') {
+                    const region = block.region || block.data?.region;
+                    if (region) {
+                        await new Promise(resolve => setTimeout(() => {
+                            const coords = showTapFeedback(region);
+                            logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                            resolve();
+                        }, 800));
+                    }
                 }
-            } else if (block.type === 'loop') {
-                for (let i = 0; i < block.iterations; i++) {
-                    await executeBlocks(block.blocks, blockIndex);
+            } catch (error) {
+                logToConsole(`Error executing block: ${error.message}`, 'error');
+            } finally {
+                if (blockElement) {
+                    blockElement.classList.remove('executing');
                 }
-            } else if (block.type === 'tap' && block.region) {
-                delay += delayIncrement;
-                await new Promise(resolve => setTimeout(() => {
-                    const coords = showTapFeedback(block.region);
-                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                    resolve();
-                }, delayIncrement));
-            } else if (block.type === 'conditional') {
-                const currentImage = captureVideoFrame();
-                try {
-                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: currentImage })
-                    });
-
-                    if (!response.ok) throw new Error('Failed to compare images');
-
-                    const result = await response.json();
-                    const blocksToExecute = result.similarity >= result.threshold ?
-                        block.data.thenBlocks : block.data.elseBlocks;
-
-                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
-                    await executeBlocks(blocksToExecute, blockIndex);
-                } catch (error) {
-                    logToConsole('Error executing conditional block: ' + error.message, 'error');
-                }
-            } else if (block.type === 'url') {
-                await executeUrlBlock(block);
-            }
-
-            if (blockElement) {
-                blockElement.classList.remove('executing');
             }
         }
     }
 
-    await executeBlocks(state.currentTask.blocks);
-    logToConsole('Task execution completed', 'success');
+    try {
+        await executeBlocks(state.currentTask.blocks);
+        logToConsole('Task execution completed', 'success');
+    } catch (error) {
+        logToConsole(`Task execution failed: ${error.message}`, 'error');
+    }
 }
 
 // Utilities
@@ -1785,77 +1685,6 @@ function addConditionalBlock() {
     updateTaskDisplay();
     scheduleAutosave();
     logToConsole('Conditional block added', 'success');
-}
-
-async function executeTask() {
-    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
-        logToConsole('No blocks to execute', 'error');
-        return;
-    }
-
-    logToConsole('Starting task execution', 'info');
-    let delay = 0;
-    const delayIncrement = 800;
-
-    async function executeBlocks(blocks, parentIndex = null) {
-        for (const [index, block] of blocks.entries()) {
-            const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
-            const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
-
-            if (blockElement) {
-                blockElement.classList.add('executing');
-            }
-
-            if (block.type === 'function') {
-                const func = functions.find(f => f.name === block.name);
-                if (func && func.blocks) {
-                    await executeBlocks(func.blocks, blockIndex);
-                } else {
-                    logToConsole(`Function "${block.name}" not found`, 'error');
-                }
-            } else if (block.type === 'loop') {
-                for (let i = 0; i < block.iterations; i++) {
-                    await executeBlocks(block.blocks, blockIndex);
-                }
-            } else if (block.type === 'tap' && block.region) {
-                delay += delayIncrement;
-                await new Promise(resolve => setTimeout(() => {
-                    const coords = showTapFeedback(block.region);
-                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                    resolve();
-                }, delayIncrement));
-            } else if (block.type === 'conditional') {
-                const currentImage = captureVideoFrame();
-                try {
-                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: currentImage })
-                    });
-
-                    if (!response.ok) throw new Error('Failed to compare images');
-
-                    const result = await response.json();
-                    const blocksToExecute = result.similarity >= result.threshold ?
-                        block.data.thenBlocks : block.data.elseBlocks;
-
-                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
-                    await executeBlocks(blocksToExecute, blockIndex);
-                } catch (error) {
-                    logToConsole('Error executing conditional block: ' + error.message, 'error');
-                }
-            } else if (block.type === 'url') {
-                await executeUrlBlock(block);
-            }
-
-            if (blockElement) {
-                blockElement.classList.remove('executing');
-            }
-        }
-    }
-
-    await executeBlocks(state.currentTask.blocks);
-    logToConsole('Task execution completed', 'success');
 }
 
 // Add button to UI
