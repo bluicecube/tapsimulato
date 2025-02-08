@@ -240,7 +240,8 @@ async function loadTask(taskId) {
         function deserializeBlock(block) {
             const deserializedBlock = {
                 ...block,
-                type: block.type
+                type: block.type,
+                collapsed: block.collapsed || false
             };
 
             // Restore type-specific data
@@ -568,7 +569,8 @@ async function saveCurrentTask() {
                 type: block.type,
                 name: block.name || null,
                 data: { ...block.data } || {},
-                order: block.order || 0
+                order: block.order || 0,
+                collapsed: block.collapsed || false
             };
 
             // Save type-specific data
@@ -674,6 +676,30 @@ function setBlockFocus(block, blockDiv) {
     }
 }
 
+// Add block collapse functionality
+function makeBlockCollapsible(blockDiv, block) {
+    const header = blockDiv.querySelector('.block-header');
+    const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+
+    if (!header || !nestedBlocks) return;
+
+    // Initialize collapse state from block data or default to expanded
+    if (block.collapsed) {
+        nestedBlocks.classList.add('collapsed');
+        blockDiv.classList.add('collapsed');
+    }
+
+    header.addEventListener('click', (e) => {
+        // Don't trigger collapse when clicking buttons inside header
+        if (e.target.closest('.btn')) return;
+
+        const isCollapsed = nestedBlocks.classList.toggle('collapsed');
+        blockDiv.classList.toggle('collapsed', isCollapsed);
+        block.collapsed = isCollapsed;
+        scheduleAutosave();
+    });
+}
+
 // Enhanced render block function with better iteration controls
 function renderBlock(block, index) {
     const blockDiv = document.createElement('div');
@@ -682,7 +708,7 @@ function renderBlock(block, index) {
 
     if (block.type === 'function') {
         blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="block-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
@@ -728,11 +754,12 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
+        makeBlockCollapsible(blockDiv, block);
     } else if (block.type === 'tap') {
         return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="block-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
@@ -782,15 +809,17 @@ function renderBlock(block, index) {
             });
         }
 
+        // Render nested blocks
         const nestedContainer = blockDiv.querySelector('.nested-blocks');
         if (block.blocks) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
+        makeBlockCollapsible(blockDiv, block);
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="block-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Logic Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
@@ -885,6 +914,7 @@ function renderBlock(block, index) {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
         }
+        makeBlockCollapsible(blockDiv, block);
     } else if (block.type === 'url') {
         return renderUrlBlock(block, blockDiv, index);
     }
@@ -902,7 +932,7 @@ function renderTapBlock(block, blockDiv, index) {
     };
 
     blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="block-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">Tap Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary set-region-btn">Set Region</button>
@@ -942,7 +972,7 @@ function renderTapBlock(block, blockDiv, index) {
     if (block.region) {
         showSelectionBox(block.region);
     }
-
+    makeBlockCollapsible(blockDiv, block);
     return blockDiv;
 }
 
@@ -1257,7 +1287,7 @@ function addBlockToFunction(type, parentElement = null) {
 
     if (type === 'loop') {
         blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="block-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Loop Block</h6>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
@@ -1324,7 +1354,7 @@ function addBlockToFunction(type, parentElement = null) {
         });
     } else { // Tap block
         blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="block-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Tap Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
@@ -1348,6 +1378,7 @@ function addBlockToFunction(type, parentElement = null) {
     });
 
     container.appendChild(blockElement);
+    makeBlockCollapsible(blockElement, block);
 }
 
 async function saveFunction() {
@@ -1439,7 +1470,8 @@ async function addFunctionBlock(functionId) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks, // Store the function's blocks for reference
-        functionId: func.id
+        functionId: func.id,
+        collapsed: false // Initialize as expanded
     };
 
     state.currentTask.blocks.push(block);
@@ -1451,7 +1483,8 @@ async function addFunctionBlock(functionId) {
 function collectBlockData(block) {
     const data = {
         type: block.type,
-        name: block.name
+        name: block.name,
+        collapsed: block.collapsed
     };
 
     if (block.type === 'tap' && block.region) {
@@ -1524,7 +1557,8 @@ function addConditionalBlock() {
             referenceImage: null,
             thenBlocks: [],  // Blocks to execute if similarity >= threshold
             elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
+        },
+        collapsed: false
     };
 
     state.currentTask.blocks.push(block);
@@ -1651,7 +1685,8 @@ async function addFunctionToTask(func) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks,
-        functionId: func.id
+        functionId: func.id,
+        collapsed: false
     };
 
     state.currentTask.blocks.push(block);
@@ -1706,7 +1741,8 @@ function openUrlBlock(url) {
     const block = {
         type: 'url',
         url: url || 'https://www.google.com',
-        description: 'Open URL'
+        description: 'Open URL',
+        collapsed: false
     };
 
     state.currentTask.blocks.push(block);
@@ -1717,7 +1753,7 @@ function openUrlBlock(url) {
 
 function renderUrlBlock(block, blockDiv, index) {
     blockDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="block-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">URL Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
@@ -1744,7 +1780,7 @@ function renderUrlBlock(block, blockDiv, index) {
         e.stopPropagation();
         removeBlock(blockDiv);
     });
-
+    makeBlockCollapsible(blockDiv, block);
     return blockDiv;
 }
 
@@ -1770,7 +1806,8 @@ function addUrlBlock() {
 
     const block = {
         type: 'url',
-        url: 'https://www.google.com'  // Default URL
+        url: 'https://www.google.com'  // Default URL,
+        collapsed: false
     };
 
     state.currentTask.blocks.push(block);

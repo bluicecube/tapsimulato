@@ -357,3 +357,41 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
         opacity: 0;
     }
 }
+
+/* Add collapsible styles */
+.nested-blocks {
+    transition: height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    overflow: hidden;
+    height: auto;
+    opacity: 1;
+}
+
+.nested-blocks.collapsed {
+    height: 0;
+    opacity: 0;
+}
+
+/* Make block headers clickable */
+.block .block-header {
+    cursor: pointer;
+    user-select: none;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.block .block-header:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Add collapse indicator */
+.block .block-header::after {
+    content: '▼';
+    float: right;
+    transition: transform 0.3s ease;
+    margin-left: 0.5rem;
+}
+
+.block.collapsed .block-header::after {
+    transform: rotate(-90deg);
+}
