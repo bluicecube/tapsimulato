@@ -110,20 +110,60 @@ function deserializeBlock(block) {
 
 // State management
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize UI elements
+    // Initialize UI elements with null checks
     const selectionBox = document.getElementById('selectionBox');
     const simulator = document.getElementById('simulator');
     const taskTitle = document.getElementById('taskTitle');
+    const deleteTaskBtn = document.getElementById('deleteTaskBtn');
+    const executeTaskBtn = document.getElementById('executeTaskBtn');
+    const addTapBtn = document.getElementById('addTapBtn');
+    const addLoopBtn = document.getElementById('addLoopBtn');
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
+    const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    const setVideoSourceBtn = document.getElementById('setVideoSource');
 
-    // Set up event listeners
-    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
-    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
-    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
-    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
-    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
-    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
+    // Set up event listeners with null checks
+    if (executeTaskBtn) {
+        executeTaskBtn.addEventListener('click', executeTask);
+    }
 
+    if (addTapBtn) {
+        addTapBtn.addEventListener('click', () => addTapBlock());
+    }
+
+    if (addLoopBtn) {
+        addLoopBtn.addEventListener('click', () => addLoopBlock());
+    }
+
+    if (newTaskBtn) {
+        newTaskBtn.addEventListener('click', async () => { await createNewTask(); });
+    }
+
+    if (addFunctionTapBtn) {
+        addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
+    }
+
+    if (addFunctionLoopBtn) {
+        addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
+    }
+
+    if (saveFunctionBtn) {
+        saveFunctionBtn.addEventListener('click', saveFunction);
+    }
+
+    if (deleteTaskBtn) {
+        deleteTaskBtn.addEventListener('click', () => {
+            const activeTask = document.querySelector('.task-list-item.active');
+            if (activeTask) {
+                const taskId = parseInt(activeTask.dataset.taskId);
+                deleteTask(taskId);
+            } else {
+                logToConsole('No task selected to delete', 'error');
+            }
+        });
+    }
 
     // Add task title change handler
     if (taskTitle) {
@@ -163,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listen for mouseup on document to catch out-of-bounds releases
     document.addEventListener('mouseup', (event) => {
-        if (isSelecting) {
+        if (isSelecting && simulator) {
             const rect = simulator.getBoundingClientRect();
             const simulatorX = event.clientX - rect.left;
             const simulatorY = event.clientY - rect.top;
@@ -178,18 +218,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Continue selection when mouse re-enters simulator
-    simulator.addEventListener('mouseenter', (event) => {
-        if (isSelecting) {
-            updateSelection(event);
-        }
-    });
+    if (simulator) {
+        simulator.addEventListener('mouseenter', (event) => {
+            if (isSelecting) {
+                updateSelection(event);
+            }
+        });
+    }
 
-    // Remove the mouseleave handler that was forcing selection completion
-    simulator.removeEventListener('mouseleave', () => {});
-
-
-    // Setup video sharing
-    setupVideoSharing();
+    // Setup video sharing with null check
+    if (setVideoSourceBtn) {
+        setupVideoSharing();
+    }
 
     // Load functions and tasks
     loadFunctions();
@@ -201,12 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const functionModal = document.getElementById('functionModal');
     if (functionModal) {
         new bootstrap.Modal(functionModal);
-    }
-
-    // Add save function button handler
-    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
-    if (saveFunctionBtn) {
-        saveFunctionBtn.addEventListener('click', saveFunction);
     }
 });
 
@@ -434,17 +468,23 @@ function startTapRegionSelection(blockElement) {
         return;
     }
 
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) {
+        logToConsole('Selection box not found', 'error');
+        return;
+    }
+
     // Reset selection state
     isSelecting = false;
     selectionStartX = 0;
     selectionStartY = 0;
 
     // Clear any existing selection box
-    const selectionBox = document.getElementById('selectionBox');
     selectionBox.classList.add('d-none');
     selectionBox.style.width = '0';
     selectionBox.style.height = '0';
 
+    // Set the pending block configuration
     state.pendingBlockConfiguration = blockElement;
     logToConsole('Select tap region on the simulator', 'info');
 }
@@ -900,7 +940,7 @@ function renderBlock(block, index) {
                 logToConsole('Reference image captured', 'success');
             } catch (error) {
                 logToConsole('Failed to save reference image', 'error');
-            }
+            }            }
         });
 
         // Add threshold change handler
@@ -932,7 +972,7 @@ function renderBlock(block, index) {
 
         // Render nested blocks
         if (block.data.thenBlocks) {
-            const thenContainer = blockDiv.querySelector('..then-blocks');
+            const thenContainer = blockDiv.querySelector('.then-blocks');
             block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
                 thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
             });
@@ -952,56 +992,75 @@ function renderBlock(block, index) {
 }
 
 function renderTapBlock(block, blockDiv, index) {
-    const updateRegionDisplay = () => {
-        const regionText = block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-            'No region set';
-
-        blockDiv.querySelector('.region-text').textContent = `Region: ${regionText}`;
-    };
-
     blockDiv.innerHTML = `
         <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">Tap Block</h6>
             <div class="btn-group">
-                <button class="btn btn-sm btn-outline-primary set-region-btn">Set Region</button>
+                <button class="btn btn-sm btn-outline-primary set-region-btn">
+                    ${block.region ? 'Change Region' : 'Set Region'}
+                </button>
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted region-text">Region: ${block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-            'No region set'}</small>
+        ${block.region ? `
+            <small class="text-muted">
+                Region: (${Math.round(block.region.x1)}, ${Math.round(block.region.y1)}) - 
+                (${Math.round(block.region.x2)}, ${Math.round(block.region.y2)})
+            </small>
+        ` : ''}
     `;
 
-    // Handle block selection and region definition
-    blockDiv.addEventListener('click', (e) => {
-        if (!e.target.closest('.btn')) {
-            e.stopPropagation();
-            setBlockFocus(block, blockDiv);
-        }
-    });
-
-    // Add dedicated button for region selection
+    // Add event listeners
     const setRegionBtn = blockDiv.querySelector('.set-region-btn');
-    setRegionBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        startTapRegionSelection(blockDiv);
-        if (block.region) {
-            showSelectionBox(block.region);
-        }
-    });
+    if (setRegionBtn) {
+        setRegionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startTapRegionSelection(blockDiv);
+        });
+    }
 
     const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    removeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        removeBlock(blockDiv);
-    });
+    if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeBlock(blockDiv);
+        });
+    }
 
-    // Update region display when the block's region changes
+    // Show existing region if it exists
     if (block.region) {
         showSelectionBox(block.region);
     }
+
     return blockDiv;
+}
+
+// Update the startTapRegionSelection function
+function startTapRegionSelection(blockElement) {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) {
+        logToConsole('Selection box not found', 'error');
+        return;
+    }
+
+    // Reset selection state
+    isSelecting = false;
+    selectionStartX = 0;
+    selectionStartY = 0;
+
+    // Clear any existing selection box
+    selectionBox.classList.add('d-none');
+    selectionBox.style.width = '0';
+    selectionBox.style.height = '0';
+
+    // Set the pending block configuration
+    state.pendingBlockConfiguration = blockElement;
+    logToConsole('Select tap region on the simulator', 'info');
 }
 
 function enableDrawingMode(block, blockDiv) {
@@ -1104,23 +1163,26 @@ function showTapFeedback(region) {
 // Fix the video sharing configuration
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
+    const setVideoSourceBtn = document.getElementById('setVideoSource');
+    if (setVideoSourceBtn && video) {
+        setVideoSourceBtn.addEventListener('click', async () => {
+            try {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always"
+                    },
+                    audio: false
+                });
+                video.srcObject = stream;
+                logToConsole('Screen sharing started', 'success');
+            } catch (error) {
+                logToConsole('Failed to start screen sharing: ' + error.message, 'error');
             }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
-    });
+        });
+    }
 }
 
 function logToConsole(message, type = 'info') {
@@ -1184,10 +1246,7 @@ async function deleteTask(taskId) {
 }
 
 // Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
-});
+//This event listener is now added within DOMContentLoaded with null check
 
 // Add new function to show selection box for existing region
 function showSelectionBox(region) {
@@ -1841,7 +1900,7 @@ function openUrlBlock(url) {
     const block = {
         type: 'url',
         url: url || 'https://www.google.com',
-        description: 'Open URL'
+        description: 'OpenURL'
     };
 
     state.currentTask.blocks.push(block);
