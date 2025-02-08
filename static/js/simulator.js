@@ -639,6 +639,16 @@ function setBlockFocus(block, blockDiv) {
 }
 
 
+// Add function for block expansion/collapse
+function toggleBlockExpansion(header, nestedBlocks, indicator) {
+    const isCollapsed = nestedBlocks.style.display === 'none';
+    nestedBlocks.style.display = isCollapsed ? 'block' : 'none';
+    indicator.style.transform = isCollapsed ? 'rotate(0deg)' : 'rotate(-90deg)';
+
+    // Save the state to the block's element
+    nestedBlocks.closest('.block').dataset.collapsed = !isCollapsed;
+}
+
 // Enhanced render block function with better iteration controls
 function renderBlock(block, index) {
     if (!block) return null;
@@ -664,19 +674,18 @@ function renderBlock(block, index) {
                     <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
                 </div>
             </div>
-            <div class="nested-blocks mt-2"></div>
+            <div class="nested-blocks mt-2" style="display: block;"></div>
         `;
 
         const header = blockDiv.querySelector('.header-clickable');
         const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+        const indicator = blockDiv.querySelector('.collapse-indicator');
 
-        // Add collapse/expand functionality
+        // Add click handler for expand/collapse
         header.addEventListener('click', (e) => {
             if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
-                blockDiv.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
-                const indicator = header.querySelector('.collapse-indicator');
-                indicator.style.transform = blockDiv.classList.contains('collapsed') ? 'rotate(-90deg)' : '';
+                e.stopPropagation();
+                toggleBlockExpansion(header, nestedBlocks, indicator);
             }
         });
 
@@ -841,8 +850,7 @@ function renderBlock(block, index) {
 
         header.addEventListener('click', (e) => {
             if (!e.target.closest('.btn')) {
-                blockDiv.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
+                toggleBlockExpansion(header, nestedBlocks, header.querySelector('.collapse-indicator'));
             }
         });
 
@@ -1069,8 +1077,7 @@ function addBlockToFunction(type, parentElement = null) {
 
         header.addEventListener('click', (e) => {
             if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
-                blockElement.classList.toggle('collapsed');
-                nestedBlocks.classList.toggle('collapsed');
+                toggleBlockExpansion(header, nestedBlocks, header.querySelector('.collapse-indicator'));
             }
         });
 
@@ -1759,4 +1766,33 @@ window.addEventListener('beforeunload', async (e) => {
         e.returnValue = '';
         await saveCurrentTask();
     }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style');
+    style.textContent = `
+        .collapse-indicator {
+            display: inline-block;
+            margin-left: 8px;
+            transition: transform 0.2s ease;
+            user-select: none;
+        }
+        .header-clickable {
+            cursor: pointer;
+            padding: 8px;
+            margin: -8px;
+            border-radius: 4px;
+        }
+        .header-clickable:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .nested-blocks.collapsed {
+            display: none;
+        }
+        .block.collapsed .collapse-indicator {
+            transform: rotate(-90deg);
+        }
+
+    `;
+    document.head.appendChild(style);
 });

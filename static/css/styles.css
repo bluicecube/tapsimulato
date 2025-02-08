@@ -102,17 +102,6 @@ body {
     padding-left: 10px;
     border-left: 2px solid var(--bs-gray);
     margin-top: 10px;
-    transition: max-height 0.3s ease-out;
-    overflow: hidden;
-    max-height: 1000px; /* Large enough to contain content */
-}
-
-.nested-blocks.collapsed {
-    max-height: 0;
-}
-
-.block {
-    position: relative;
 }
 
 .block .header-clickable {
@@ -129,13 +118,8 @@ body {
 .block .collapse-indicator {
     margin-left: 8px;
     display: inline-block;
-    transition: transform 0.3s ease;
+    transition: transform 0.2s ease;
 }
-
-.block.collapsed .collapse-indicator {
-    transform: rotate(-90deg);
-}
-
 
 /* Console output */
 .live-console {
