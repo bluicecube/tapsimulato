@@ -432,10 +432,6 @@ function updateSelection(event) {
     let currentX = event.clientX - rect.left;
     let currentY = event.clientY - rect.top;
 
-    // Clamp coordinates to simulator bounds
-    currentX = Math.min(Math.max(currentX, 0), rect.width);
-    currentY = Math.min(Math.max(currentY, 0), rect.height);
-
     const width = currentX - selectionStartX;
     const height = currentY - selectionStartY;
 
@@ -449,10 +445,15 @@ function stopSelection(event) {
     if (!isSelecting) return;
 
     const rect = event.target.getBoundingClientRect();
-    const endX = Math.min(Math.max(event.clientX - rect.left, 0), DEVICE_WIDTH);
-    const endY = Math.min(Math.max(event.clientY - rect.top, 0), DEVICE_HEIGHT);
+    let endX = event.clientX - rect.left;
+    let endY = event.clientY - rect.top;
+
+    // Clamp final coordinates to simulator bounds
+    endX = Math.min(Math.max(endX, 0), rect.width);
+    endY = Math.min(Math.max(endY, 0), rect.height);
 
     finishSelection(endX, endY);
+    isSelecting = false;
 }
 
 function finishSelection(endX, endY) {
@@ -482,7 +483,6 @@ function finishSelection(endX, endY) {
     if (targetBlock) {
         targetBlock.region = region;
         state.pendingBlockConfiguration = null;
-        isSelecting = false;
 
         // Show selection box for the newly set region
         showSelectionBox(region);
@@ -922,7 +922,7 @@ function setupVideoSharing() {
             }
             const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
-                    cursor: "always"
+                    cursor:                    cursor: "always"
                 },
                 audio: false
             });
