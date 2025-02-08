@@ -354,3 +354,57 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
         opacity: 0;
     }
 }
+
+/* Block overlay styles */
+.block {
+    position: relative;
+}
+
+.block-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.75);
+    z-index: 1;
+    display: none;
+}
+
+.block-overlay.active {
+    display: block;
+}
+
+.block-overlay-title {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--bs-dark);
+    text-align: center;
+    display: none;
+    z-index: 2;
+}
+
+.block-overlay-title.active {
+    display: block;
+}
+
+.toggle-overlay-btn {
+    padding: 2px 6px;
+    line-height: 1;
+    font-size: 0.8rem;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.toggle-overlay-btn:hover {
+    opacity: 1;
+}
+
+.toggle-overlay-btn.active {
+    background-color: var(--bs-secondary);
+    color: var(--bs-light);
+}
