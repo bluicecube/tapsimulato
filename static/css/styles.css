@@ -85,14 +85,32 @@ body {
     position: relative;
 }
 
+/* Tap block styling */
 .tap-block {
     border-left: 4px solid var(--bs-primary);
+    margin-bottom: 0.5rem;
+    padding: 15px;
 }
 
+.tap-block .controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tap-block .region-text {
+    font-size: 0.875rem;
+    color: var(--bs-secondary);
+    margin: 0;
+}
+
+/* Loop block styling */
 .loop-block {
     border-left: 4px solid var(--bs-success);
 }
 
+/* Function block styling */
 .function-block {
     border-left: 4px solid var(--bs-light);
     position: relative;
@@ -107,9 +125,10 @@ body {
     background-color: rgba(255, 255, 255, 0.75);
     display: none;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     z-index: 10;
     transition: opacity 0.3s ease;
+    padding-top: 2rem;
 }
 
 .function-overlay.active {
@@ -117,11 +136,33 @@ body {
 }
 
 .function-overlay-text {
-    font-size: 1.5rem;
+    font-size: 2rem;
     font-weight: bold;
     color: var(--bs-dark);
     text-align: center;
     padding: 1rem;
+}
+
+.function-overlay-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    opacity: 0.1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+.pattern-text {
+    font-size: 1rem;
+    color: var(--bs-dark);
+    margin: 0.5rem;
+    transform: rotate(-45deg);
 }
 
 .toggle-overlay-btn {
@@ -133,12 +174,12 @@ body {
     color: var(--bs-light);
     cursor: pointer;
     transition: background-color 0.2s ease;
+    z-index: 11;
 }
 
 .toggle-overlay-btn:hover {
     background-color: var(--bs-secondary);
 }
-
 
 .nested-blocks {
     margin-left: 20px;

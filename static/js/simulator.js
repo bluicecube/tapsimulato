@@ -783,13 +783,74 @@ function renderBlock(block, index) {
                 </div>
             </div>
             <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-loop-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-loop-btn">Add Loop</button>
+            </div>
         `;
 
-        // Add event listeners
+        // Add event listeners for iteration controls
         const iterationsInput = blockDiv.querySelector('.iterations-input');
         const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
         const increaseBtn = blockDiv.querySelector('.increase-iterations');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
+
+        // Add event listeners for nested block buttons
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-loop-btn');
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-loop-btn');
+
+        if (addTapBtn) {
+            addTapBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const blockIndex = blockDiv.dataset.index;
+                const indices = blockIndex.split('.');
+                let targetBlock = state.currentTask.blocks[indices[0]];
+
+                // Navigate to the correct nested block if necessary
+                for (let i = 1; i < indices.length; i++) {
+                    targetBlock = targetBlock.blocks[indices[i]];
+                }
+
+                if (!targetBlock.blocks) {
+                    targetBlock.blocks = [];
+                }
+
+                targetBlock.blocks.push({
+                    type: 'tap',
+                    description: 'Click to set region'
+                });
+
+                updateTaskDisplay();
+                scheduleAutosave();
+            });
+        }
+
+        if (addLoopBtn) {
+            addLoopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const blockIndex = blockDiv.dataset.index;
+                const indices = blockIndex.split('.');
+                let targetBlock = state.currentTask.blocks[indices[0]];
+
+                // Navigate to the correct nested block if necessary
+                for (let i = 1; i < indices.length; i++) {
+                    targetBlock = targetBlock.blocks[indices[i]];
+                }
+
+                if (!targetBlock.blocks) {
+                    targetBlock.blocks = [];
+                }
+
+                targetBlock.blocks.push({
+                    type: 'loop',
+                    iterations: 1,
+                    blocks: []
+                });
+
+                updateTaskDisplay();
+                scheduleAutosave();
+            });
+        }
 
         if (iterationsInput && decreaseBtn && increaseBtn) {
             decreaseBtn.addEventListener('click', (e) => {
@@ -1822,7 +1883,7 @@ function renderUrlBlock(block, blockDiv, index) {
         <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">URL Block</h6>
             <div class="btn-group">
-                <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
+                <button class="btn btn-sm btn-outline-primary edit-urlbtn">Edit URL</button>
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
@@ -1887,6 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addUrlBtn.id = 'addUrlBtn';
 
     // Find the button group and addconst btnGroup = document.querySelector('.btn-group.w-100.mb-3');
+    const btnGroup = document.querySelector('#addLoopBtn').parentElement;
     if (btnGroup) {
         btnGroup.appendChild(addUrlBtn);
         addUrlBtn.addEventListener('click', addUrlBlock);
