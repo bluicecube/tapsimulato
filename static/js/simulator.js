@@ -2,6 +2,9 @@
 const DEVICE_WIDTH = 320;
 const DEVICE_HEIGHT = 720;
 
+// Functions state
+let functions = [];
+
 // Initial state setup
 window.state = {
     currentTask: null,
@@ -12,13 +15,9 @@ window.state = {
     lastTaskId: localStorage.getItem('lastTaskId'),
     currentFrame: null,
     functionOverlaysEnabled: true,
-    executingBlocks: new Set() // Track executing blocks
+    executingBlocks: new Set()
 };
 
-// Functions state
-let functions = [];
-
-// Add these helper functions at the top level
 async function loadFunctionData(functionId) {
     console.log('Loading function data for ID:', functionId);
     try {
@@ -33,30 +32,18 @@ async function loadFunctionData(functionId) {
     }
 }
 
-// Move these functions to the top level for global access
+// Block serialization/deserialization
 function serializeBlock(block) {
     console.log('Serializing block:', block);
     const serializedBlock = {
         type: block.type,
         name: block.name || null,
-        data: block.data || {},
+        data: { ...block.data } || {},
         order: block.order || 0
     };
 
-    // Save type-specific data
-    if (block.type === 'tap' && block.data?.region) {
-        serializedBlock.data.region = block.data.region;
-    } else if (block.type === 'loop') {
-        serializedBlock.data.iterations = block.data?.iterations || 1;
-        if (block.blocks && block.blocks.length > 0) {
-            serializedBlock.blocks = block.blocks.map(serializeBlock);
-        }
-    } else if (block.type === 'function') {
-        serializedBlock.data.functionId = block.data?.functionId;
-        serializedBlock.data.description = block.data?.description;
-        if (block.blocks && block.blocks.length > 0) {
-            serializedBlock.blocks = block.blocks.map(serializeBlock);
-        }
+    if (block.blocks && block.blocks.length > 0) {
+        serializedBlock.blocks = block.blocks.map(serializeBlock);
     }
 
     console.log('Serialized block:', serializedBlock);
@@ -68,30 +55,16 @@ function deserializeBlock(block) {
     const deserializedBlock = {
         type: block.type,
         name: block.name,
-        data: block.data || {},
-        order: block.order || 0
+        data: { ...block.data } || {},
+        order: block.order || 0,
+        blocks: block.blocks ? block.blocks.map(deserializeBlock) : []
     };
-
-    // Restore type-specific data
-    if (block.type === 'tap' && block.data?.region) {
-        deserializedBlock.data.region = block.data.region;
-    } else if (block.type === 'loop') {
-        deserializedBlock.data.iterations = block.data?.iterations || 1;
-        if (block.blocks && block.blocks.length > 0) {
-            deserializedBlock.blocks = block.blocks.map(deserializeBlock);
-        }
-    } else if (block.type === 'function') {
-        deserializedBlock.data.functionId = block.data?.functionId;
-        deserializedBlock.data.description = block.data?.description;
-        if (block.blocks && block.blocks.length > 0) {
-            deserializedBlock.blocks = block.blocks.map(deserializeBlock);
-        }
-    }
 
     console.log('Deserialized block:', deserializedBlock);
     return deserializedBlock;
 }
 
+// Block execution
 async function executeBlock(block) {
     console.log('Executing block:', block);
     const blockElement = document.querySelector(`[data-index="${block.order}"]`);
@@ -141,29 +114,6 @@ async function executeBlock(block) {
     }
 }
 
-
-async function simulateTap(region) {
-    return new Promise((resolve) => {
-        const centerX = (region.x1 + region.x2) / 2;
-        const centerY = (region.y1 + region.y2) / 2;
-
-        // Create tap feedback effect
-        const feedback = document.createElement('div');
-        feedback.className = 'tap-feedback';
-        feedback.style.left = `${centerX}px`;
-        feedback.style.top = `${centerY}px`;
-
-        const simulator = document.getElementById('simulator');
-        simulator.appendChild(feedback);
-
-        // Remove the feedback element after animation
-        setTimeout(() => {
-            feedback.remove();
-            resolve();
-        }, 500);
-    });
-}
-
 // Update the loadTask function to properly deserialize blocks
 async function loadTask(taskId) {
     try {
@@ -180,7 +130,7 @@ async function loadTask(taskId) {
 
         state.currentTask = {
             id: taskId,
-            blocks: blocks.map(block => deserializeBlock(block))
+            blocks: blocks.map(deserializeBlock)
         };
 
         // Save last opened task ID
@@ -209,6 +159,7 @@ async function saveCurrentTask() {
 
     try {
         const blocks = state.currentTask.blocks.map(serializeBlock);
+        console.log('Saving blocks:', blocks);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
@@ -225,164 +176,14 @@ async function saveCurrentTask() {
     }
 }
 
-
-// State management
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize UI elements
-    const selectionBox = document.getElementById('selectionBox');
-    const simulator = document.getElementById('simulator');
-    const taskTitle = document.getElementById('taskTitle');
-
-    // Set up event listeners
-    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
-    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
-    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
-    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
-    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
-    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
-
-
-    // Add task title change handler
-    taskTitle.addEventListener('change', async () => {
-        if (state.currentTask) {
-            try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: taskTitle.value
-                    })
-                });
-
-                if (!response.ok) throw new Error('Failed to update task name');
-
-                const updatedTask = await response.json();
-                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
-                if (taskIndex !== -1) {
-                    state.tasks[taskIndex] = updatedTask;
-                    updateTaskList();
-                }
-
-                logToConsole('Task name updated', 'success');
-            } catch (error) {
-                logToConsole('Failed to update task name', 'error');
-            }
-        }
-    });
-
-    // Selection events
-    simulator.addEventListener('mousedown', startSelection);
-    simulator.addEventListener('mousemove', updateSelection);
-
-    // Listen for mouseup on document to catch out-of-bounds releases
-    document.addEventListener('mouseup', (event) => {
-        if (isSelecting) {
-            const rect = simulator.getBoundingClientRect();
-            const simulatorX = event.clientX - rect.left;
-            const simulatorY = event.clientY - rect.top;
-
-            // Clamp coordinates to simulator bounds
-            const endX = Math.max(0, Math.min(rect.width, simulatorX));
-            const endY = Math.max(0, Math.min(rect.height, simulatorY));
-
-            finishSelection(endX, endY);
-            isSelecting = false;
-        }
-    });
-
-    // Continue selection when mouse re-enters simulator
-    simulator.addEventListener('mouseenter', (event) => {
-        if (isSelecting) {
-            updateSelection(event);
-        }
-    });
-
-    // Remove the mouseleave handler that was forcing selection completion
-    simulator.removeEventListener('mouseleave', () => {});
-
-
-    // Setup video sharing
-    setupVideoSharing();
-
-    // Load functions and tasks
-    loadFunctions();
-    loadTasks().then(() => {
-        console.log('Initial state setup complete:', window.state);
-    });
-
-    // Initialize function modal
-    const functionModal = document.getElementById('functionModal');
-    if (functionModal) {
-        new bootstrap.Modal(functionModal);
-    }
-
-    // Add save function button handler
-    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
-    if (saveFunctionBtn) {
-        saveFunctionBtn.addEventListener('click', saveFunction);
-    }
-
-    // Add function overlay control next to the function button
-    const functionBtn = document.querySelector('[data-bs-target="#functionModal"]');
-    if (functionBtn) {
-        const overlayControl = document.createElement('div');
-        overlayControl.className = 'function-overlay-control';
-        overlayControl.innerHTML = `
-            <input type="checkbox" id="functionOverlayToggle" checked>
-            <label for="functionOverlayToggle">Collapse Function Blocks</label>
-        `;
-        functionBtn.parentNode.insertBefore(overlayControl, functionBtn);
-    }
-
-    // Add event listener for overlay toggle
-    document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
-        state.functionOverlaysEnabled = e.target.checked;
-        const functionBlocks = document.querySelectorAll('.function-block');
-        functionBlocks.forEach(block => {
-            if (e.target.checked) {
-                block.classList.add('collapsed');
-            } else {
-                block.classList.remove('collapsed');
-            }
-        });
-    });
-});
-
-// Make functions available globally
-window.processBlocks = function(blocks) {
-    console.log('Processing blocks in simulator:', blocks);
-    if (!window.state.currentTask) {
-        console.error('No active task available');
-        return false;
-    }
-
-    try {
-        blocks.forEach(block => {
-            if (block.type === 'loop') {
-                addLoopBlock(block.iterations, block.blocks);
-            } else if (block.type === 'tap') {
-                addTapBlock(null, block.region);
-            } else if (block.type === 'url') {
-                addUrlBlock(block.url);
-            }
-        });
-        updateTaskDisplay();
-        scheduleAutosave();
-        return true;
-    } catch (error) {
-        console.error('Error processing blocks:', error);
-        return false;
-    }
-};
-
-// Task Management
+// Load tasks
 async function loadTasks() {
     try {
         const response = await fetch('/api/tasks');
         if (!response.ok) throw new Error('Failed to load tasks');
 
         state.tasks = await response.json();
+        console.log('Loaded tasks:', state.tasks);
         updateTaskList();
 
         if (state.tasks.length > 0) {
@@ -413,54 +214,6 @@ async function loadTasks() {
         }
     }
 }
-
-async function createNewTask() {
-    try {
-        // Find highest task number
-        const taskNumbers = state.tasks
-            .map(t => {
-                const match = t.name.match(/^Task (\d+)$/);
-                return match ? parseInt(match[1]) : 0;
-            })
-            .filter(n => !isNaN(n));
-
-        const nextNumber = taskNumbers.length > 0 ? Math.max(...taskNumbers) + 1 : 1;
-
-        const response = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: `Task ${nextNumber}`
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to create task');
-
-        const task = await response.json();
-        state.tasks.push(task);
-        state.currentTask = {
-            id: task.id,
-            blocks: []
-        };
-
-        // Save last opened task ID
-        state.lastTaskId = task.id;
-        localStorage.setItem('lastTaskId', task.id);
-
-        updateTaskList();
-        updateTaskDisplay();
-
-        logToConsole('New task created', 'success');
-        return task;
-    } catch (error) {
-        logToConsole('Error creating task', 'error');
-        throw error;
-    }
-}
-
-// Add autosave before loading new task
-
-
 
 // UI Updates
 function updateTaskList() {
@@ -1387,6 +1140,7 @@ async function saveCurrentTask() {
 
     try {
         const blocks = state.currentTask.blocks.map(serializeBlock);
+        console.log('Saving blocks:', blocks);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
@@ -1884,7 +1638,7 @@ async function executeUrlBlock(block) {
     try {
         window.open(block.url, '_blank');
         logToConsole(`Opened URL: ${block.url}`, 'success');
-    } catch (error{
+    } catch (error) {
         logToConsole(`Failed to open URL: ${error.message}`, 'error');
     }
 }
