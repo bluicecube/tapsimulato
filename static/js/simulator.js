@@ -727,7 +727,30 @@ function renderBlock(block, index) {
     blockDiv.className = `block ${block.type}-block`;
     blockDiv.dataset.index = index;
 
+    function hasUndefinedValues(block) {
+        if (!block) return true;
+
+        if (block.type === 'tap' && !block.region) {
+            return true;
+        }
+
+        if (block.type === 'loop' && block.blocks) {
+            return block.blocks.some(hasUndefinedValues);
+        }
+
+        if (block.type === 'function') {
+            return block.blocks && block.blocks.some(hasUndefinedValues);
+        }
+
+        return false;
+    }
+
+
     if (block.type === 'function') {
+        if (hasUndefinedValues(block)) {
+            blockDiv.classList.add('has-undefined');
+        }
+
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
