@@ -236,7 +236,13 @@ async function loadTask(taskId) {
         const blocks = await response.json();
         state.currentTask = {
             id: taskId,
-            blocks: blocks || []
+            blocks: blocks.map(block => {
+                // Ensure all block data is properly loaded
+                if (block.type === 'tap' && block.data && block.data.region) {
+                    block.region = block.data.region;
+                }
+                return block;
+            }) || []
         };
 
         // Save last opened task ID
@@ -471,19 +477,6 @@ function updateSelection(event) {
     selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
 }
 
-function stopSelection(event) {
-    if (!isSelecting) return;
-
-    const simulator = document.getElementById('simulator');
-    const rect = simulator.getBoundingClientRect();
-
-    // Get final coordinates, clamped to simulator bounds
-    let endX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-    let endY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-
-    finishSelection(endX, endY);
-    isSelecting = false;
-}
 
 function finishSelection(endX, endY) {
     const region = {
@@ -493,7 +486,6 @@ function finishSelection(endX, endY) {
         y2: Math.max(selectionStartY, endY)
     };
 
-    // Find the block to update based on the configuration index
     const blockIndex = state.pendingBlockConfiguration.dataset.index;
     const indices = blockIndex.split('.');
     let targetBlock;
@@ -531,12 +523,19 @@ async function saveCurrentTask() {
     if (!state.currentTask) return;
 
     try {
+        const blocks = state.currentTask.blocks.map(block => {
+            const blockData = { ...block };
+            // Ensure region data is saved in the block's data field
+            if (block.type === 'tap' && block.region) {
+                blockData.data = { ...blockData.data, region: block.region };
+            }
+            return blockData;
+        });
+
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                blocks: state.currentTask.blocks || []
-            })
+            body: JSON.stringify({ blocks })
         });
 
         if (!response.ok) throw new Error('Failed to save blocks');
@@ -814,41 +813,54 @@ function renderBlock(block, index) {
 }
 
 function renderTapBlock(block, blockDiv, index) {
-    const regionText = block.region ?
-        `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-        'No region set';
+    const updateRegionDisplay = () => {
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            'No region set';
+
+        blockDiv.querySelector('.region-text').textContent = `Region: ${regionText}`;
+    };
 
     blockDiv.innerHTML = `
         <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">Tap Block</h6>
             <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary set-region-btn">Set Region</button>
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted">Region: ${regionText}</small>
+        <small class="text-muted region-text">Region: ${block.region ? 
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` : 
+            'No region set'}</small>
     `;
 
-    // Make the entire block clickable for region selection
+    // Handle block selection and region definition
     blockDiv.addEventListener('click', (e) => {
         if (!e.target.closest('.btn')) {
             e.stopPropagation();
-            const wasAlreadyFocused = blockDiv.classList.contains('focused');
             setBlockFocus(block, blockDiv);
+        }
+    });
 
-            // Start region selection immediately if block is already focused
-            if (wasAlreadyFocused || !block.region) {
-                startTapRegionSelection(blockDiv);
-            }
-            enableDrawingMode(block, blockDiv);
+    // Add dedicated button for region selection
+    const setRegionBtn = blockDiv.querySelector('.set-region-btn');
+    setRegionBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startTapRegionSelection(blockDiv);
+        if (block.region) {
+            showSelectionBox(block.region);
         }
     });
 
     const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            removeBlock(blockDiv);
-        });
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeBlock(blockDiv);
+    });
+
+    // Update region display when the block's region changes
+    if (block.region) {
+        showSelectionBox(block.region);
     }
 
     return blockDiv;
