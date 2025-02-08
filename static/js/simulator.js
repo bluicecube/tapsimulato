@@ -542,10 +542,8 @@ async function saveCurrentTask() {
                 }
 
                 // Handle nested blocks in loops and functions
-                if (block.type === 'loop' || block.type === 'function') {
-                    if (block.blocks && block.blocks.length > 0) {
-                        preparedBlock.blocks = prepareBlocks(block.blocks);
-                    }
+                if ((block.type === 'loop' || block.type === 'function') && block.blocks) {
+                    preparedBlock.blocks = prepareBlocks(block.blocks);
                 }
 
                 return preparedBlock;
@@ -919,22 +917,25 @@ async function executeTask() {
                     logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
                 }, delay);
             } else if (block.type === 'conditional') {
-                const currentImage = captureVideoFrame();                try {
-                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: currentImage })
-                });
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
 
-                if (!response.ok) throw new Error('Failed to compare images');
+                    if (!response.ok) throw new Error('Failed to compare images');
 
-                const result = await response.json();
-                const blocksToExecute = result.similarity >= result.threshold ?
-                    block.data.thenBlocks : block.data.elseBlocks;
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
 
-                logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
-                await executeBlocks(blocksToExecute);
-            } catch (error) {
-                logToConsole('Error executing conditional block: ' + error.message, 'error');
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
             }
         }
     }
@@ -943,6 +944,92 @@ async function executeTask() {
     setTimeout(() => {
         logToConsole('Task execution completed', 'success');
     }, delay + delayIncrement);
+}
+
+// Add missing utility functions
+function showTapFeedback(region) {
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+    feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
+}
+
+function captureVideoFrame() {
+    const video = document.getElementById('bgVideo');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
+}
+
+// Enhanced save function to ensure all nested blocks are saved
+async function saveCurrentTask() {
+    if (!state.currentTask) return;
+
+    try {
+        // Deep clone and prepare blocks for saving
+        function prepareBlocks(blocks) {
+            return blocks.map(block => {
+                const preparedBlock = { ...block };
+
+                // Handle tap blocks
+                if (block.type === 'tap' && block.region) {
+                    preparedBlock.data = { ...preparedBlock.data, region: block.region };
+                }
+
+                // Handle nested blocks in loops and functions
+                if ((block.type === 'loop' || block.type === 'function') && block.blocks) {
+                    preparedBlock.blocks = prepareBlocks(block.blocks);
+                }
+
+                return preparedBlock;
+            });
+        }
+
+        const blocks = prepareBlocks(state.currentTask.blocks);
+
+        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blocks })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Task saved', 'success');
+    } catch (error) {
+        logToConsole('Failed to save task', 'error');
+        console.error('Save task error:', error);
+        throw error;
+    }
+}
+
+// Enhance scheduleAutosave to provide immediate feedback
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                await saveCurrentTask();
+            } catch (error) {
+                console.error('Autosave failed:', error);
+            }
+        }
+    }, 1000); // Save after 1 second of inactivity
 }
 
 // Add button to UI
