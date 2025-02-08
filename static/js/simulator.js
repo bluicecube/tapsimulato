@@ -291,6 +291,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Add tab switching functionality
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            // Update active button
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            // Show selected content
+            document.querySelectorAll('.content-section').forEach(section => section.classList.add('d-none'));
+            document.getElementById(button.dataset.tab).classList.remove('d-none');
+        });
+    });
+
+    // Initialize charts
+    initializeCharts();
 });
 
 // Make functions available globally
@@ -920,7 +936,7 @@ function renderBlock(block, index) {
         });
 
         // Add threshold change handler
-        const thresholdInput = blockDiv.querySelector('.threshold-input');
+        const thresholdInput = blockDiv.querySelector('.threshold-input;
         thresholdInput.addEventListener('change', (e) => {
             block.data.threshold = parseInt(e.target.value) || 90;
             scheduleAutosave();
@@ -1050,9 +1066,13 @@ async function executeTask() {
         for (const [index, block] of blocks.entries()) {
             const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
             const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+            const progressItem = document.querySelectorAll('.progress-item')[parseInt(blockIndex)];
 
             if (blockElement) {
                 blockElement.classList.add('executing');
+            }
+            if (progressItem) {
+                progressItem.classList.add('completed');
             }
 
             if (block.type === 'function') {
@@ -1099,11 +1119,19 @@ async function executeTask() {
 
             if (blockElement) {
                 blockElement.classList.remove('executing');
+
+                // Validate function blocks
+                if (block.type === 'function' && !validateFunction(block)) {
+                    blockElement.classList.add('invalid');
+                }
             }
         }
     }
 
+    const startTime = performance.now();
     await executeBlocks(state.currentTask.blocks);
+    const executionTime = (performance.now() - startTime) / 1000;
+    updateExecutionStats(executionTime);
     logToConsole('Task execution completed', 'success');
 }
 
@@ -1692,9 +1720,13 @@ async function executeTask() {
         for (const [index, block] of blocks.entries()) {
             const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
             const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+            const progressItem = document.querySelectorAll('.progress-item')[parseInt(blockIndex)];
 
             if (blockElement) {
                 blockElement.classList.add('executing');
+            }
+            if (progressItem) {
+                progressItem.classList.add('completed');
             }
 
             if (block.type === 'function') {
@@ -1741,11 +1773,24 @@ async function executeTask() {
 
             if (blockElement) {
                 blockElement.classList.remove('executing');
+
+                // Validate function blocks
+                if (block.type === 'function' && !validateFunction(block)) {
+                    blockElement.classList.add('invalid');
+                }
             }
         }
     }
 
-    await executeBlocks(state.currentTask.blocks);
+    updateProgressTracker(state.currentTask.blocks);
+    const startTime = performance.now();
+    try {
+        await executeBlocks(state.currentTask.blocks);
+        const executionTime = (performance.now() - startTime) / 1000;
+        updateExecutionStats(executionTime);
+    } catch (error) {
+        logToConsole('Error executing task: ' + error.message, 'error');
+    }
     logToConsole('Task execution completed', 'success');
 }
 
@@ -1966,3 +2011,221 @@ executeBlocks = async function(blocks) {
         }
     }
 };
+
+// Add tab switching functionality
+document.addEventListener('DOMContentLoaded', () => {
+    // existing initialization code 
+
+    // Tab switching
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            // Update active button
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            // Show selected content
+            document.querySelectorAll('.content-section').forEach(section => section.classList.add('d-none'));
+            document.getElementById(button.dataset.tab).classList.remove('d-none');
+        });
+    });
+
+    // Initialize charts
+    initializeCharts();
+});
+
+// Progress tracking
+function updateProgressTracker(blocks, parentName = '') {
+    const progressItems = document.getElementById('progressItems');
+    progressItems.innerHTML = '';
+
+    function addProgressItem(block, prefix = '') {
+        const item = document.createElement('div');
+        item.className = 'progress-item';
+        item.innerHTML = `
+            <div class="progress-checkbox"></div>
+            <div class="progress-label">${prefix}${block.type === 'function' ? block.name : block.type}</div>
+        `;
+        progressItems.appendChild(item);
+
+        if (block.blocks) {
+            block.blocks.forEach(nestedBlock => {
+                addProgressItem(nestedBlock, `${prefix}  → `);
+            });
+        }
+    }
+
+    blocks.forEach(block => addProgressItem(block));
+}
+
+// Function validation
+function validateFunction(block) {
+    if (block.type === 'function') {
+        const hasUndefinedBlocks = block.blocks.some(b => !b.type || !b.name);
+        if (hasUndefinedBlocks) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Execution tracking
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks) {
+        logToConsole('No task selected or empty task', 'error');
+        return;
+    }
+
+    updateProgressTracker(state.currentTask.blocks);
+    const startTime = performance.now();
+
+    try {
+        await executeBlocks(state.currentTask.blocks);
+        const executionTime = (performance.now() - startTime) / 1000;
+        updateExecutionStats(executionTime);
+    } catch (error) {
+        logToConsole('Error executing task: ' + error.message, 'error');
+    }
+}
+
+// Financial dashboard
+function initializeCharts() {
+    // Execution Time Chart
+    const timeCtx = document.getElementById('executionTimeChart').getContext('2d');
+    new Chart(timeCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Task Execution Time (s)',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Task Completion Chart
+    const completionCtx = document.getElementById('taskCompletionChart').getContext('2d');
+    new Chart(completionCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Completed', 'Failed'],
+            datasets: [{
+                label: 'Task Completion Status',
+                data: [0, 0],
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(255, 99, 132, 0.2)'
+                ],
+                borderColor: [
+                    'rgb(75, 192, 192)',
+                    'rgb(255, 99, 132)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function updateExecutionStats(executionTime) {
+    const timeChart = Chart.getChart('executionTimeChart');
+    const completionChart = Chart.getChart('taskCompletionChart');
+
+    if (timeChart) {
+        timeChart.data.labels.push(new Date().toLocaleTimeString());
+        timeChart.data.datasets[0].data.push(executionTime);
+        if (timeChart.data.labels.length > 10) {
+            timeChart.data.labels.shift();
+            timeChart.data.datasets[0].data.shift();
+        }
+        timeChart.update();
+    }
+
+    if (completionChart) {
+        completionChart.data.datasets[0].data[0]++;
+        completionChart.update();
+    }
+}
+
+// Update existing executeBlocks function
+async function executeBlocks(blocks, parentIndex = null) {
+    for (const [index, block] of blocks.entries()) {
+        const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+        const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+        const progressItem = document.querySelectorAll('.progress-item')[parseInt(blockIndex)];
+
+        if (blockElement) {
+            blockElement.classList.add('executing');
+        }
+        if (progressItem) {
+            progressItem.classList.add('completed');
+        }
+
+        if (block.type === 'function') {
+            const func = functions.find(f => f.name === block.name);
+            if (func && func.blocks) {
+                await executeBlocks(func.blocks, blockIndex);
+            } else {
+                logToConsole(`Function "${block.name}" not found`, 'error');
+            }
+        } else if (block.type === 'loop') {
+            for (let i = 0; i < block.iterations; i++) {
+                await executeBlocks(block.blocks, blockIndex);
+            }
+        } else if (block.type === 'tap' && block.region) {
+            delay += delayIncrement;
+            await new Promise(resolve => setTimeout(() => {
+                const coords = showTapFeedback(block.region);
+                logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                resolve();
+            }, delayIncrement));
+        } else if (block.type === 'conditional') {
+            const currentImage = captureVideoFrame();
+            try {
+                const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: currentImage })
+                });
+
+                if (!response.ok) throw new Error('Failed to compare images');
+
+                const result = await response.json();
+                const blocksToExecute = result.similarity >= result.threshold ?
+                    block.data.thenBlocks : block.data.elseBlocks;
+
+                logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                await executeBlocks(blocksToExecute, blockIndex);
+            } catch (error) {
+                logToConsole('Error executing conditional block: ' + error.message, 'error');
+            }
+        } else if (block.type === 'url') {
+            await executeUrlBlock(block);
+        }
+
+        if (blockElement) {
+            blockElement.classList.remove('executing');
+
+            // Validate function blocks
+            if (block.type === 'function' && !validateFunction(block)) {
+                blockElement.classList.add('invalid');
+            }
+        }
+    }
+}
