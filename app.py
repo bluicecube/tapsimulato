@@ -68,7 +68,7 @@ def compare_images(img1_data, img2_data):
 def index():
     return render_template('index.html')
 
-# Function-related endpoints remain unchanged
+# Function-related endpoints
 @app.route('/api/functions', methods=['GET'])
 def get_functions():
     functions = Function.query.filter_by(is_active=True).all()
@@ -107,6 +107,7 @@ def update_function(function_id):
     function.name = data.get('name', function.name)
     function.description = data.get('description', function.description)
     function.blocks = data.get('blocks', function.blocks)
+    function.is_active = data.get('is_active', function.is_active)  # Add support for restoring
     function.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({
@@ -115,7 +116,8 @@ def update_function(function_id):
         'description': function.description,
         'blocks': function.blocks,
         'created_at': function.created_at.isoformat(),
-        'updated_at': function.updated_at.isoformat()
+        'updated_at': function.updated_at.isoformat(),
+        'is_active': function.is_active
     })
 
 @app.route('/api/functions/<int:function_id>', methods=['DELETE'])
@@ -265,7 +267,7 @@ def save_blocks(task_id):
         logger.error(f"Error saving blocks: {str(e)}")
         return jsonify({'error': 'Failed to save blocks'}), 500
 
-# Other endpoints remain unchanged
+# Other endpoints
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:

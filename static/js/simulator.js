@@ -11,7 +11,9 @@ window.state = {
     focusedBlock: null,
     lastTaskId: localStorage.getItem('lastTaskId'),
     currentFrame: null,
-    functionOverlaysEnabled: true // New state for function overlays
+    functionOverlaysEnabled: true,
+    deletedFunctions: [], // Stack for undo
+    restoredFunctions: [] // Stack for redo
 };
 
 // Functions state
@@ -289,6 +291,78 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+    }
+
+    // Add undo/redo buttons after the function overlay control
+    const functionControls = document.createElement('div');
+    functionControls.className = 'function-controls';
+    functionControls.innerHTML = `
+        <div class="btn-group">
+            <button id="undoBtn" class="btn btn-outline-secondary" disabled title="Undo Delete">↩</button>
+            <button id="redoBtn" class="btn btn-outline-secondary" disabled title="Redo Delete">↪</button>
+        </div>
+    `;
+    actionButtonsContainer.insertAdjacentElement('afterend', functionControls);
+
+    // Add event listeners for undo/redo
+    document.getElementById('undoBtn').addEventListener('click', async () => {
+        if (state.deletedFunctions.length > 0) {
+            const functionToRestore = state.deletedFunctions.pop();
+            try {
+                const response = await fetch(`/api/functions/${functionToRestore.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...functionToRestore,
+                        is_active: true
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to restore function');
+
+                state.restoredFunctions.push(functionToRestore);
+                await loadFunctions(); // Refresh the function list
+                updateUndoRedoButtons();
+                logToConsole(`Restored function: ${functionToRestore.name}`, 'success');
+            } catch (error) {
+                logToConsole('Failed to restore function', 'error');
+                state.deletedFunctions.push(functionToRestore); // Put it back in the stack
+            }
+        }
+    });
+
+    document.getElementById('redoBtn').addEventListener('click', async () => {
+        if (state.restoredFunctions.length > 0) {
+            const functionToDelete = state.restoredFunctions.pop();
+            try {
+                const response = await fetch(`/api/functions/${functionToDelete.id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete function');
+
+                state.deletedFunctions.push(functionToDelete);
+                await loadFunctions(); // Refresh the function list
+                updateUndoRedoButtons();
+                logToConsole(`Re-deleted function: ${functionToDelete.name}`, 'success');
+            } catch (error) {
+                logToConsole('Failed to delete function', 'error');
+                state.restoredFunctions.push(functionToDelete); // Put it back in the stack
+            }
+        }
+    });
+
+    // Add function to update button states
+    function updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+
+        if (undoBtn) {
+            undoBtn.disabled = state.deletedFunctions.length === 0;
+        }
+        if (redoBtn) {
+            redoBtn.disabled = state.restoredFunctions.length === 0;
+        }
     }
 });
 
@@ -1796,6 +1870,9 @@ async function addFunctionToTask(func) {
 }
 
 async function deleteFunction(functionId) {
+    const functionToDelete = functions.find(f =>f.id === functionId);
+    if (!functionToDelete) return;
+
     try {
         const response = await fetch(`/api/functions/${functionId}`, {
             method: 'DELETE'
@@ -1803,11 +1880,13 @@ async function deleteFunction(functionId) {
 
         if (!response.ok) throw new Error('Failed to delete function');
 
-        window.functions = window.functions.filter(f => f.id !== functionId);
-        updateFunctionsList();
-        logToConsole('Function deleted successfully', 'success');
+        state.deletedFunctions.push(functionToDelete);
+        state.restoredFunctions = []; // Clear redo stack when new action is performed
+        await loadFunctions();
+        updateUndoRedoButtons();
+        logToConsole(`Deleted function: ${functionToDelete.name}`, 'success');
     } catch (error) {
-        logToConsole('Error deleting function', 'error');
+        logToConsole('Failed to delete function', 'error');
     }
 }
 
@@ -1883,7 +1962,8 @@ function renderUrlBlock(block, blockDiv, index) {
 }
 
 async function executeUrlBlock(block) {
-    if (!block.url) {logToConsole('No URL specified for URL block', 'error');
+    if (!block.url) {
+        logToConsole('No URL specified for URL block', 'error');
         return;
     }
 
