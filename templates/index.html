@@ -10,112 +10,83 @@
 </head>
 <body>
     <div class="container-fluid">
-        <!-- Main Content Section -->
-        <div id="mainContent" class="content-section">
-            <div class="row">
-                <!-- Simulator Column -->
-                <div class="col-md-4">
-                    <div class="card mb-3">
-                        <div class="simulator-content">
-                            <div id="simulator" class="simulator">
-                                <video id="bgVideo" autoplay muted></video>
-                                <div id="selectionBox" class="selection-box d-none"></div>
-                            </div>
-                            <button class="btn btn-sm btn-primary share-screen-btn" id="setVideoSource">
-                                Share Screen
+        <div class="row">
+            <!-- Simulator Column -->
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="simulator-content">
+                        <div id="simulator" class="simulator">
+                            <video id="bgVideo" autoplay muted></video>
+                            <div id="selectionBox" class="selection-box d-none"></div>
+                        </div>
+                        <button class="btn btn-sm btn-primary share-screen-btn" id="setVideoSource">
+                            Share Screen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Controls Column -->
+            <div class="col-md-5">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Task Controls</h4>
+                            <button class="btn btn-success" id="executeTaskBtn">Execute</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Task Title -->
+                        <div class="mb-3">
+                            <input type="text" id="taskTitle" class="form-control" placeholder="Task Name">
+                        </div>
+
+                        <!-- Block Controls -->
+                        <div class="btn-group w-100 mb-3">
+                            <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
+                            <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
+                            <button class="btn btn-outline-info" id="addConditionalBtn">Add Logic</button>
+                            <button class="btn btn-outline-light dropdown-toggle" id="addFunctionBtn" data-bs-toggle="dropdown">
+                                Add Function
+                            </button>
+                            <ul class="dropdown-menu" id="functionsList">
+                                <!-- Functions will be populated here -->
+                            </ul>
+                        </div>
+
+                        <!-- Function Creation Modal Button -->
+                        <div class="text-end mb-3">
+                            <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#functionModal">
+                                Create New Function
                             </button>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Task Controls Column -->
-                <div class="col-md-5">
-                    <div class="card mb-3">
-                        <div class="card-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h4 class="mb-0">Task Controls</h4>
-                                <button class="btn btn-success" id="executeTaskBtn">Execute</button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <!-- Function Overlay Control -->
-                            <div class="function-overlay-control mb-3">
-                                <input type="checkbox" id="functionOverlayToggle" checked>
-                                <label for="functionOverlayToggle">Collapse Function Blocks</label>
-                            </div>
+                        <!-- Current Task Blocks -->
+                        <div id="currentTask" class="current-task"></div>
 
-                            <!-- Task Title -->
-                            <div class="mb-3">
-                                <input type="text" id="taskTitle" class="form-control" placeholder="Task Name">
-                            </div>
-
-                            <!-- Block Controls -->
-                            <div class="btn-group w-100 mb-3">
-                                <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
-                                <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
-                                <button class="btn btn-outline-info" id="addConditionalBtn">Add Logic</button>
-                                <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#functionModal">
-                                    Create New Function
-                                </button>
-                            </div>
-
-                            <!-- Current Task Blocks -->
-                            <div id="currentTask" class="current-task"></div>
-
-                            <!-- Console Output -->
-                            <div id="liveConsole" class="live-console mt-3"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Task List Column -->
-                <div class="col-md-3 pe-0">
-                    <div class="card task-list-card">
-                        <div class="card-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h4 class="mb-0">Tasks</h4>
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-outline-danger" id="deleteAllTasksBtn">Delete All</button>
-                                    <button class="btn btn-sm btn-outline-primary" id="newTaskBtn">New Task</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body p-0">
-                            <div id="taskList" class="task-list custom-scrollbar"></div>
-                        </div>
+                        <!-- Console Output -->
+                        <div id="liveConsole" class="live-console mt-3"></div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Progress Tracker Section -->
-        <div id="progressTracker" class="content-section d-none">
-            <div class="progress-tracker">
-                <h3>Execution Progress</h3>
-                <div id="progressItems">
-                    <!-- Progress items will be added here dynamically -->
+            <!-- Task List Column -->
+            <div class="col-md-3 pe-0">
+                <div class="card task-list-card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Tasks</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-danger" id="deleteAllTasksBtn">Delete All</button>
+                                <button class="btn btn-sm btn-outline-primary" id="newTaskBtn">New Task</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="taskList" class="task-list custom-scrollbar"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Financials Dashboard Section -->
-        <div id="financialsDashboard" class="content-section d-none">
-            <div class="financials-dashboard">
-                <h3>Financial Overview</h3>
-                <div class="chart-container">
-                    <canvas id="executionTimeChart"></canvas>
-                </div>
-                <div class="chart-container">
-                    <canvas id="taskCompletionChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab Navigation -->
-        <div class="tab-navigation">
-            <button class="tab-button active" data-tab="mainContent">Task Editor</button>
-            <button class="tab-button" data-tab="progressTracker">Progress Tracker</button>
-            <button class="tab-button" data-tab="financialsDashboard">Financials</button>
         </div>
     </div>
 
@@ -156,7 +127,6 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
 </body>
 </html>
