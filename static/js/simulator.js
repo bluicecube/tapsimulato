@@ -18,7 +18,91 @@ window.state = {
 // Functions state
 let functions = [];
 
-// Add serialization functions
+// Move these functions to the top level for global access
+function serializeBlock(block) {
+    const serializedBlock = {
+        type: block.type,
+        name: block.name || null,
+        data: block.data || {},
+        order: block.order || 0
+    };
+
+    // Save type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.region) {
+                serializedBlock.data.region = block.region;
+            }
+            break;
+        case 'loop':
+            serializedBlock.data.iterations = block.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'function':
+            serializedBlock.data.functionId = block.functionId;
+            serializedBlock.data.description = block.description;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'conditional':
+            if (block.data) {
+                serializedBlock.data = block.data;
+                if (block.data.thenBlocks && block.data.thenBlocks.length > 0) {
+                    serializedBlock.data.thenBlocks = block.data.thenBlocks.map(serializeBlock);
+                }
+                if (block.data.elseBlocks && block.data.elseBlocks.length > 0) {
+                    serializedBlock.data.elseBlocks = block.data.elseBlocks.map(serializeBlock);
+                }
+            }
+            break;
+    }
+
+    return serializedBlock;
+}
+
+function deserializeBlock(block) {
+    const deserializedBlock = {
+        ...block,
+        type: block.type,
+    };
+
+    // Restore type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.data && block.data.region) {
+                deserializedBlock.region = block.data.region;
+            }
+            break;
+        case 'loop':
+            deserializedBlock.iterations = block.data?.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'function':
+            deserializedBlock.functionId = block.data?.functionId;
+            deserializedBlock.description = block.data?.description;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'conditional':
+            deserializedBlock.data = {
+                threshold: block.data?.threshold || 90,
+                referenceImage: block.data?.referenceImage,
+                thenBlocks: block.data?.thenBlocks ? block.data.thenBlocks.map(deserializeBlock) : [],
+                elseBlocks: block.data?.elseBlocks ? block.data.elseBlocks.map(deserializeBlock) : []
+            };
+            break;
+    }
+
+    return deserializedBlock;
+}
+
+// Update the loadTask function to properly deserialize blocks
 async function loadTask(taskId) {
     try {
         // Save current task before loading new one
@@ -34,7 +118,7 @@ async function loadTask(taskId) {
 
         state.currentTask = {
             id: taskId,
-            blocks: blocks.map(deserializeBlock)
+            blocks: blocks.map(block => deserializeBlock(block))
         };
 
         // Save last opened task ID
@@ -169,6 +253,7 @@ function deserializeBlock(block) {
 
     return deserializedBlock;
 }
+
 
 // State management
 document.addEventListener('DOMContentLoaded', () => {
@@ -403,6 +488,7 @@ async function createNewTask() {
 }
 
 // Add autosave before loading new task
+
 
 // UI Updates
 function updateTaskList() {
@@ -885,7 +971,7 @@ function renderBlock(block, index) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
-        }
+                }
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">

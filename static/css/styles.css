@@ -368,8 +368,8 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
     left: 15px;
     top: 50%;
     transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background-color: var(--bs-success);
     opacity: 0;
