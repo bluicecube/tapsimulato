@@ -593,9 +593,6 @@ function finishSelection(endX, endY) {
     let targetBlock;
     let currentBlocks = state.currentTask.blocks;
 
-    // Store the collapse state before updating
-    const wasCollapsed = state.pendingBlockConfiguration.closest('.block.collapsed');
-
     // Navigate through nested blocks
     for (let i = 0; i < indices.length; i++) {
         const index = parseInt(indices[i]);
@@ -613,18 +610,6 @@ function finishSelection(endX, endY) {
         // Show selection box for the newly set region
         showSelectionBox(region);
         updateTaskDisplay();
-
-        // Restore collapse state after update if it was collapsed
-        if (wasCollapsed) {
-            const newBlockElement = document.querySelector(`[data-index="${blockIndex}"]`);
-            if (newBlockElement) {
-                newBlockElement.classList.add('collapsed');
-                const nestedBlocks = newBlockElement.querySelector('.nested-blocks');
-                if (nestedBlocks) {
-                    nestedBlocks.classList.add('collapsed');
-                }
-            }
-        }
 
         // Save immediately after region update
         saveCurrentTask().then(() => {
@@ -939,14 +924,14 @@ function renderBlock(block, index) {
 
         // Render nested blocks
         if (block.data.thenBlocks) {
-            const thenContainer = blockDiv.querySelector('.thenblocks');
+            const thenContainer = blockDiv.querySelector('.then-blocks');
             block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
-                thenContainer.appendChild(renderBlock(`nestedBlock, `${index}.then.${nestedIndex}`));
+                thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
             });
         }
 
         if (block.data.elseBlocks) {
-            const elseContainer = blockDiv.querySelector('.else-blocks');
+            const elseContainer = blockDiv.querySelector('..else-blocks');
             block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
@@ -1130,47 +1115,16 @@ function setupVideoSharing() {
     });
 }
 
-// Modify the logToConsole function to work with the collapsible console
 function logToConsole(message, type = 'info') {
-    const consoleElement = document.getElementById('liveConsole');
-
-    // Create console header if it doesn't exist
-    if (!consoleElement.querySelector('.console-header')) {
-        const header = document.createElement('div');
-        header.className = 'console-header';
-        header.innerHTML = `
-            <span>Console Output</span>
-            <span class="console-collapse-icon">▼</span>
-        `;
-
-        const content = document.createElement('div');
-        content.className = 'console-content';
-
-        // Move existing messages to content
-        while (consoleElement.firstChild) {
-            content.appendChild(consoleElement.firstChild);
-        }
-
-        consoleElement.appendChild(header);
-        consoleElement.appendChild(content);
-
-        // Add click handler for collapse/expand
-        header.addEventListener('click', () => {
-            consoleElement.classList.toggle('collapsed');
-        });
-
-        // Set initial state to collapsed
-        consoleElement.classList.add('collapsed');
-    }
-
-    const content = consoleElement.querySelector('.console-content');
+    const console = document.getElementById('liveConsole');
     const messageEl = document.createElement('div');
     messageEl.className = `text-${type}`;
     messageEl.textContent = message;
-    content.appendChild(messageEl);
-    content.scrollTop = content.scrollHeight;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
 }
 
+// Update scheduleAutosave to use the new save function
 function scheduleAutosave() {
     if (state.autoSaveTimeout) {
         clearTimeout(state.autoSaveTimeout);
@@ -1239,6 +1193,7 @@ function showSelectionBox(region) {
     selectionBox.classList.remove('d-none');
 }
 
+// Update task list with active task highlighting
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
     if (!taskList) {
@@ -1889,7 +1844,7 @@ function openUrlBlock(url) {
 
 function renderUrlBlock(block, blockDiv, index) {
     blockDiv.innerHTML = `
-        <<div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">URL Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
