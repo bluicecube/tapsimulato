@@ -16,6 +16,21 @@ window.state = {
 // Functions state
 let functions = [];
 
+// Function loading
+async function loadFunctions() {
+    try {
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
+
+        window.functions = await response.json();
+        console.log('Loaded functions:', window.functions);
+        updateFunctionsList();
+    } catch (error) {
+        console.error('Error loading functions:', error);
+        logToConsole('Error loading functions', 'error');
+    }
+}
+
 // State management
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
