@@ -2,9 +2,6 @@
 const DEVICE_WIDTH = 320;
 const DEVICE_HEIGHT = 720;
 
-// Functions state
-let functions = [];
-
 // Initial state setup
 window.state = {
     currentTask: null,
@@ -15,103 +12,94 @@ window.state = {
     lastTaskId: localStorage.getItem('lastTaskId'),
     currentFrame: null,
     functionOverlaysEnabled: true,
-    executingBlocks: new Set()
+    executingBlocks: new Set() // Track executing blocks
 };
 
-async function loadFunctionData(functionId) {
-    console.log('Loading function data for ID:', functionId);
-    try {
-        const response = await fetch(`/api/functions/${functionId}`);
-        if (!response.ok) throw new Error(`Failed to load function ${functionId}`);
-        const functionData = await response.json();
-        console.log('Loaded function data:', functionData);
-        return functionData;
-    } catch (error) {
-        console.error('Error loading function:', error);
-        throw error;
-    }
-}
+// Functions state
+let functions = [];
 
-// Block serialization/deserialization
+// Move these functions to the top level for global access
 function serializeBlock(block) {
-    console.log('Serializing block:', block);
     const serializedBlock = {
         type: block.type,
         name: block.name || null,
-        data: { ...block.data } || {},
+        data: block.data || {},
         order: block.order || 0
     };
 
-    if (block.blocks && block.blocks.length > 0) {
-        serializedBlock.blocks = block.blocks.map(serializeBlock);
+    // Save type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.region) {
+                serializedBlock.data.region = block.region;
+            }
+            break;
+        case 'loop':
+            serializedBlock.data.iterations = block.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'function':
+            serializedBlock.data.functionId = block.functionId;
+            serializedBlock.data.description = block.description;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'conditional':
+            if (block.data) {
+                serializedBlock.data = block.data;
+                if (block.data.thenBlocks && block.data.thenBlocks.length > 0) {
+                    serializedBlock.data.thenBlocks = block.data.thenBlocks.map(serializeBlock);
+                }
+                if (block.data.elseBlocks && block.data.elseBlocks.length > 0) {
+                    serializedBlock.data.elseBlocks = block.data.elseBlocks.map(serializeBlock);
+                }
+            }
+            break;
     }
 
-    console.log('Serialized block:', serializedBlock);
     return serializedBlock;
 }
 
 function deserializeBlock(block) {
-    console.log('Deserializing block:', block);
     const deserializedBlock = {
+        ...block,
         type: block.type,
-        name: block.name,
-        data: { ...block.data } || {},
-        order: block.order || 0,
-        blocks: block.blocks ? block.blocks.map(deserializeBlock) : []
     };
 
-    console.log('Deserialized block:', deserializedBlock);
+    // Restore type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.data && block.data.region) {
+                deserializedBlock.region = block.data.region;
+            }
+            break;
+        case 'loop':
+            deserializedBlock.iterations = block.data?.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'function':
+            deserializedBlock.functionId = block.data?.functionId;
+            deserializedBlock.description = block.data?.description;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'conditional':
+            deserializedBlock.data = {
+                threshold: block.data?.threshold || 90,
+                referenceImage: block.data?.referenceImage,
+                thenBlocks: block.data?.thenBlocks ? block.data.thenBlocks.map(deserializeBlock) : [],
+                elseBlocks: block.data?.elseBlocks ? block.data.elseBlocks.map(deserializeBlock) : []
+            };
+            break;
+    }
+
     return deserializedBlock;
-}
-
-// Block execution
-async function executeBlock(block) {
-    console.log('Executing block:', block);
-    const blockElement = document.querySelector(`[data-index="${block.order}"]`);
-    if (blockElement) {
-        blockElement.classList.add('executing');
-    }
-
-    try {
-        if (block.type === 'function' && block.data?.functionId) {
-            console.log('Executing function block with ID:', block.data.functionId);
-            const functionData = await loadFunctionData(block.data.functionId);
-            console.log('Loaded function data:', functionData);
-
-            if (!functionData.blocks) {
-                throw new Error('Function has no blocks defined');
-            }
-
-            logToConsole(`Executing function: ${functionData.name}`, 'info');
-            for (const functionBlock of functionData.blocks) {
-                const deserializedBlock = deserializeBlock(functionBlock);
-                await executeBlock(deserializedBlock);
-            }
-        } else if (block.type === 'tap' && block.data?.region) {
-            console.log('Executing tap with region:', block.data.region);
-            await simulateTap(block.data.region);
-            logToConsole(`Tapped at region: ${JSON.stringify(block.data.region)}`, 'success');
-        } else if (block.type === 'loop' && block.blocks) {
-            const iterations = block.data?.iterations || 1;
-            logToConsole(`Starting loop with ${iterations} iterations`, 'info');
-
-            for (let i = 0; i < iterations; i++) {
-                console.log(`Loop iteration ${i + 1}/${iterations}`);
-                for (const nestedBlock of block.blocks) {
-                    await executeBlock(nestedBlock);
-                }
-            }
-            logToConsole(`Completed loop with ${iterations} iterations`, 'success');
-        }
-    } catch (error) {
-        console.error('Block execution error:', error);
-        logToConsole(`Failed to execute block: ${error.message}`, 'error');
-        throw error;
-    } finally {
-        if (blockElement) {
-            blockElement.classList.remove('executing');
-        }
-    }
 }
 
 // Update the loadTask function to properly deserialize blocks
@@ -130,7 +118,7 @@ async function loadTask(taskId) {
 
         state.currentTask = {
             id: taskId,
-            blocks: blocks.map(deserializeBlock)
+            blocks: blocks.map(block => deserializeBlock(block))
         };
 
         // Save last opened task ID
@@ -159,7 +147,6 @@ async function saveCurrentTask() {
 
     try {
         const blocks = state.currentTask.blocks.map(serializeBlock);
-        console.log('Saving blocks:', blocks);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
@@ -176,14 +163,255 @@ async function saveCurrentTask() {
     }
 }
 
-// Load tasks
+function serializeBlock(block) {
+    const serializedBlock = {
+        type: block.type,
+        name: block.name || null,
+        data: {},
+        order: block.order || 0
+    };
+
+    // Save type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.region) {
+                serializedBlock.data.region = block.region;
+            }
+            break;
+        case 'loop':
+            serializedBlock.data.iterations = block.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'function':
+            serializedBlock.data.functionId = block.functionId;
+            serializedBlock.data.description = block.description;
+            if (block.blocks && block.blocks.length > 0) {
+                serializedBlock.blocks = block.blocks.map(serializeBlock);
+            }
+            break;
+        case 'conditional':
+            serializedBlock.data.threshold = block.data.threshold;
+            if (block.data.referenceImage) {
+                serializedBlock.data.referenceImage = block.data.referenceImage;
+            }
+            if (block.data.thenBlocks && block.data.thenBlocks.length > 0) {
+                serializedBlock.data.thenBlocks = block.data.thenBlocks.map(serializeBlock);
+            }
+            if (block.data.elseBlocks && block.data.elseBlocks.length > 0) {
+                serializedBlock.data.elseBlocks = block.data.elseBlocks.map(serializeBlock);
+            }
+            break;
+        case 'url':
+            serializedBlock.data.url = block.url;
+            break;
+
+    }
+
+    return serializedBlock;
+}
+
+function deserializeBlock(block) {
+    const deserializedBlock = {
+        ...block,
+        type: block.type,
+    };
+
+    // Restore type-specific data
+    switch (block.type) {
+        case 'tap':
+            if (block.data && block.data.region) {
+                deserializedBlock.region = block.data.region;
+            }
+            break;
+        case 'loop':
+            deserializedBlock.iterations = block.data?.iterations || 1;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'function':
+            deserializedBlock.functionId = block.data?.functionId;
+            deserializedBlock.description = block.data?.description;
+            if (block.blocks && block.blocks.length > 0) {
+                deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+            }
+            break;
+        case 'conditional':
+            deserializedBlock.data = {
+                threshold: block.data.threshold,
+                referenceImage: block.data.referenceImage,
+                thenBlocks: block.data.thenBlocks ? block.data.thenBlocks.map(deserializeBlock) : [],
+                elseBlocks: block.data.elseBlocks ? block.data.elseBlocks.map(deserializeBlock) : []
+            };
+            break;
+        case 'url':
+            deserializedBlock.url = block.data.url;
+            break;
+    }
+
+    return deserializedBlock;
+}
+
+
+// State management
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize UI elements
+    const selectionBox = document.getElementById('selectionBox');
+    const simulator = document.getElementById('simulator');
+    const taskTitle = document.getElementById('taskTitle');
+
+    // Set up event listeners
+    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
+    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
+    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
+    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
+    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
+    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
+    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
+
+
+    // Add task title change handler
+    taskTitle.addEventListener('change', async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: taskTitle.value
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to update task name');
+
+                const updatedTask = await response.json();
+                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                if (taskIndex !== -1) {
+                    state.tasks[taskIndex] = updatedTask;
+                    updateTaskList();
+                }
+
+                logToConsole('Task name updated', 'success');
+            } catch (error) {
+                logToConsole('Failed to update task name', 'error');
+            }
+        }
+    });
+
+    // Selection events
+    simulator.addEventListener('mousedown', startSelection);
+    simulator.addEventListener('mousemove', updateSelection);
+
+    // Listen for mouseup on document to catch out-of-bounds releases
+    document.addEventListener('mouseup', (event) => {
+        if (isSelecting) {
+            const rect = simulator.getBoundingClientRect();
+            const simulatorX = event.clientX - rect.left;
+            const simulatorY = event.clientY - rect.top;
+
+            // Clamp coordinates to simulator bounds
+            const endX = Math.max(0, Math.min(rect.width, simulatorX));
+            const endY = Math.max(0, Math.min(rect.height, simulatorY));
+
+            finishSelection(endX, endY);
+            isSelecting = false;
+        }
+    });
+
+    // Continue selection when mouse re-enters simulator
+    simulator.addEventListener('mouseenter', (event) => {
+        if (isSelecting) {
+            updateSelection(event);
+        }
+    });
+
+    // Remove the mouseleave handler that was forcing selection completion
+    simulator.removeEventListener('mouseleave', () => {});
+
+
+    // Setup video sharing
+    setupVideoSharing();
+
+    // Load functions and tasks
+    loadFunctions();
+    loadTasks().then(() => {
+        console.log('Initial state setup complete:', window.state);
+    });
+
+    // Initialize function modal
+    const functionModal = document.getElementById('functionModal');
+    if (functionModal) {
+        new bootstrap.Modal(functionModal);
+    }
+
+    // Add save function button handler
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    if (saveFunctionBtn) {
+        saveFunctionBtn.addEventListener('click', saveFunction);
+    }
+
+    // Add function overlay control next to the function button
+    const functionBtn = document.querySelector('[data-bs-target="#functionModal"]');
+    if (functionBtn) {
+        const overlayControl = document.createElement('div');
+        overlayControl.className = 'function-overlay-control';
+        overlayControl.innerHTML = `
+            <input type="checkbox" id="functionOverlayToggle" checked>
+            <label for="functionOverlayToggle">Collapse Function Blocks</label>
+        `;
+        functionBtn.parentNode.insertBefore(overlayControl, functionBtn);
+    }
+
+    // Add event listener for overlay toggle
+    document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
+        state.functionOverlaysEnabled = e.target.checked;
+        const functionBlocks = document.querySelectorAll('.function-block');
+        functionBlocks.forEach(block => {
+            if (e.target.checked) {
+                block.classList.add('collapsed');
+            } else {
+                block.classList.remove('collapsed');
+            }
+        });
+    });
+});
+
+// Make functions available globally
+window.processBlocks = function(blocks) {
+    console.log('Processing blocks in simulator:', blocks);
+    if (!window.state.currentTask) {
+        console.error('No active task available');
+        return false;
+    }
+
+    try {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                addLoopBlock(block.iterations, block.blocks);
+            } else if (block.type === 'tap') {
+                addTapBlock(null, block.region);
+            } else if (block.type === 'url') {
+                addUrlBlock(block.url);
+            }
+        });
+        updateTaskDisplay();
+        scheduleAutosave();
+        return true;
+    } catch (error) {
+        console.error('Error processing blocks:', error);
+        return false;
+    }
+};
+
+// Task Management
 async function loadTasks() {
     try {
         const response = await fetch('/api/tasks');
         if (!response.ok) throw new Error('Failed to load tasks');
 
         state.tasks = await response.json();
-        console.log('Loaded tasks:', state.tasks);
         updateTaskList();
 
         if (state.tasks.length > 0) {
@@ -214,6 +442,53 @@ async function loadTasks() {
         }
     }
 }
+
+async function createNewTask() {
+    try {
+        // Find highest task number
+        const taskNumbers = state.tasks
+            .map(t => {
+                const match = t.name.match(/^Task (\d+)$/);
+                return match ? parseInt(match[1]) : 0;
+            })
+            .filter(n => !isNaN(n));
+
+        const nextNumber = taskNumbers.length > 0 ? Math.max(...taskNumbers) + 1 : 1;
+
+        const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: `Task ${nextNumber}`
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to create task');
+
+        const task = await response.json();
+        state.tasks.push(task);
+        state.currentTask = {
+            id: task.id,
+            blocks: []
+        };
+
+        // Save last opened task ID
+        state.lastTaskId = task.id;
+        localStorage.setItem('lastTaskId', task.id);
+
+        updateTaskList();
+        updateTaskDisplay();
+
+        logToConsole('New task created', 'success');
+        return task;
+    } catch (error) {
+        logToConsole('Error creating task', 'error');
+        throw error;
+    }
+}
+
+// Add autosave before loading new task
+
 
 // UI Updates
 function updateTaskList() {
@@ -314,8 +589,7 @@ function addTapBlock(parentLoopIndex = null, region = null) {
     const block = {
         type: 'tap',
         description: 'Click to set region',
-        data: { region: region },
-        order: state.currentTask.blocks.length //add order property
+        region: region
     };
 
     if (parentLoopIndex !== null) {
@@ -349,9 +623,8 @@ function addLoopBlock(iterations = 1, blocks = []) {
 
     const block = {
         type: 'loop',
-        data: { iterations: iterations },
-        blocks: blocks,
-        order: state.currentTask.blocks.length //add order property
+        iterations: iterations,
+        blocks: blocks
     };
 
     state.currentTask.blocks.push(block);
@@ -372,10 +645,6 @@ function updateTaskDisplay() {
     }
 
     if (state.currentTask && state.currentTask.blocks) {
-        // Assign order to blocks if it doesn't exist
-        state.currentTask.blocks.forEach((block, index) => {
-            block.order = index;
-        });
         state.currentTask.blocks.forEach((block, index) => {
             currentTaskElement.appendChild(renderBlock(block, index.toString()));
         });
@@ -454,8 +723,6 @@ function finishSelection(endX, endY) {
         y2: Math.max(selectionStartY, endY)
     };
 
-    if (!state.pendingBlockConfiguration) return;
-
     const blockIndex = state.pendingBlockConfiguration.dataset.index;
     const indices = blockIndex.split('.');
     let targetBlock;
@@ -467,26 +734,19 @@ function finishSelection(endX, endY) {
         if (i === indices.length - 1) {
             targetBlock = currentBlocks[index];
         } else {
-            currentBlocks = currentBlocks[index].blocks || [];
+            currentBlocks = currentBlocks[index].blocks;
         }
     }
 
     if (targetBlock) {
-        // For function blocks, we need to update the blocks array
-        if (targetBlock.type === 'function' && targetBlock.blocks) {
-            const lastBlock = targetBlock.blocks[targetBlock.blocks.length - 1];
-            if (lastBlock && lastBlock.type === 'tap') {
-                lastBlock.region = region;
-                lastBlock.data.region = region;
-            }
-        } else {
-            targetBlock.data = targetBlock.data || {};
-            targetBlock.data.region = region;
-        }
-
+        targetBlock.region = region;
         state.pendingBlockConfiguration = null;
+
+        // Show selection box for the newly set region
         showSelectionBox(region);
         updateTaskDisplay();
+
+        // Save immediately after region update
         saveCurrentTask().then(() => {
             logToConsole('Region updated and saved', 'success');
         }).catch(error => {
@@ -536,8 +796,8 @@ function setBlockFocus(block, blockDiv) {
 
     // Show region if it exists
     if (block.type === 'tap') {
-        if (block.data?.region) {
-            showSelectionBox(block.data.region);
+        if (block.region) {
+            showSelectionBox(block.region);
         } else {
             // If no region is set, hide the selection box
             const selectionBox = document.getElementById('selectionBox');
@@ -556,7 +816,7 @@ function renderBlock(block, index) {
     function hasUndefinedValues(block) {
         if (!block) return true;
 
-        if (block.type === 'tap' && !block.data?.region) {
+        if (block.type === 'tap' && !block.region) {
             return true;
         }
 
@@ -658,7 +918,7 @@ function renderBlock(block, index) {
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
                         <input type="number" class="form-control iterations-input"
-                            value="${block.data?.iterations}" min="1">
+                            value="${block.iterations}" min="1">
                         <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
                     </div>
                     <span class="ms-2">times</span>
@@ -711,7 +971,7 @@ function renderBlock(block, index) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
-        }
+                }
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -818,8 +1078,8 @@ function renderBlock(block, index) {
 
 function renderTapBlock(block, blockDiv, index) {
     const updateRegionDisplay = () => {
-        const regionText = block.data?.region ?
-            `(${Math.round(block.data.region.x1)},${Math.round(block.data.region.y1)}) to (${Math.round(block.data.region.x2)},${Math.round(block.data.region.y2)})` :
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set';
 
         blockDiv.querySelector('.region-text').textContent = `Region: ${regionText}`;
@@ -833,8 +1093,8 @@ function renderTapBlock(block, blockDiv, index) {
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted region-text">Region: ${block.data?.region ?
-            `(${Math.round(block.data.region.x1)},${Math.round(block.data.region.y1)}) to (${Math.round(block.data.region.x2)},${Math.round(block.data.region.y2)})` :
+        <small class="text-muted region-text">Region: ${block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set'}</small>
     `;
 
@@ -851,8 +1111,8 @@ function renderTapBlock(block, blockDiv, index) {
     setRegionBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startTapRegionSelection(blockDiv);
-        if (block.data?.region) {
-            showSelectionBox(block.data.region);
+        if (block.region) {
+            showSelectionBox(block.region);
         }
     });
 
@@ -863,8 +1123,8 @@ function renderTapBlock(block, blockDiv, index) {
     });
 
     // Update region display when the block's region changes
-    if (block.data?.region) {
-        showSelectionBox(block.data.region);
+    if (block.region) {
+        showSelectionBox(block.region);
     }
     return blockDiv;
 }
@@ -873,8 +1133,8 @@ function enableDrawingMode(block, blockDiv) {
     // If it's a tap block, start region selection immediately
     if (block.type === 'tap') {
         startTapRegionSelection(blockDiv);
-        if (block.data?.region) {
-            showSelectionBox(block.data.region);
+        if (block.region) {
+            showSelectionBox(block.region);
         }
     }
 }
@@ -885,96 +1145,75 @@ window.showSelectionBox = showSelectionBox;
 window.enableDrawingMode = enableDrawingMode;
 
 // Task Execution
-// Function execution
 async function executeTask() {
-    if (!state.currentTask || !state.currentTask.blocks) {
-        logToConsole('No task selected or task has no blocks', 'error');
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
         return;
     }
 
     logToConsole('Starting task execution', 'info');
-    console.log('Task blocks to execute:', state.currentTask.blocks);
+    let delay = 0;
+    const delayIncrement = 800;
 
-    try {
-        for (const block of state.currentTask.blocks) {
-            console.log('Executing block:', block);
-            await executeBlock(block);
+    async function executeBlocks(blocks, parentIndex = null) {
+        for (const [index, block] of blocks.entries()) {
+            const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+            const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+
+            if (blockElement) {
+                blockElement.classList.add('executing');
+            }
+
+            if (block.type === 'function') {
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    await executeBlocks(func.blocks, blockIndex);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks, blockIndex);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                await new Promise(resolve => setTimeout(() => {
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                    resolve();
+                }, delayIncrement));
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute, blockIndex);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
+            } else if (block.type === 'url') {
+                await executeUrlBlock(block);
+            }
+
+            if (blockElement) {
+                blockElement.classList.remove('executing');
+            }
         }
-        logToConsole('Task execution completed', 'success');
-    } catch (error) {
-        console.error('Task execution error:', error);
-        logToConsole(`Task execution failed: ${error.message}`, 'error');
     }
-}
 
-async function executeBlock(block) {
-    console.log('Executing block type:', block.type, 'Block data:', block.data);
-
-    if (block.type === 'function') {
-        console.log('Executing function block with ID:', block.data?.functionId);
-        try {
-            const functionData = await loadFunctionData(block.data?.functionId);
-            console.log('Loaded function data:', functionData);
-
-            if (!functionData.blocks || !Array.isArray(functionData.blocks)) {
-                throw new Error('Invalid function blocks data');
-            }
-
-            logToConsole(`Executing function: ${functionData.name}`, 'info');
-
-            for (const functionBlock of functionData.blocks) {
-                const deserializedBlock = deserializeBlock(functionBlock);
-                console.log('Executing nested function block:', deserializedBlock);
-                await executeBlock(deserializedBlock);
-            }
-        } catch (error) {
-            console.error('Function execution error:', error);
-            logToConsole(`Failed to execute function: ${error.message}`, 'error');
-            throw error;
-        }
-    } else if (block.type === 'tap' && block.data?.region) {
-        console.log('Executing tap with region:', block.data.region);
-        await simulateTap(block.data.region);
-        logToConsole(`Executed tap at ${JSON.stringify(block.data.region)}`, 'success');
-    } else if (block.type === 'loop' && block.blocks) {
-        const iterations = block.data?.iterations || 1;
-        console.log(`Executing loop block with ${iterations} iterations`);
-        logToConsole(`Starting loop with ${iterations} iterations`, 'info');
-
-        for (let i = 0; i < iterations; i++) {
-            console.log(`Loop iteration ${i + 1}/${iterations}`);
-            for (const nestedBlock of block.blocks) {
-                await executeBlock(nestedBlock);
-            }
-        }
-        logToConsole(`Completed loop with ${iterations} iterations`, 'success');
-    }
-}
-
-async function simulateTap(region) {
-    return new Promise((resolve) => {
-        console.log('Simulating tap at region:', region);
-        // Handle both direct region and data.region formats
-        const tapRegion = region.x1 !== undefined ? region : region.region || region;
-
-        const centerX = (tapRegion.x1 + tapRegion.x2) / 2;
-        const centerY = (tapRegion.y1 + tapRegion.y2) / 2;
-
-        // Create tap feedback effect
-        const feedback = document.createElement('div');
-        feedback.className = 'tap-feedback';
-        feedback.style.left = `${centerX}px`;
-        feedback.style.top = `${centerY}px`;
-
-        const simulator = document.getElementById('simulator');
-        simulator.appendChild(feedback);
-
-        // Remove the feedback element after animation
-        setTimeout(() => {
-            feedback.remove();
-            resolve();
-        }, 500);
-    });
+    await executeBlocks(state.currentTask.blocks);
+    logToConsole('Task execution completed', 'success');
 }
 
 // Utilities
@@ -1140,7 +1379,6 @@ async function saveCurrentTask() {
 
     try {
         const blocks = state.currentTask.blocks.map(serializeBlock);
-        console.log('Saving blocks:', blocks);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
@@ -1246,47 +1484,122 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFunctions();
 });
 
-function addBlockToFunction(blockType, functionBlock) {
-    console.log('Adding block to function:', blockType, functionBlock);
-    const index = functionBlock.dataset.index;
-    const indices = index.split('.');
-    let targetBlock;
-    let currentBlocks = state.currentTask.blocks;
+function addBlockToFunction(type, parentElement = null) {
+    const container = parentElement ?
+        parentElement.querySelector('.nested-blocks') :
+        document.getElementById('functionBlocks');
 
-    // Navigate to the correct function block
-    for (let i = 0; i < indices.length; i++) {
-        targetBlock = currentBlocks[indices[i]];
-        if (i < indices.length - 1) {
-            currentBlocks = targetBlock.blocks;
-        }
+    if (!container) {
+        logToConsole('Error: Could not find container for new block', 'error');
+        return;
     }
 
-    if (!targetBlock.blocks) {
-        targetBlock.blocks = [];
+    const block = {
+        type: type,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
+    };
+
+    if (type === 'loop') {
+        block.iterations = 1;
+        block.blocks = [];
     }
 
-    if (blockType === 'tap') {
-        const tapBlock = {
-            type: 'tap',
-            name: 'Tap Block',
-            data: {},
-            order: targetBlock.blocks.length
-        };
-        targetBlock.blocks.push(tapBlock);
-    } else if (blockType === 'loop') {
-        const loopBlock = {
-            type: 'loop',
-            name: 'Loop Block',
-            blocks: [],
-            iterations: 1,
-            data: { iterations: 1 },
-            order: targetBlock.blocks.length
-        };
-        targetBlock.blocks.push(loopBlock);
+    const blockElement = document.createElement('div');
+    blockElement.className = `block ${type}-block`;
+
+    if (type === 'loop') {
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input" 
+                               value="1" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners for nested block buttons
+        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockElement);
+        });
+
+        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockElement);
+        });
+
+        // Add event listeners for iterations
+        const iterationsInput = blockElement.querySelector('.iterations-input');
+        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
+        const increaseBtn = blockElement.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+                scheduleAutosave();
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+            scheduleAutosave();
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
+            scheduleAutosave();
+        });
+    } else { // Tap block
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">No region set</small>
+        `;
+
+        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            startTapRegionSelection(blockElement);
+        });
     }
 
-    updateTaskDisplay();
-    scheduleAutosave();
+    // Add remove button handler
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        blockElement.remove();
+        scheduleAutosave();
+    });
+
+    container.appendChild(blockElement);
 }
 
 async function saveFunction() {
@@ -1313,7 +1626,7 @@ async function saveFunction() {
 
             if (type === 'loop') {
                 const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.data = { iterations: parseInt(iterationsInput.value) || 1 };
+                block.iterations = parseInt(iterationsInput.value) || 1;
                 block.blocks = [];
 
                 const nestedContainer = blockElement.querySelector('.nested-blocks');
@@ -1378,8 +1691,7 @@ async function addFunctionBlock(functionId) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks, // Store the function's blocks for reference
-        data: { functionId: func.id },
-        order: state.currentTask.blocks.length //add order property
+        functionId: func.id
     };
 
     state.currentTask.blocks.push(block);
@@ -1394,16 +1706,16 @@ function collectBlockData(block) {
         name: block.name
     };
 
-    if (block.type === 'tap' && block.data?.region) {
-        data.region = block.data.region;
+    if (block.type === 'tap' && block.region) {
+        data.region = block.region;
     } else if (block.type === 'loop') {
-        data.iterations = block.data?.iterations || 1;
+        data.iterations = block.iterations || 1;
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
     } else if (block.type === 'function') {
         data.description = block.description;
-        data.functionId = block.data?.functionId;
+        data.functionId = block.functionId;
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
@@ -1466,14 +1778,84 @@ function addConditionalBlock() {
             referenceImage: null,
             thenBlocks: [],  // Blocks to execute if similarity >= threshold
             elseBlocks: []   // Blocks to execute if similarity < threshold
-        },
-        order: state.currentTask.blocks.length //add order property
+        }
     };
 
     state.currentTask.blocks.push(block);
     updateTaskDisplay();
     scheduleAutosave();
     logToConsole('Conditional block added', 'success');
+}
+
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800;
+
+    async function executeBlocks(blocks, parentIndex = null) {
+        for (const [index, block] of blocks.entries()) {
+            const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+            const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+
+            if (blockElement) {
+                blockElement.classList.add('executing');
+            }
+
+            if (block.type === 'function') {
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    await executeBlocks(func.blocks, blockIndex);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks, blockIndex);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                await new Promise(resolve => setTimeout(() => {
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                    resolve();
+                }, delayIncrement));
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute, blockIndex);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
+            } else if (block.type === 'url') {
+                await executeUrlBlock(block);
+            }
+
+            if (blockElement) {
+                blockElement.classList.remove('executing');
+            }
+        }
+    }
+
+    await executeBlocks(state.currentTask.blocks);
+    logToConsole('Task execution completed', 'success');
 }
 
 // Add button to UI
@@ -1512,9 +1894,9 @@ function showTapFeedback(region) {
 function handleIterationsChange(block, value, iterationsInput) {
     if (value < 1) {
         iterationsInput.value = 1;
-        block.data.iterations = 1;
+        block.iterations = 1;
     } else {
-        block.data.iterations = value;
+        block.iterations = value;
     }
 
     // Save immediately after iterations change
@@ -1531,8 +1913,7 @@ async function addFunctionToTask(func) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks,
-        data: { functionId: func.id },
-        order: state.currentTask.blocks.length //add order property
+        functionId: func.id
     };
 
     state.currentTask.blocks.push(block);
@@ -1587,8 +1968,7 @@ function openUrlBlock(url) {
     const block = {
         type: 'url',
         url: url || 'https://www.google.com',
-        description: 'Open URL',
-        order: state.currentTask.blocks.length //add order property
+        description: 'Open URL'
     };
 
     state.currentTask.blocks.push(block);
@@ -1652,7 +2032,6 @@ function addUrlBlock() {
     const block = {
         type: 'url',
         url: 'https://www.google.com'  // Default URL,
-        order: state.currentTask.blocks.length //add order property
     };
 
     state.currentTask.blocks.push(block);
