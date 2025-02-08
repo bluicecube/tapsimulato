@@ -13,30 +13,24 @@ window.state = {
     tasks: [],
     autoSaveTimeout: null,
     pendingBlockConfiguration: null,
-    focusedBlock: null,
-    lastTaskId: localStorage.getItem('lastTaskId'),
-    currentFrame: null
+    focusedBlock: null,  // Track currently focused block
+    lastTaskId: localStorage.getItem('lastTaskId'), // Track last opened task
+    currentFrame: null  // Store current video frame
 };
 
-// Execute task function
-function executeTask() {
-    if (!state.currentTask || !state.currentTask.blocks) {
-        logToConsole('No task to execute', 'error');
-        return;
-    }
-    logToConsole('Starting task execution...', 'info');
-}
+// Functions state
+let functions = [];
 
-// Add Logic Block
-function addLogicBlock() {
+// Add Conditional Block
+function addConditionalBlock() {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
     }
 
     const block = {
-        type: 'logic',
-        name: 'Logic Block',
+        type: 'conditional',
+        name: 'Conditional Block',
         data: {
             threshold: 90,
             referenceImage: null,
@@ -52,54 +46,7 @@ function addLogicBlock() {
     state.currentTask.blocks.push(block);
     updateTaskDisplay();
     scheduleAutosave();
-    logToConsole('Added Logic block', 'success');
-}
-
-// Add Tap Block
-function addTapBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const tapBlock = {
-        type: 'tap',
-        region: null,
-        name: 'Tap Block'
-    };
-
-    if (!state.currentTask.blocks) {
-        state.currentTask.blocks = [];
-    }
-
-    state.currentTask.blocks.push(tapBlock);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Added Tap block', 'success');
-}
-
-// Add Loop Block
-function addLoopBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const loopBlock = {
-        type: 'loop',
-        iterations: 1,
-        blocks: [],
-        name: 'Loop Block'
-    };
-
-    if (!state.currentTask.blocks) {
-        state.currentTask.blocks = [];
-    }
-
-    state.currentTask.blocks.push(loopBlock);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Added Loop block', 'success');
+    logToConsole('Added Conditional block', 'success');
 }
 
 // State management
@@ -113,44 +60,77 @@ document.addEventListener('DOMContentLoaded', function() {
     const executeTaskBtn = document.getElementById('executeTaskBtn');
     const addTapBtn = document.getElementById('addTapBtn');
     const addLoopBtn = document.getElementById('addLoopBtn');
-    const addLogicBtn = document.getElementById('addLogicBtn');
+    const addConditionalBtn = document.getElementById('addConditionalBtn');
     const newTaskBtn = document.getElementById('newTaskBtn');
     const deleteAllTasksBtn = document.getElementById('deleteAllTasksBtn');
+    const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
+    const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
 
     if (executeTaskBtn) {
         executeTaskBtn.addEventListener('click', executeTask);
     }
 
     if (addTapBtn) {
-        addTapBtn.addEventListener('click', addTapBlock);
+        addTapBtn.addEventListener('click', () => {
+            if (!state.currentTask) {
+                logToConsole('Please create or select a task first', 'error');
+                return;
+            }
+            addTapBlock();
+        });
     }
 
     if (addLoopBtn) {
-        addLoopBtn.addEventListener('click', addLoopBlock);
+        addLoopBtn.addEventListener('click', () => {
+            if (!state.currentTask) {
+                logToConsole('Please create or select a task first', 'error');
+                return;
+            }
+            addLoopBlock();
+        });
     }
 
-    if (addLogicBtn) {
-        addLogicBtn.addEventListener('click', addLogicBlock);
+    if (addConditionalBtn) {
+        addConditionalBtn.addEventListener('click', addConditionalBlock);
     }
 
     if (newTaskBtn) {
-        newTaskBtn.addEventListener('click', createNewTask);
+        newTaskBtn.addEventListener('click', async () => {
+            try {
+                await createNewTask();
+                logToConsole('New task created successfully', 'success');
+            } catch (error) {
+                logToConsole('Failed to create new task: ' + error.message, 'error');
+            }
+        });
     }
 
     if (deleteAllTasksBtn) {
         deleteAllTasksBtn.addEventListener('click', async () => {
-            if (confirm('Are you sure you want to delete all tasks?')) {
-                try {
-                    await fetch('/api/tasks/all', { method: 'DELETE' });
-                    state.tasks = [];
-                    state.currentTask = null;
-                    await createNewTask();
-                    updateTaskList();
-                    updateTaskDisplay();
-                    logToConsole('All tasks deleted', 'success');
-                } catch (error) {
-                    logToConsole('Error deleting tasks', 'error');
-                }
+            if (!confirm('Are you sure you want to delete all tasks?')) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/tasks/all', {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete all tasks');
+
+                // Clear tasks from state
+                state.tasks = [];
+                state.currentTask = null;
+
+                // Create a new task
+                const newTask = await createNewTask();
+                await loadTask(newTask.id);
+
+                updateTaskList();
+                updateTaskDisplay();
+                logToConsole('All tasks deleted and new task created', 'success');
+            } catch (error) {
+                logToConsole('Error deleting all tasks', 'error');
             }
         });
     }
@@ -185,19 +165,120 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Initialize by loading tasks
+    // Selection events
+    if (simulator) {
+        simulator.addEventListener('mousedown', startSelection);
+        simulator.addEventListener('mousemove', updateSelection);
+        simulator.addEventListener('mouseup', stopSelection);
+        simulator.addEventListener('mouseleave', (event) => {
+            if (isSelecting) {
+                const rect = simulator.getBoundingClientRect();
+                const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+                const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+                finishSelection(lastKnownY, lastKnownX); // Note: X and Y coordinates were swapped
+            }
+        });
+    }
+
+    // Initialize
+    setupVideoSharing();
+    loadFunctions();
     loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
     });
+    // Initialize function modal
+    const functionModal = document.getElementById('functionModal');
+    if (functionModal) {
+        new bootstrap.Modal(functionModal);
+    }
+
+    // Add save function button handler
+    if (saveFunctionBtn) {
+        saveFunctionBtn.addEventListener('click', saveFunction);
+    }
+    if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
+    if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
 });
 
+// Make functions available globally
+window.processBlocks = function(blocks) {
+    console.log('Processing blocks in simulator:', blocks);
+    if (!window.state.currentTask) {
+        console.error('No active task available');
+        return false;
+    }
+
+    try {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                addLoopBlock(block.iterations, block.blocks);
+            } else if (block.type === 'tap') {
+                addTapBlock(null, block.region);
+            }
+        });
+        updateTaskDisplay();
+        scheduleAutosave();
+        return true;
+    } catch (error) {
+        console.error('Error processing blocks:', error);
+        return false;
+    }
+};
+
 // Task Management
+async function loadTasks() {
+    try {
+        const response = await fetch('/api/tasks');
+        if (!response.ok) throw new Error('Failed to load tasks');
+
+        state.tasks = await response.json();
+        updateTaskList();
+
+        if (state.tasks.length > 0) {
+            let taskToLoad;
+
+            // Try to load last opened task
+            if (state.lastTaskId) {
+                taskToLoad = state.tasks.find(t => t.id === parseInt(state.lastTaskId));
+            }
+
+            // If no last task or it doesn't exist, load most recent
+            if (!taskToLoad) {
+                taskToLoad = state.tasks.reduce((latest, current) => {
+                    const latestDate = new Date(latest.updated_at);
+                    const currentDate = new Date(current.updated_at);
+                    return currentDate > latestDate ? current : latest;
+                }, state.tasks[0]);
+            }
+
+            await loadTask(taskToLoad.id);
+        } else {
+            // Only create a new task if there are no existing tasks
+            await createNewTask();
+        }
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+        logToConsole('Error loading tasks', 'error');
+
+        // Create a new task as fallback
+        if (!state.currentTask) {
+            await createNewTask();
+        }
+    }
+}
+
+// Update createNewTask function to properly handle task creation and state updates
 async function createNewTask() {
     try {
-        const nextNumber = state.tasks.length > 0 ? Math.max(...state.tasks.map(t => {
-            const match = t.name.match(/^Task (\d+)$/);
-            return match ? parseInt(match[1]) : 0;
-        })) + 1 : 1;
+        // Find highest task number
+        const taskNumbers = state.tasks
+            .map(t => {
+                const match = t.name.match(/^Task (\d+)$/);
+                return match ? parseInt(match[1]) : 0;
+            })
+            .filter(n => !isNaN(n));
+
+        const nextNumber = taskNumbers.length > 0 ? Math.max(...taskNumbers) + 1 : 1;
 
         const response = await fetch('/api/tasks', {
             method: 'POST',
@@ -210,14 +291,21 @@ async function createNewTask() {
         if (!response.ok) throw new Error('Failed to create task');
 
         const task = await response.json();
+
+        // Update state with the new task
         state.tasks.push(task);
+
+        // Set the new task as current
         state.currentTask = {
             id: task.id,
             blocks: []
         };
+
+        // Save last opened task ID
         state.lastTaskId = task.id;
         localStorage.setItem('lastTaskId', task.id);
 
+        // Update UI
         updateTaskList();
         updateTaskDisplay();
 
@@ -235,122 +323,10 @@ async function createNewTask() {
     }
 }
 
-async function loadTasks() {
-    try {
-        const response = await fetch('/api/tasks');
-        if (!response.ok) throw new Error('Failed to load tasks');
-
-        state.tasks = await response.json();
-        updateTaskList();
-
-        if (state.tasks.length > 0) {
-            let taskToLoad = state.tasks[0];
-            if (state.lastTaskId) {
-                const savedTask = state.tasks.find(t => t.id === parseInt(state.lastTaskId));
-                if (savedTask) {
-                    taskToLoad = savedTask;
-                }
-            }
-            await loadTask(taskToLoad.id);
-        } else {
-            await createNewTask();
-        }
-    } catch (error) {
-        console.error('Error loading tasks:', error);
-        logToConsole('Error loading tasks', 'error');
-        if (!state.currentTask) {
-            await createNewTask();
-        }
-    }
-}
-
-function updateTaskDisplay() {
-    const currentTaskElement = document.getElementById('currentTask');
-    if (!currentTaskElement) return;
-
-    currentTaskElement.innerHTML = '';
-
-    if (state.currentTask && state.currentTask.blocks) {
-        state.currentTask.blocks.forEach(block => {
-            const blockElement = createBlockElement(block);
-            if (blockElement) {
-                currentTaskElement.appendChild(blockElement);
-            }
-        });
-    }
-}
-
-function createBlockElement(block) {
-    const blockDiv = document.createElement('div');
-    blockDiv.className = `block ${block.type}-block`;
-
-    let innerHTML = '';
-    switch (block.type) {
-        case 'tap':
-            innerHTML = `
-                <h6 class="mb-2">Tap Block</h6>
-                <small class="text-muted">Region: ${block.region ? JSON.stringify(block.region) : 'Not set'}</small>
-            `;
-            break;
-        case 'loop':
-            innerHTML = `
-                <h6 class="mb-2">Loop Block</h6>
-                <div class="input-group mb-2">
-                    <span class="input-group-text">Iterations</span>
-                    <input type="number" class="form-control iterations-input" value="${block.iterations}" min="1">
-                </div>
-                <div class="nested-blocks"></div>
-            `;
-            break;
-        case 'logic':
-            innerHTML = `
-                <h6 class="mb-2">Logic Block</h6>
-                <div class="nested-blocks">
-                    <div class="then-blocks">Then:</div>
-                    <div class="else-blocks">Else:</div>
-                </div>
-            `;
-            break;
-    }
-
-    blockDiv.innerHTML = innerHTML;
-    return blockDiv;
-}
-
-function scheduleAutosave() {
-    if (state.autoSaveTimeout) {
-        clearTimeout(state.autoSaveTimeout);
-    }
-
-    state.autoSaveTimeout = setTimeout(async () => {
-        try {
-            await saveCurrentTask();
-            logToConsole('Task autosaved', 'success');
-        } catch (error) {
-            logToConsole('Failed to autosave task', 'error');
-        }
-    }, 2000);
-}
-
-async function saveCurrentTask() {
-    if (!state.currentTask) return;
-
-    try {
-        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(state.currentTask.blocks)
-        });
-
-        if (!response.ok) throw new Error('Failed to save task');
-    } catch (error) {
-        console.error('Error saving task:', error);
-        throw error;
-    }
-}
-
+// Add autosave before loading new task
 async function loadTask(taskId) {
     try {
+        // Save current task before loading new one
         if (state.currentTask) {
             await saveCurrentTask();
         }
@@ -361,7 +337,35 @@ async function loadTask(taskId) {
         const blocks = await response.json();
         state.currentTask = {
             id: taskId,
-            blocks: blocks
+            blocks: blocks.map(block => {
+                // Ensure all properties are properly loaded
+                if (block.type === 'tap') {
+                    return {
+                        ...block,
+                        region: block.region || null
+                    };
+                } else if (block.type === 'loop') {
+                    return {
+                        ...block,
+                        iterations: block.iterations || 1,
+                        blocks: (block.blocks || []).map(nestedBlock => ({
+                            ...nestedBlock,
+                            region: nestedBlock.region || null
+                        }))
+                    };
+                } else if (block.type === 'conditional') {
+                    return {
+                        ...block,
+                        data: {
+                            threshold: block.data.threshold || 90,
+                            referenceImage: block.data.referenceImage || null,
+                            thenBlocks: block.data.thenBlocks || [],
+                            elseBlocks: block.data.elseBlocks || []
+                        }
+                    };
+                }
+                return block;
+            })
         };
 
         updateTaskDisplay();
@@ -369,61 +373,4 @@ async function loadTask(taskId) {
         console.error('Error loading task:', error);
         logToConsole('Error loading task', 'error');
     }
-}
-
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    if (!taskList) return;
-
-    taskList.innerHTML = '';
-    state.tasks.forEach(task => {
-        const taskElement = document.createElement('div');
-        taskElement.className = 'task-list-item';
-        if (state.currentTask && task.id === state.currentTask.id) {
-            taskElement.classList.add('active');
-        }
-
-        taskElement.innerHTML = `
-            <span>${task.name}</span>
-            <div class="btn-group">
-                <button class="btn btn-sm btn-outline-danger delete-task-btn">Delete</button>
-                <button class="btn btn-sm btn-outline-primary load-task-btn">Load</button>
-            </div>
-        `;
-
-        taskElement.querySelector('.load-task-btn').addEventListener('click', () => loadTask(task.id));
-        taskElement.querySelector('.delete-task-btn').addEventListener('click', async () => {
-            if (confirm('Are you sure you want to delete this task?')) {
-                try {
-                    await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
-                    state.tasks = state.tasks.filter(t => t.id !== task.id);
-                    if (state.currentTask && state.currentTask.id === task.id) {
-                        state.currentTask = null;
-                        if (state.tasks.length > 0) {
-                            await loadTask(state.tasks[0].id);
-                        } else {
-                            await createNewTask();
-                        }
-                    }
-                    updateTaskList();
-                    logToConsole('Task deleted', 'success');
-                } catch (error) {
-                    logToConsole('Error deleting task', 'error');
-                }
-            }
-        });
-
-        taskList.appendChild(taskElement);
-    });
-}
-
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    if (!console) return;
-
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
 }
