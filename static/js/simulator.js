@@ -1873,7 +1873,7 @@ async function deleteFunction(functionId) {
     const functionToDelete = functions.find(f =>f.id === functionId);
     if (!functionToDelete) return;
 
-    try {
+    try{
         const response = await fetch(`/api/functions/${functionId}`, {
             method: 'DELETE'
         });
