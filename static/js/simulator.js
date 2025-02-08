@@ -1076,14 +1076,107 @@ async function loadFunctions() {
 
 function updateFunctionsList() {
     const functionsList = document.getElementById('functionsList');
-    functionsList.innerHTML = functions.map(func => `
-        <li>
-            <a class="dropdown-item" href="#" onclick="addFunctionBlock(${func.id})">${func.name}</a>
-        </li>
-    `).join('') || '<li><span class="dropdown-item">No functions available</span></li>';
+    const addFunctionBtn = document.getElementById('addFunctionBtn');
+
+    if (!functionsList) return;
+
+    // Clear existing items
+    functionsList.innerHTML = '';
+
+    // Add delete all functions option if there are functions
+    if (window.functions && window.functions.length > 0) {
+        const deleteAllItem = document.createElement('li');
+        deleteAllItem.innerHTML = `
+            <button class="dropdown-item text-danger" type="button">
+                <i class="fas fa-trash-alt"></i> Delete All Functions
+            </button>
+        `;
+        deleteAllItem.addEventListener('click', deleteAllFunctions);
+        functionsList.appendChild(deleteAllItem);
+
+        // Add divider
+        const divider = document.createElement('li');
+        divider.innerHTML = '<hr class="dropdown-divider">';
+        functionsList.appendChild(divider);
+    }
+
+    // Add function items
+    if (window.functions && window.functions.length > 0) {
+        window.functions.forEach(func => {
+            const item = document.createElement('li');
+            item.className = 'd-flex justify-content-between align-items-center px-2';
+            item.innerHTML = `
+                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
+                    ${func.name}
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
+                        data-function-id="${func.id}" title="Delete function">×</button>
+            `;
+
+            // Add function to task
+            const functionBtn = item.querySelector('.function-item');
+            functionBtn.addEventListener('click', () => {
+                if (!state.currentTask) {
+                    logToConsole('Please create or select a task first', 'error');
+                    return;
+                }
+                addFunctionToTask(func);
+            });
+
+            // Delete function
+            const deleteBtn = item.querySelector('.delete-function-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteFunction(func.id);
+            });
+
+            functionsList.appendChild(item);
+        });
+    } else {
+        const emptyItem = document.createElement('li');
+        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
+        functionsList.appendChild(emptyItem);
+    }
 }
 
-// Added functions from edited snippet
+async function deleteFunction(functionId) {
+    try {
+        const response = await fetch(`/api/functions/${functionId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete function');
+
+        window.functions = window.functions.filter(f => f.id !== functionId);
+        updateFunctionsList();
+        logToConsole('Function deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting function', 'error');
+    }
+}
+
+async function deleteAllFunctions() {
+    if (!confirm('Are you sure you want to delete all functions?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/functions/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all functions');
+
+        window.functions = [];
+        updateFunctionsList();
+        logToConsole('All functions deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting all functions', 'error');
+    }
+}
+
+// Previous code remains unchanged
+
 function addBlockToFunction(type, parentElement = null) {
     const container = parentElement ?
         parentElement.querySelector('.nested-blocks') :
@@ -1496,4 +1589,19 @@ function handleIterationsChange(block, value, iterationsInput) {
     }).catch(error => {
         logToConsole('Failed to save iterations update', 'error');
     });
+}
+
+// Add addFunctionToTask function
+async function addFunctionToTask(func) {
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: func.blocks
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
 }
