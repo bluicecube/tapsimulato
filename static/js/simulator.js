@@ -25,13 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up event listeners
     document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
-    document.getElementById('addTapBtn').addEventListener('click', addTapBlock);
-    document.getElementById('addLoopBtn').addEventListener('click', addLoopBlock);
+    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
+    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
     document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
-    document.getElementById('newTaskBtn').addEventListener('click', createNewTask);
+    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
     document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
     document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
     document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
+
 
     // Add task title change handler
     taskTitle.addEventListener('change', async () => {
@@ -40,7 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: taskTitle.value })
+                    body: JSON.stringify({
+                        name: taskTitle.value
+                    })
                 });
 
                 if (!response.ok) throw new Error('Failed to update task name');
@@ -62,12 +65,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Selection events
     simulator.addEventListener('mousedown', startSelection);
     simulator.addEventListener('mousemove', updateSelection);
-    document.addEventListener('mouseup', handleMouseUp);
+
+    // Listen for mouseup on document to catch out-of-bounds releases
+    document.addEventListener('mouseup', (event) => {
+        if (isSelecting) {
+            const rect = simulator.getBoundingClientRect();
+            const simulatorX = event.clientX - rect.left;
+            const simulatorY = event.clientY - rect.top;
+
+            // Clamp coordinates to simulator bounds
+            const endX = Math.max(0, Math.min(rect.width, simulatorX));
+            const endY = Math.max(0, Math.min(rect.height, simulatorY));
+
+            finishSelection(endX, endY);
+            isSelecting = false;
+        }
+    });
+
+    // Continue selection when mouse re-enters simulator
     simulator.addEventListener('mouseenter', (event) => {
         if (isSelecting) {
             updateSelection(event);
         }
     });
+
+    // Remove the mouseleave handler that was forcing selection completion
+    simulator.removeEventListener('mouseleave', () => {});
+
 
     // Setup video sharing
     setupVideoSharing();
@@ -83,23 +107,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (functionModal) {
         new bootstrap.Modal(functionModal);
     }
-});
 
-// Handle mouse up event
-function handleMouseUp(event) {
-    if (isSelecting) {
-        const rect = simulator.getBoundingClientRect();
-        const simulatorX = event.clientX - rect.left;
-        const simulatorY = event.clientY - rect.top;
-
-        // Clamp coordinates to simulator bounds
-        const endX = Math.max(0, Math.min(rect.width, simulatorX));
-        const endY = Math.max(0, Math.min(rect.height, simulatorY));
-
-        finishSelection(endX, endY);
-        isSelecting = false;
+    // Add save function button handler
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    if (saveFunctionBtn) {
+        saveFunctionBtn.addEventListener('click', saveFunction);
     }
-}
+});
 
 // Make functions available globally
 window.processBlocks = function(blocks) {
@@ -179,14 +193,19 @@ async function createNewTask() {
         const response = await fetch('/api/tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: `Task ${nextNumber}` })
+            body: JSON.stringify({
+                name: `Task ${nextNumber}`
+            })
         });
 
         if (!response.ok) throw new Error('Failed to create task');
 
         const task = await response.json();
         state.tasks.push(task);
-        state.currentTask = { id: task.id, blocks: [] };
+        state.currentTask = {
+            id: task.id,
+            blocks: []
+        };
 
         // Save last opened task ID
         state.lastTaskId = task.id;
@@ -301,11 +320,8 @@ document.getElementById('deleteAllTasksBtn').addEventListener('click', async () 
     }
 });
 
-// Block Management
-let isSelecting = false;
-let selectionStartX = 0;
-let selectionStartY = 0;
 
+// Block Management
 function startTapRegionSelection(blockElement) {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
@@ -421,6 +437,10 @@ function removeBlock(blockElement) {
 }
 
 // Selection Handling
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+
 function startSelection(event) {
     if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
 
@@ -456,6 +476,7 @@ function updateSelection(event) {
     selectionBox.style.left = `${width < 0 ? currentX : selectionStartX}px`;
     selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
 }
+
 
 function finishSelection(endX, endY) {
     const region = {
@@ -922,6 +943,603 @@ async function executeTask() {
     }, delay + delayIncrement);
 }
 
+// Utilities
+function showTapFeedback(region) {
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+    feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
+}
+
+// Fix the video sharing configuration
+function setupVideoSharing() {
+    const video = document.getElementById('bgVideo');
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
+        try {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
+        }
+    });
+}
+
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = message;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
+// Update scheduleAutosave to use the new save function
+function scheduleAutosave() {
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    state.autoSaveTimeout = setTimeout(async () => {
+        if (state.currentTask) {
+            try {
+                await saveCurrentTask();
+            } catch (error) {
+                console.error('Autosave failed:', error);
+            }
+        }
+    }, 1000);
+}
+
+async function deleteTask(taskId) {
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete task');
+
+        // Remove task from state
+        state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskList();
+
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
+        }
+
+        logToConsole('Task deleted successfully', 'success');
+
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
+    } catch (error) {
+        logToConsole('Error deleting task', 'error');
+    }
+}
+
+// Add delete button event listener 
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
+    deleteTask(taskId);
+});
+
+// Add new function to show selection box for existing region
+function showSelectionBox(region) {
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) return;
+
+    selectionBox.style.left = `${region.x1}px`;
+    selectionBox.style.top = `${region.y1}px`;
+    selectionBox.style.width = `${region.x2 - region.x1}px`;
+    selectionBox.style.height = `${region.y2 - region.y1}px`;
+    selectionBox.classList.remove('d-none');
+}
+
+// Add these new functions for function management
+async function loadFunctions() {
+    try {
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
+
+        functions = await response.json();
+        updateFunctionsList();
+    } catch (error) {
+        logToConsole('Error loading functions', 'error');
+    }
+}
+
+function updateFunctionsList() {
+    const functionsList = document.getElementById('functionsList');
+    const addFunctionBtn = document.getElementById('addFunctionBtn');
+
+    if (!functionsList) return;
+
+    // Clear existing items
+    functionsList.innerHTML = '';
+
+    // Add delete all functions option if there are functions
+    if (window.functions && window.functions.length > 0) {
+        const deleteAllItem = document.createElement('li');
+        deleteAllItem.innerHTML = `
+            <button class="dropdown-item text-danger" type="button">
+                <i class="fas fa-trash-alt"></i> Delete All Functions
+            </button>
+        `;
+        deleteAllItem.addEventListener('click', deleteAllFunctions);
+        functionsList.appendChild(deleteAllItem);
+
+        // Add divider
+        const divider = document.createElement('li');
+        divider.innerHTML = '<hr class="dropdown-divider">';
+        functionsList.appendChild(divider);
+    }
+
+    // Add function items
+    if (window.functions && window.functions.length > 0) {
+        window.functions.forEach(func => {
+            const item = document.createElement('li');
+            item.className = 'd-flex justify-content-between align-items-center px-2';
+            item.innerHTML = `
+                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
+                    ${func.name}
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
+                        data-function-id="${func.id}" title="Delete function">×</button>
+            `;
+
+            // Add function to task
+            const functionBtn = item.querySelector('.function-item');
+            functionBtn.addEventListener('click', () => {
+                if (!state.currentTask) {
+                    logToConsole('Please create or select a task first', 'error');
+                    return;
+                }
+                addFunctionToTask(func);
+            });
+
+            // Delete function
+            const deleteBtn = item.querySelector('.delete-function-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteFunction(func.id);
+            });
+
+            functionsList.appendChild(item);
+        });
+    } else {
+        const emptyItem = document.createElement('li');
+        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
+        functionsList.appendChild(emptyItem);
+    }
+}
+
+async function deleteFunction(functionId) {
+    try {
+        const response = await fetch(`/api/functions/${functionId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete function');
+
+        window.functions = window.functions.filter(f => f.id !== functionId);
+        updateFunctionsList();
+        logToConsole('Function deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting function', 'error');
+    }
+}
+
+async function deleteAllFunctions() {
+    if (!confirm('Are you sure you want to delete all functions?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/functions/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all functions');
+
+        window.functions = [];
+        updateFunctionsList();
+        logToConsole('All functions deleted successfully', 'success');
+    } catch (error) {
+        logToConsole('Error deleting all functions', 'error');
+    }
+}
+
+// Previous code remains unchanged
+
+function addBlockToFunction(type, parentElement = null) {
+    const container = parentElement ?
+        parentElement.querySelector('.nested-blocks') :
+        document.getElementById('functionBlocks');
+
+    if (!container) {
+        logToConsole('Error: Could not find container for new block', 'error');
+        return;
+    }
+
+    const block = {
+        type: type,
+        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
+    };
+
+    if (type === 'loop') {
+        block.iterations = 1;
+        block.blocks = [];
+    }
+
+    const blockElement = document.createElement('div');
+    blockElement.className = `block ${type}-block`;
+
+    if (type === 'loop') {
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input" 
+                               value="1" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners for nested block buttons
+        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockElement);
+        });
+
+        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockElement);
+        });
+
+        // Add event listeners for iterations
+        const iterationsInput = blockElement.querySelector('.iterations-input');
+        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
+        const increaseBtn = blockElement.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+                scheduleAutosave();
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+            scheduleAutosave();
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
+            scheduleAutosave();
+        });
+    } else { // Tap block
+        blockElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">No region set</small>
+        `;
+
+        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            startTapRegionSelection(blockElement);
+        });
+    }
+
+    // Add remove button handler
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        blockElement.remove();
+        scheduleAutosave();
+    });
+
+    container.appendChild(blockElement);
+}
+
+async function saveFunction() {
+    const nameInput = document.getElementById('functionName');
+    const descriptionInput = document.getElementById('functionDescription');
+    const blocksContainer = document.getElementById('functionBlocks');
+
+    const name = nameInput.value.trim();
+    const description = descriptionInput.value.trim();
+
+    if (!name) {
+        logToConsole('Function name is required', 'error');
+        return;
+    }
+
+    // Collect blocks from the container with nested structure
+    function collectBlocks(container) {
+        return Array.from(container.children).map(blockElement => {
+            const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
+            const block = {
+                type,
+                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
+            };
+
+            if (type === 'loop') {
+                const iterationsInput = blockElement.querySelector('.iterations-input');
+                block.iterations = parseInt(iterationsInput.value) || 1;
+                block.blocks = [];
+
+                const nestedContainer = blockElement.querySelector('.nested-blocks');
+                if (nestedContainer) {
+                    block.blocks = collectBlocks(nestedContainer);
+                }
+            }
+            return block;
+        });
+    }
+
+    const blocks = collectBlocks(blocksContainer);
+
+    try {
+        const response = await fetch('/api/functions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                description,
+                blocks
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to save function');
+
+        const savedFunction = await response.json();
+        functions.push(savedFunction);
+        updateFunctionsList();
+
+        // Close modal and reset form
+        const modal = document.getElementById('functionModal');
+        const bsModal = bootstrap.Modal.getInstance(modal);
+        if (bsModal) {
+            bsModal.hide();
+        }
+
+        nameInput.value = '';
+        descriptionInput.value = '';
+        blocksContainer.innerHTML = '';
+
+        logToConsole('Function saved successfully', 'success');
+    } catch (error) {
+        logToConsole('Error saving function: ' + error.message, 'error');
+    }
+}
+
+async function addFunctionBlock(functionId) {
+    const func = functions.find(f => f.id === functionId);
+    if (!func) {
+        logToConsole('Function not found', 'error');
+        return;
+    }
+
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: func.blocks // Store the function's blocks for reference
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
+}
+
+// Update the block data collection in saveBlocks
+function collectBlockData(block) {
+    const data = {
+        type: block.type,
+        name: block.name
+    };
+
+    if (block.type === 'tap' && block.region) {
+        data.region = block.region;
+    } else if (block.type === 'loop') {
+        data.iterations = block.iterations || 1;
+        if (block.blocks) {
+            data.blocks = block.blocks.map(b => collectBlockData(b));
+        }
+    } else if (block.type === 'function') {
+        data.description = block.description;
+        if (block.blocks) {
+            data.blocks = block.blocks.map(b => collectBlockData(b));
+        }
+    } else if (block.type === 'conditional') {
+        data.data = {
+            threshold: block.data.threshold,
+            referenceImage: block.data.referenceImage,
+            thenBlocks: block.data.thenBlocks.map(b => collectBlockData(b)),
+            elseBlocks: block.data.elseBlocks.map(b => collectBlockData(b))
+        };
+    }
+
+    return data;
+}
+
+// Update save_blocks endpoint handling
+async function saveBlocks(taskId, blocks) {
+    try {
+        const processedBlocks = blocks.map(block => collectBlockData(block));
+
+        const response = await fetch(`/api/tasks/${taskId}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                blocks: processedBlocks
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Blocks saved successfully', 'success');
+    } catch (error) {
+        logToConsole('Error saving blocks: ' + error.message, 'error');
+    }
+}
+
+// Add new function to capture video frame
+function captureVideoFrame() {
+    const video = document.getElementById('bgVideo');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
+}
+
+// Add new function to add conditional block
+function addConditionalBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'conditional',
+        name: 'Conditional Block',
+        data: {
+            threshold: 90,  // Default similarity threshold
+            referenceImage: null,
+            thenBlocks: [],  // Blocks to execute if similarity >= threshold
+            elseBlocks: []   // Blocks to execute if similarity < threshold
+        }
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Conditional block added', 'success');
+}
+
+// Update executeTask to handle conditional blocks
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800;
+
+    async function executeBlocks(blocks) {
+        for (const block of blocks) {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    await executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                setTimeout(() => {
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                }, delay);
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
+            }
+        }
+    }
+
+    await executeBlocks(state.currentTask.blocks);
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + delayIncrement);
+}
+
 // Add button to UI
 document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
     <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
@@ -975,26 +1593,11 @@ function handleIterationsChange(block, value, iterationsInput) {
 
 // Add addFunctionToTask function
 async function addFunctionToTask(func) {
-    // Deep clone the function's blocks to ensure we don't modify the original
-    function cloneBlocks(blocks) {
-        return blocks.map(block => {
-            const clonedBlock = { ...block };
-            if (block.blocks) {
-                clonedBlock.blocks = cloneBlocks(block.blocks);
-            }
-            // Ensure tap blocks retain their region data
-            if (block.type === 'tap' && block.data && block.data.region) {
-                clonedBlock.region = block.data.region;
-            }
-            return clonedBlock;
-        });
-    }
-
     const block = {
         type: 'function',
         name: func.name,
         description: func.description || '',
-        blocks: cloneBlocks(func.blocks || [])
+        blocks: func.blocks
     };
 
     state.currentTask.blocks.push(block);
@@ -1002,1208 +1605,3 @@ async function addFunctionToTask(func) {
     scheduleAutosave();
     logToConsole(`Added function: ${func.name}`, 'success');
 }
-
-// Add conditional block function
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        name: 'Conditional Block',
-        data: {
-            threshold: 90,  // Default similarity threshold
-            referenceImage: null,
-            thenBlocks: [],  // Blocks to execute if similarity >= threshold
-            elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
-// Update the loop block rendering to ensure iterations are saved
-function renderBlock(block, index) {
-    const blockDiv = document.createElement('div');
-    blockDiv.className = `block ${block.type}-block`;
-    blockDiv.dataset.index = index;
-
-    if (block.type === 'loop') {
-        blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-        `;
-
-        const iterationsInput = blockDiv.querySelector('.iterations-input');
-        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
-        const increaseBtn = blockDiv.querySelector('.increase-iterations');
-
-        decreaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                handleIterationsChange(block, currentValue - 1, iterationsInput);
-            }
-        });
-
-        increaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            handleIterationsChange(block, currentValue + 1, iterationsInput);
-        });
-
-        iterationsInput.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            handleIterationsChange(block, value, iterationsInput);
-        });
-
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
-
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
-    }
-
-    // Other block types rendering logic remains unchanged...
-
-    return blockDiv;
-}
-
-// Add these utility functions for block interaction
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Setup video sharing
-function setupVideoSharing() {
-    const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
-    });
-}
-
-// Logging utility
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = message;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
-}
-
-// Add delete task functionality
-async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete task');
-
-        // Remove task from state
-        state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
-        logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
-    } catch (error) {
-        logToConsole('Error deleting task', 'error');
-    }
-}
-
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
-});
-
-// Add new function to show selection box for existing region
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Add these new functions for function management
-async function loadFunctions() {
-    try {
-        const response = await fetch('/api/functions');
-        if (!response.ok) throw new Error('Failed to load functions');
-
-        window.functions = await response.json();
-        updateFunctionsList();
-    } catch (error) {
-        logToConsole('Error loading functions', 'error');
-    }
-}
-
-function updateFunctionsList() {
-    const functionsList = document.getElementById('functionsList');
-    const addFunctionBtn = document.getElementById('addFunctionBtn');
-
-    if (!functionsList) return;
-
-    // Clear existing items
-    functionsList.innerHTML = '';
-
-    // Add delete all functions option if there are functions
-    if (window.functions && window.functions.length > 0) {
-        const deleteAllItem = document.createElement('li');
-        deleteAllItem.innerHTML = `
-            <button class="dropdown-item text-danger" type="button">
-                <i class="fas fa-trash-alt"></i> Delete All Functions
-            </button>
-        `;
-        deleteAllItem.addEventListener('click', deleteAllFunctions);
-        functionsList.appendChild(deleteAllItem);
-
-        // Add divider
-        const divider = document.createElement('li');
-        divider.innerHTML = '<hr class="dropdown-divider">';
-        functionsList.appendChild(divider);
-    }
-
-    // Add function items
-    if (window.functions && window.functions.length > 0) {
-        window.functions.forEach(func => {
-            const item = document.createElement('li');
-            item.className = 'd-flex justify-content-between align-items-center px-2';
-            item.innerHTML = `
-                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
-                    ${func.name}
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
-                        data-function-id="${func.id}" title="Delete function">×</button>
-            `;
-
-            // Add function to task
-            const functionBtn = item.querySelector('.function-item');
-            functionBtn.addEventListener('click', () => {
-                if (!state.currentTask) {
-                    logToConsole('Please create or select a task first', 'error');
-                    return;
-                }
-                addFunctionToTask(func);
-            });
-
-            // Delete function
-            const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteFunction(func.id);
-            });
-
-            functionsList.appendChild(item);
-        });
-    } else {
-        const emptyItem = document.createElement('li');
-        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
-        functionsList.appendChild(emptyItem);
-    }
-}
-
-async function deleteFunction(functionId) {
-    try {
-        const response = await fetch(`/api/functions/${functionId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete function');
-
-        window.functions = window.functions.filter(f => f.id !== functionId);
-        updateFunctionsList();
-        logToConsole('Function deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting function', 'error');
-    }
-}
-
-async function deleteAllFunctions() {
-    if (!confirm('Are you sure you want to delete all functions?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/functions/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all functions');
-
-        window.functions = [];
-        updateFunctionsList();
-        logToConsole('All functions deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all functions', 'error');
-    }
-}
-
-// Previous code remains unchanged
-
-async function addFunctionToTask(func) {
-    // Deep clone the function's blocks to ensure we don't modify the original
-    function cloneBlocks(blocks) {
-        return blocks.map(block => {
-            const clonedBlock = { ...block };
-            if (block.blocks) {
-                clonedBlock.blocks = cloneBlocks(block.blocks);
-            }
-            // Ensure tap blocks retain their region data
-            if (block.type === 'tap' && block.data && block.data.region) {
-                clonedBlock.region = block.data.region;
-            }
-            return clonedBlock;
-        });
-    }
-
-    const block = {
-        type: 'function',
-        name: func.name,
-        description: func.description || '',
-        blocks: cloneBlocks(func.blocks || [])
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole(`Added function: ${func.name}`, 'success');
-}
-
-// Add conditional block function
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        name: 'Conditional Block',
-        data: {
-            threshold: 90,  // Default similarity threshold
-            referenceImage: null,
-            thenBlocks: [],  // Blocks to execute if similarity >= threshold
-            elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
-// Update the loop block rendering to ensure iterations are saved
-function renderBlock(block, index) {
-    const blockDiv = document.createElement('div');
-    blockDiv.className = `block ${block.type}-block`;
-    blockDiv.dataset.index = index;
-
-    if (block.type === 'loop') {
-        blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-        `;
-
-        const iterationsInput = blockDiv.querySelector('.iterations-input');
-        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
-        const increaseBtn = blockDiv.querySelector('.increase-iterations');
-
-        decreaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                handleIterationsChange(block, currentValue - 1, iterationsInput);
-            }
-        });
-
-        increaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            handleIterationsChange(block, currentValue + 1, iterationsInput);
-        });
-
-        iterationsInput.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            handleIterationsChange(block, value, iterationsInput);
-        });
-
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
-
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
-    }
-
-    // Other block types rendering logic remains unchanged...
-
-    return blockDiv;
-}
-
-// Add these utility functions for block interaction
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Setup video sharing
-function setupVideoSharing() {
-    const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
-    });
-}
-
-// Logging utility
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = message;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
-}
-
-// Add delete task functionality
-async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete task');
-
-        // Remove task from state
-        state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
-        logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
-    } catch (error) {
-        logToConsole('Error deleting task', 'error');
-    }
-}
-
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
-});
-
-// Add new function to show selection box for existing region
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Add these new functions for function management
-async function loadFunctions() {
-    try {
-        const response = await fetch('/api/functions');
-        if (!response.ok) throw new Error('Failed to load functions');
-
-        window.functions = await response.json();
-        updateFunctionsList();
-    } catch (error) {
-        logToConsole('Error loading functions', 'error');
-    }
-}
-
-function updateFunctionsList() {
-    const functionsList = document.getElementById('functionsList');
-    const addFunctionBtn = document.getElementById('addFunctionBtn');
-
-    if (!functionsList) return;
-
-    // Clear existing items
-    functionsList.innerHTML = '';
-
-    // Add delete all functions option if there are functions
-    if (window.functions && window.functions.length > 0) {
-        const deleteAllItem = document.createElement('li');
-        deleteAllItem.innerHTML = `
-            <button class="dropdown-item text-danger" type="button">
-                <i class="fas fa-trash-alt"></i> Delete All Functions
-            </button>
-        `;
-        deleteAllItem.addEventListener('click', deleteAllFunctions);
-        functionsList.appendChild(deleteAllItem);
-
-        // Add divider
-        const divider = document.createElement('li');
-        divider.innerHTML = '<hr class="dropdown-divider">';
-        functionsList.appendChild(divider);
-    }
-
-    // Add function items
-    if (window.functions && window.functions.length > 0) {
-        window.functions.forEach(func => {
-            const item = document.createElement('li');
-            item.className = 'd-flex justify-content-between align-items-center px-2';
-            item.innerHTML = `
-                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
-                    ${func.name}
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
-                        data-function-id="${func.id}" title="Delete function">×</button>
-            `;
-
-            // Add function to task
-            const functionBtn = item.querySelector('.function-item');
-            functionBtn.addEventListener('click', () => {
-                if (!state.currentTask) {
-                    logToConsole('Please create or select a task first', 'error');
-                    return;
-                }
-                addFunctionToTask(func);
-            });
-
-            // Delete function
-            const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteFunction(func.id);
-            });
-
-            functionsList.appendChild(item);
-        });
-    } else {
-        const emptyItem = document.createElement('li');
-        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
-        functionsList.appendChild(emptyItem);
-    }
-}
-
-async function deleteFunction(functionId) {
-    try {
-        const response = await fetch(`/api/functions/${functionId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete function');
-
-        window.functions = window.functions.filter(f => f.id !== functionId);
-        updateFunctionsList();
-        logToConsole('Function deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting function', 'error');
-    }
-}
-
-async function deleteAllFunctions() {
-    if (!confirm('Are you sure you want to delete all functions?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/functions/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all functions');
-
-        window.functions = [];
-        updateFunctionsList();
-        logToConsole('All functions deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all functions', 'error');
-    }
-}
-
-// Previous code remains unchanged
-
-async function addFunctionToTask(func) {
-    // Deep clone the function's blocks to ensure we don't modify the original
-    function cloneBlocks(blocks) {
-        return blocks.map(block => {
-            const clonedBlock = { ...block };
-            if (block.blocks) {
-                clonedBlock.blocks = cloneBlocks(block.blocks);
-            }
-            // Ensure tap blocks retain their region data
-            if (block.type === 'tap' && block.data && block.data.region) {
-                clonedBlock.region = block.data.region;
-            }
-            return clonedBlock;
-        });
-    }
-
-    const block = {
-        type: 'function',
-        name: func.name,
-        description: func.description || '',
-        blocks: cloneBlocks(func.blocks || [])
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole(`Added function: ${func.name}`, 'success');
-}
-
-// Add conditional block function
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        name: 'Conditional Block',
-        data: {
-            threshold: 90,  // Default similarity threshold
-            referenceImage: null,
-            thenBlocks: [],  // Blocks to execute if similarity >= threshold
-            elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
-// Update the loop block rendering to ensure iterations are saved
-function renderBlock(block, index) {
-    const blockDiv = document.createElement('div');
-    blockDiv.className = `block ${block.type}-block`;
-    blockDiv.dataset.index = index;
-
-    if (block.type === 'loop') {
-        blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-        `;
-
-        const iterationsInput = blockDiv.querySelector('.iterations-input');
-        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
-        const increaseBtn = blockDiv.querySelector('.increase-iterations');
-
-        decreaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                handleIterationsChange(block, currentValue - 1, iterationsInput);
-            }
-        });
-
-        increaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            handleIterationsChange(block, currentValue + 1, iterationsInput);
-        });
-
-        iterationsInput.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            handleIterationsChange(block, value, iterationsInput);
-        });
-
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
-
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
-    }
-
-    // Other block types rendering logic remains unchanged...
-
-    return blockDiv;
-}
-
-// Add these utility functions for block interaction
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Setup video sharing
-function setupVideoSharing() {
-    const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
-    });
-}
-
-// Logging utility
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = message;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
-}
-
-// Add delete task functionality
-async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete task');
-
-        // Remove task from state
-        state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
-        logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
-    } catch (error) {
-        logToConsole('Error deleting task', 'error');
-    }
-}
-
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
-});
-
-// Add new function to show selection box for existing region
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Add these new functions for function management
-async function loadFunctions() {
-    try {
-        const response = await fetch('/api/functions');
-        if (!response.ok) throw new Error('Failed to load functions');
-
-        window.functions = await response.json();
-        updateFunctionsList();
-    } catch (error) {
-        logToConsole('Error loading functions', 'error');
-    }
-}
-
-function updateFunctionsList() {
-    const functionsList = document.getElementById('functionsList');
-    const addFunctionBtn = document.getElementById('addFunctionBtn');
-
-    if (!functionsList) return;
-
-    // Clear existing items
-    functionsList.innerHTML = '';
-
-    // Add delete all functions option if there are functions
-    if (window.functions && window.functions.length > 0) {
-        const deleteAllItem = document.createElement('li');
-        deleteAllItem.innerHTML = `
-            <button class="dropdown-item text-danger" type="button">
-                <i class="fas fa-trash-alt"></i> Delete All Functions
-            </button>
-        `;
-        deleteAllItem.addEventListener('click', deleteAllFunctions);
-        functionsList.appendChild(deleteAllItem);
-
-        // Add divider
-        const divider = document.createElement('li');
-        divider.innerHTML = '<hr class="dropdown-divider">';
-        functionsList.appendChild(divider);
-    }
-
-    // Add function items
-    if (window.functions && window.functions.length > 0) {
-        window.functions.forEach(func => {
-            const item = document.createElement('li');
-            item.className = 'd-flex justify-content-between align-items-center px-2';
-            item.innerHTML = `
-                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
-                    ${func.name}
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
-                        data-function-id="${func.id}" title="Delete function">×</button>
-            `;
-
-            // Add function to task
-            const functionBtn = item.querySelector('.function-item');
-            functionBtn.addEventListener('click', () => {
-                if (!state.currentTask) {
-                    logToConsole('Please create or select a task first', 'error');
-                    return;
-                }
-                addFunctionToTask(func);
-            });
-
-            // Delete function
-            const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteFunction(func.id);
-            });
-
-            functionsList.appendChild(item);
-        });
-    } else {
-        const emptyItem = document.createElement('li');
-        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
-        functionsList.appendChild(emptyItem);
-    }
-}
-
-async function deleteFunction(functionId) {
-    try {
-        const response = await fetch(`/api/functions/${functionId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete function');
-
-        window.functions = window.functions.filter(f => f.id !== functionId);
-        updateFunctionsList();
-        logToConsole('Function deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting function', 'error');
-    }
-}
-
-async function deleteAllFunctions() {
-    if (!confirm('Are you sure you want to delete all functions?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/functions/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all functions');
-
-        window.functions = [];
-        updateFunctionsList();
-        logToConsole('All functions deleted successfully', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all functions', 'error');
-    }
-}
-
-// Previous code remains unchanged
-
-async function addFunctionToTask(func) {
-    // Deep clone the function's blocks to ensure we don't modify the original
-    function cloneBlocks(blocks) {
-        return blocks.map(block => {
-            const clonedBlock = { ...block };
-            if (block.blocks) {
-                clonedBlock.blocks = cloneBlocks(block.blocks);
-            }
-            // Ensure tap blocks retain their region data
-            if (block.type === 'tap' && block.data && block.data.region) {
-                clonedBlock.region = block.data.region;
-            }
-            return clonedBlock;
-        });
-    }
-
-    const block = {
-        type: 'function',
-        name: func.name,
-        description: func.description || '',
-        blocks: cloneBlocks(func.blocks || [])
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole(`Added function: ${func.name}`, 'success');
-}
-
-// Add conditional block function
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        name: 'Conditional Block',
-        data: {
-            threshold: 90,  // Default similarity threshold
-            referenceImage: null,
-            thenBlocks: [],  // Blocks to execute if similarity >= threshold
-            elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
-// Update the loop block rendering to ensure iterations are saved
-function renderBlock(block, index) {
-    const blockDiv = document.createElement('div');
-    blockDiv.className = `block ${block.type}-block`;
-    blockDiv.dataset.index = index;
-
-    if (block.type === 'loop') {
-        blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-        `;
-
-        const iterationsInput = blockDiv.querySelector('.iterations-input');
-        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
-        const increaseBtn = blockDiv.querySelector('.increase-iterations');
-
-        decreaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                handleIterationsChange(block, currentValue - 1, iterationsInput);
-            }
-        });
-
-        increaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            handleIterationsChange(block, currentValue + 1, iterationsInput);
-        });
-
-        iterationsInput.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            handleIterationsChange(block, value, iterationsInput);
-        });
-
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
-
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
-    }
-
-    // Other block types rendering logic remains unchanged...
-
-    return blockDiv;
-}
-
-// Add these utility functions for block interaction
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Setup video sharing
-function setupVideoSharing() {
-    const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
-    });
-}
-
-// Logging utility
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = message;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
-}
-
-// Add delete task functionality
-async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete task');
-
-        // Remove task from state
-        state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
-        logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
-    } catch (error) {
-        logToConsole('Error deleting task', 'error');
-    }
-}
-
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
-    deleteTask(taskId);
-});
-
-// Add new function to show selection box for existing region
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Add these new functions for function
