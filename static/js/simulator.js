@@ -13,13 +13,90 @@ window.state = {
     tasks: [],
     autoSaveTimeout: null,
     pendingBlockConfiguration: null,
-    focusedBlock: null,  // Track currently focused block
-    lastTaskId: localStorage.getItem('lastTaskId'), // Track last opened task
-    currentFrame: null  // Store current video frame
+    focusedBlock: null,
+    lastTaskId: localStorage.getItem('lastTaskId'),
+    currentFrame: null
 };
 
 // Functions state
 let functions = [];
+
+// Execute task function
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks) {
+        logToConsole('No task to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution...', 'info');
+
+    try {
+        for (const block of state.currentTask.blocks) {
+            await executeBlock(block);
+        }
+        logToConsole('Task execution completed', 'success');
+    } catch (error) {
+        logToConsole(`Task execution failed: ${error.message}`, 'error');
+    }
+}
+
+// Helper function to execute individual blocks
+async function executeBlock(block) {
+    if (!block) return;
+
+    switch (block.type) {
+        case 'tap':
+            if (!block.region) {
+                throw new Error('Tap region not set');
+            }
+            logToConsole(`Executing tap at region: (${block.region.x1},${block.region.y1})`, 'info');
+            // Add visual feedback for tap
+            showTapFeedback(block.region);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait for animation
+            break;
+
+        case 'loop':
+            for (let i = 0; i < block.iterations; i++) {
+                logToConsole(`Loop iteration ${i + 1}/${block.iterations}`, 'info');
+                for (const nestedBlock of block.blocks || []) {
+                    await executeBlock(nestedBlock);
+                }
+            }
+            break;
+
+        case 'logic':
+            logToConsole('Executing logic block', 'info');
+            // Logic block execution would go here
+            break;
+
+        default:
+            logToConsole(`Unknown block type: ${block.type}`, 'warning');
+    }
+}
+
+// Visual feedback for taps
+function showTapFeedback(region) {
+    const simulator = document.getElementById('simulator');
+    if (!simulator) return;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+
+    // Calculate center point of the region
+    const centerX = (region.x1 + region.x2) / 2;
+    const centerY = (region.y1 + region.y2) / 2;
+
+    // Position the feedback element
+    feedback.style.left = `${centerX}px`;
+    feedback.style.top = `${centerY}px`;
+
+    simulator.appendChild(feedback);
+
+    // Remove the feedback element after animation completes
+    setTimeout(() => {
+        feedback.remove();
+    }, 500);
+}
 
 // Add Logic Block
 function addLogicBlock() {
