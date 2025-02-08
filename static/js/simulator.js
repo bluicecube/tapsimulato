@@ -839,7 +839,7 @@ async function executeTask() {
 
     logToConsole('Starting task execution', 'info');
     let delay = 0;
-    const delayIncrement = 800; // Increased delay between actions for better visibility
+    const delayIncrement = 800;
 
     async function executeBlocks(blocks) {
         for (const block of blocks) {
@@ -859,8 +859,8 @@ async function executeTask() {
             } else if (block.type === 'tap' && block.region) {
                 delay += delayIncrement;
                 setTimeout(() => {
-                    showTapFeedback(block.region);
-                    logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
                 }, delay);
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
@@ -887,7 +887,6 @@ async function executeTask() {
     }
 
     await executeBlocks(state.currentTask.blocks);
-
     setTimeout(() => {
         logToConsole('Task execution completed', 'success');
     }, delay + delayIncrement);
@@ -895,25 +894,26 @@ async function executeTask() {
 
 // Utilities
 function showTapFeedback(region) {
-    const centerX = (region.x1 + region.x2) / 2;
-    const centerY = (region.y1 + region.y2) / 2;
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
 
     const feedback = document.createElement('div');
     feedback.className = 'tap-feedback';
-    feedback.style.left = `${centerX}px`;
-    feedback.style.top = `${centerY}px`;
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
 
     document.getElementById('simulator').appendChild(feedback);
-
-    // Remove the feedback element after animation completes
     feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
 }
 
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
     document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {
-            if (video.srcObject) {
+        try {            if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
             const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -1336,7 +1336,7 @@ async function executeTask() {
 
     logToConsole('Starting task execution', 'info');
     let delay = 0;
-    const delayIncrement = 800; // Increased delay between actions for better visibility
+    const delayIncrement = 800;
 
     async function executeBlocks(blocks) {
         for (const block of blocks) {
@@ -1356,8 +1356,8 @@ async function executeTask() {
             } else if (block.type === 'tap' && block.region) {
                 delay += delayIncrement;
                 setTimeout(() => {
-                    showTapFeedback(block.region);
-                    logToConsole(`Executed tap at region (${Math.round(block.region.x1)},${Math.round(block.region.y1)})`, 'success');
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
                 }, delay);
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
@@ -1384,7 +1384,6 @@ async function executeTask() {
     }
 
     await executeBlocks(state.currentTask.blocks);
-
     setTimeout(() => {
         logToConsole('Task execution completed', 'success');
     }, delay + delayIncrement);
@@ -1396,3 +1395,30 @@ document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
 `);
 
 document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+
+// Add beforeunload event listener
+window.addEventListener('beforeunload', async (e) => {
+    if (state.currentTask) {
+        e.preventDefault();
+        e.returnValue = '';
+        await saveCurrentTask();
+    }
+});
+
+// Update tap execution to use random coordinates
+function showTapFeedback(region) {
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+    feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
+}
