@@ -702,32 +702,39 @@ function renderBlock(block, index) {
 
     if (block.type === 'function') {
         blockDiv.innerHTML = `
-            <div class="block-overlay"></div>
-            <div class="block-overlay-title">${block.name}</div>
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">${block.name}</h6>
                 <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-secondary toggle-overlay-btn" title="Toggle overlay">≡</button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
             </div>
             <small class="text-muted">${block.description || ''}</small>
             <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
         `;
 
-        // Add toggle overlay handler - purely visual
-        const toggleBtn = blockDiv.querySelector('.toggle-overlay-btn');
-        const overlay = blockDiv.querySelector('.block-overlay');
-        const overlayTitle = blockDiv.querySelector('.block-overlay-title');
-        toggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            overlay.classList.toggle('active');
-            overlayTitle.classList.toggle('active');
-            toggleBtn.classList.toggle('active');
-        });
-
-        // Add delete handler
+        // Add event listeners
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
+
+        if (addTapBtn) {
+            addTapBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addBlockToFunction('tap', blockDiv);
+            });
+        }
+
+        if (addLoopBtn) {
+            addLoopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addBlockToFunction('loop', blockDiv);
+            });
+        }
+
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -762,7 +769,7 @@ function renderBlock(block, index) {
             <div class="nested-blocks mt-2"></div>
         `;
 
-        // Add event handlers for iterations
+        // Add event listeners
         const iterationsInput = blockDiv.querySelector('.iterations-input');
         const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
         const increaseBtn = blockDiv.querySelector('.increase-iterations');
@@ -928,7 +935,7 @@ function renderTapBlock(block, blockDiv, index) {
             </div>
         </div>
         <small class="text-muted region-text">Region: ${block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)})to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set'}</small>
     `;
 
@@ -1885,13 +1892,11 @@ renderBlock = function(block, index) {
 
 const originalExecuteBlocks = executeBlocks;
 executeBlocks = async function(blocks) {
-    for (
-        const block of blocks) {
-            if (block.type === 'url') {
-                await executeUrlBlock(block);
-            } else {
-                await originalExecuteBlocks([block]); // Execute single block using original function
-            }
+    for (const block of blocks) {
+        if (block.type === 'url') {
+            await executeUrlBlock(block);
+        } else {
+            await originalExecuteBlocks([block]); // Execute single block using original function
         }
     }
 };
