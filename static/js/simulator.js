@@ -10,7 +10,8 @@ window.state = {
     pendingBlockConfiguration: null,
     focusedBlock: null,
     lastTaskId: localStorage.getItem('lastTaskId'),
-    currentFrame: null
+    currentFrame: null,
+    functionOverlaysEnabled: true // New state for function overlays
 };
 
 // Functions state
@@ -264,6 +265,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveFunctionBtn) {
         saveFunctionBtn.addEventListener('click', saveFunction);
     }
+
+    // Add function overlay control
+    const taskSection = document.getElementById('currentTask').parentElement;
+    const overlayControl = document.createElement('div');
+    overlayControl.className = 'function-overlay-control';
+    overlayControl.innerHTML = `
+        <input type="checkbox" id="functionOverlayToggle" checked>
+        <label for="functionOverlayToggle">Collapse Function Blocks</label>
+    `;
+    taskSection.insertBefore(overlayControl, taskSection.firstChild);
+
+    // Add event listener for overlay toggle
+    document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
+        state.functionOverlaysEnabled = e.target.checked;
+        const functionBlocks = document.querySelectorAll('.function-block');
+        functionBlocks.forEach(block => {
+            if (e.target.checked) {
+                block.classList.add('collapsed');
+            } else {
+                block.classList.remove('collapsed');
+            }
+        });
+    });
 });
 
 // Make functions available globally
@@ -714,13 +738,30 @@ function renderBlock(block, index) {
                 <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
                 <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
             </div>
+            <div class="function-overlay">
+                <div class="function-overlay-text">${block.name}</div>
+            </div>
         `;
 
         // Add event listeners
         const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
         const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        const overlay = blockDiv.querySelector('.function-overlay');
 
+        // Add overlay click handler
+        overlay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            blockDiv.classList.remove('collapsed');
+        });
+
+        blockDiv.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn') && !e.target.closest('.function-overlay')) {
+                blockDiv.classList.add('collapsed');
+            }
+        });
+
+        // Add existing button handlers
         if (addTapBtn) {
             addTapBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -740,6 +781,11 @@ function renderBlock(block, index) {
                 e.stopPropagation();
                 removeBlock(blockDiv);
             });
+        }
+
+        // Set initial collapsed state based on global setting
+        if (state.functionOverlaysEnabled) {
+            blockDiv.classList.add('collapsed');
         }
 
         // Render nested blocks
@@ -896,7 +942,7 @@ function renderBlock(block, index) {
             });
         });
 
-        // Render nested blocks
+        // Render nestedblocks
         if (block.data.thenBlocks) {
             const thenContainer = blockDiv.querySelector('.then-blocks');
             block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
