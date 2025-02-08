@@ -237,53 +237,9 @@ async function loadTask(taskId) {
 
         const blocks = await response.json();
 
-        function deserializeBlock(block) {
-            const deserializedBlock = {
-                ...block,
-                type: block.type,
-                collapsed: block.collapsed || false
-            };
-
-            // Restore type-specific data
-            switch (block.type) {
-                case 'tap':
-                    if (block.data && block.data.region) {
-                        deserializedBlock.region = block.data.region;
-                    }
-                    break;
-                case 'loop':
-                    deserializedBlock.iterations = block.data?.iterations || 1;
-                    if (block.blocks && block.blocks.length > 0) {
-                        deserializedBlock.blocks = block.blocks.map(deserializeBlock);
-                    }
-                    break;
-                case 'function':
-                    deserializedBlock.functionId = block.data?.functionId;
-                    deserializedBlock.description = block.data?.description;
-                    if (block.blocks && block.blocks.length > 0) {
-                        deserializedBlock.blocks = block.blocks.map(deserializeBlock);
-                    }
-                    break;
-                case 'conditional':
-                    if (block.data) {
-                        deserializedBlock.data = {
-                            ...block.data,
-                            thenBlocks: (block.data.thenBlocks || []).map(deserializeBlock),
-                            elseBlocks: (block.data.elseBlocks || []).map(deserializeBlock)
-                        };
-                    }
-                    break;
-                case 'url':
-                    deserializedBlock.url = block.data?.url;
-                    break;
-            }
-
-            return deserializedBlock;
-        }
-
         state.currentTask = {
             id: taskId,
-            blocks: blocks.map(deserializeBlock) || []
+            blocks: blocks || []
         };
 
         // Save last opened task ID
@@ -564,52 +520,6 @@ async function saveCurrentTask() {
     if (!state.currentTask) return;
 
     try {
-        function serializeBlock(block) {
-            const serializedBlock = {
-                type: block.type,
-                name: block.name || null,
-                data: { ...block.data } || {},
-                order: block.order || 0,
-                collapsed: block.collapsed || false
-            };
-
-            // Save type-specific data
-            switch (block.type) {
-                case 'tap':
-                    if (block.region) {
-                        serializedBlock.data.region = block.region;
-                    }
-                    break;
-                case 'loop':
-                    serializedBlock.data.iterations = block.iterations || 1;
-                    if (block.blocks && block.blocks.length > 0) {
-                        serializedBlock.blocks = block.blocks.map(serializeBlock);
-                    }
-                    break;
-                case 'function':
-                    serializedBlock.data.functionId = block.functionId;
-                    serializedBlock.data.description = block.description;
-                    if (block.blocks && block.blocks.length > 0) {
-                        serializedBlock.blocks = block.blocks.map(serializeBlock);
-                    }
-                    break;
-                case 'conditional':
-                    if (block.data) {
-                        serializedBlock.data = {
-                            ...block.data,
-                            thenBlocks: (block.data.thenBlocks || []).map(serializeBlock),
-                            elseBlocks: (block.data.elseBlocks || []).map(serializeBlock)
-                        };
-                    }
-                    break;
-                case 'url':
-                    serializedBlock.data.url = block.url;
-                    break;
-            }
-
-            return serializedBlock;
-        }
-
         const blocks = state.currentTask.blocks.map(serializeBlock);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
@@ -627,7 +537,7 @@ async function saveCurrentTask() {
     }
 }
 
-// Enhance scheduleAutosave to provide immediate feedback
+// Enhanced scheduleAutosave to provide immediate feedback
 function scheduleAutosave() {
     if (state.autoSaveTimeout) {
         clearTimeout(state.autoSaveTimeout);
@@ -676,29 +586,6 @@ function setBlockFocus(block, blockDiv) {
     }
 }
 
-// Add block collapse functionality
-function makeBlockCollapsible(blockDiv, block) {
-    const header = blockDiv.querySelector('.block-header');
-    const nestedBlocks = blockDiv.querySelector('.nested-blocks');
-
-    if (!header || !nestedBlocks) return;
-
-    // Initialize collapse state from block data or default to expanded
-    if (block.collapsed) {
-        nestedBlocks.classList.add('collapsed');
-        blockDiv.classList.add('collapsed');
-    }
-
-    header.addEventListener('click', (e) => {
-        // Don't trigger collapse when clicking buttons inside header
-        if (e.target.closest('.btn')) return;
-
-        const isCollapsed = nestedBlocks.classList.toggle('collapsed');
-        blockDiv.classList.toggle('collapsed', isCollapsed);
-        block.collapsed = isCollapsed;
-        scheduleAutosave();
-    });
-}
 
 // Enhanced render block function with better iteration controls
 function renderBlock(block, index) {
@@ -708,8 +595,11 @@ function renderBlock(block, index) {
 
     if (block.type === 'function') {
         blockDiv.innerHTML = `
-            <div class="block-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">${block.name}</h6>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="header-clickable d-flex align-items-center" style="flex: 1">
+                    <h6 class="mb-0">${block.name}</h6>
+                    <span class="collapse-indicator">▼</span>
+                </div>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
@@ -722,24 +612,36 @@ function renderBlock(block, index) {
             </div>
         `;
 
-        // Add event listeners with stopPropagation
+        // Add click handler for collapse
+        const header = blockDiv.querySelector('.header-clickable');
+        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
+
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                blockDiv.classList.toggle('collapsed');
+                nestedBlocks.classList.toggle('collapsed');
+            }
+        });
+
+        // Add event listeners
         const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
-        addTapBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            addBlockToFunction('tap', blockDiv);
-            updateTaskDisplay();
-            scheduleAutosave();
-        });
-
         const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
-        addLoopBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            addBlockToFunction('loop', blockDiv);
-            updateTaskDisplay();
-            scheduleAutosave();
-        });
-
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
+
+        if (addTapBtn) {
+            addTapBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addBlockToFunction('tap', blockDiv);
+            });
+        }
+
+        if (addLoopBtn) {
+            addLoopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addBlockToFunction('loop', blockDiv);
+            });
+        }
+
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -754,13 +656,15 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
-        makeBlockCollapsible(blockDiv, block);
     } else if (block.type === 'tap') {
         return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
-            <div class="block-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="header-clickable d-flex align-items-center" style="flex: 1">
+                    <h6 class="mb-0">Loop Block</h6>
+                    <span class="collapse-indicator">▼</span>
+                </div>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
@@ -775,33 +679,47 @@ function renderBlock(block, index) {
             <div class="nested-blocks mt-2"></div>
         `;
 
-        const iterationsInput = blockDiv.querySelector('.iterations-input');
-        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
-        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+        // Add click handler for collapse
+        const header = blockDiv.querySelector('.header-clickable');
+        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
 
-        decreaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                handleIterationsChange(block, currentValue - 1, iterationsInput);
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
+                blockDiv.classList.toggle('collapsed');
+                nestedBlocks.classList.toggle('collapsed');
             }
         });
 
-        increaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            handleIterationsChange(block, currentValue + 1, iterationsInput);
-        });
-
-        iterationsInput.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            handleIterationsChange(block, value, iterationsInput);
-        });
-
+        // Add event listeners
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
+
+        if (iterationsInput && decreaseBtn && increaseBtn) {
+            decreaseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const currentValue = parseInt(iterationsInput.value) || 1;
+                if (currentValue > 1) {
+                    iterationsInput.value = currentValue - 1;
+                    handleIterationsChange(block, currentValue - 1, iterationsInput);
+                }
+            });
+
+            increaseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const currentValue = parseInt(iterationsInput.value) || 1;
+                iterationsInput.value = currentValue + 1;
+                handleIterationsChange(block, currentValue + 1, iterationsInput);
+            });
+
+            iterationsInput.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const value = parseInt(e.target.value) || 1;
+                handleIterationsChange(block, value, iterationsInput);
+            });
+        }
+
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -816,10 +734,9 @@ function renderBlock(block, index) {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
         }
-        makeBlockCollapsible(blockDiv, block);
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
-            <div class="block-header d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Logic Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
@@ -914,7 +831,6 @@ function renderBlock(block, index) {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
         }
-        makeBlockCollapsible(blockDiv, block);
     } else if (block.type === 'url') {
         return renderUrlBlock(block, blockDiv, index);
     }
@@ -932,7 +848,7 @@ function renderTapBlock(block, blockDiv, index) {
     };
 
     blockDiv.innerHTML = `
-        <div class="block-header d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">Tap Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary set-region-btn">Set Region</button>
@@ -972,7 +888,6 @@ function renderTapBlock(block, blockDiv, index) {
     if (block.region) {
         showSelectionBox(block.region);
     }
-    makeBlockCollapsible(blockDiv, block);
     return blockDiv;
 }
 
@@ -1010,7 +925,7 @@ async function executeTask() {
                 if (func && func.blocks) {
                     // Execute the function's blocks
                     await executeBlocks(func.blocks);
-                } else {
+                } else{
                     logToConsole(`Function "${block.name}" not found`, 'error');
                 }
             } else if (block.type === 'loop') {
@@ -1173,6 +1088,55 @@ function showSelectionBox(region) {
     selectionBox.classList.remove('d-none');
 }
 
+// Update task list with active task highlighting
+function updateTaskList() {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
+
+    taskList.innerHTML = state.tasks.map(task => `
+        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
+             data-task-id="${task.id}">
+            <span>${task.name}</span>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-danger delete-task-btn" 
+                        onclick="deleteTask(${task.id})" title="Delete task">×</button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add click handlers for task selection
+    taskList.querySelectorAll('.task-list-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                const taskId = parseInt(item.dataset.taskId);
+                loadTask(taskId);
+            }
+        });
+    });
+}
+
+// Save current task function
+async function saveCurrentTask() {
+    if (!state.currentTask) return;
+
+    try {
+        const blocks = state.currentTask.blocks;
+
+        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blocks })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Task saved', 'success');
+    } catch (error) {
+        logToConsole('Failed to save task', 'error');
+        console.error('Save task error:', error);
+        throw error;
+    }
+}
+
 // Remove the current dropdown implementation and replace with new version
 function updateFunctionsList() {
     const functionsList = document.getElementById('functionsList');
@@ -1287,8 +1251,11 @@ function addBlockToFunction(type, parentElement = null) {
 
     if (type === 'loop') {
         blockElement.innerHTML = `
-            <div class="block-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="header-clickable d-flex align-items-center" style="flex: 1">
+                    <h6 class="mb-0">Loop Block</h6>
+                    <span class="collapse-indicator">▼</span>
+                </div>
                 <div class="iteration-controls">
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
@@ -1306,6 +1273,17 @@ function addBlockToFunction(type, parentElement = null) {
                 <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
             </div>
         `;
+
+        // Add click handler for collapse
+        const header = blockElement.querySelector('.header-clickable');
+        const nestedBlocks = blockElement.querySelector('.nested-blocks');
+
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
+                blockElement.classList.toggle('collapsed');
+                nestedBlocks.classList.toggle('collapsed');
+            }
+        });
 
         // Add event listeners for nested block buttons
         blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
@@ -1354,7 +1332,7 @@ function addBlockToFunction(type, parentElement = null) {
         });
     } else { // Tap block
         blockElement.innerHTML = `
-            <div class="block-header d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Tap Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
@@ -1378,7 +1356,6 @@ function addBlockToFunction(type, parentElement = null) {
     });
 
     container.appendChild(blockElement);
-    makeBlockCollapsible(blockElement, block);
 }
 
 async function saveFunction() {
@@ -1470,8 +1447,7 @@ async function addFunctionBlock(functionId) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks, // Store the function's blocks for reference
-        functionId: func.id,
-        collapsed: false // Initialize as expanded
+        functionId: func.id
     };
 
     state.currentTask.blocks.push(block);
@@ -1483,8 +1459,7 @@ async function addFunctionBlock(functionId) {
 function collectBlockData(block) {
     const data = {
         type: block.type,
-        name: block.name,
-        collapsed: block.collapsed
+        name: block.name
     };
 
     if (block.type === 'tap' && block.region) {
@@ -1500,15 +1475,6 @@ function collectBlockData(block) {
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
-    } else if (block.type === 'conditional') {
-        data.data = {
-            threshold: block.data.threshold,
-            referenceImage: block.data.referenceImage,
-            thenBlocks: block.data.thenBlocks.map(b => collectBlockData(b)),
-            elseBlocks: block.data.elseBlocks.map(b => collectBlockData(b))
-        };
-    } else if (block.type === 'url') {
-        data.url = block.url;
     }
 
     return data;
@@ -1557,8 +1523,7 @@ function addConditionalBlock() {
             referenceImage: null,
             thenBlocks: [],  // Blocks to execute if similarity >= threshold
             elseBlocks: []   // Blocks to execute if similarity < threshold
-        },
-        collapsed: false
+        }
     };
 
     state.currentTask.blocks.push(block);
@@ -1685,8 +1650,7 @@ async function addFunctionToTask(func) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks,
-        functionId: func.id,
-        collapsed: false
+        functionId: func.id
     };
 
     state.currentTask.blocks.push(block);
@@ -1741,8 +1705,7 @@ function openUrlBlock(url) {
     const block = {
         type: 'url',
         url: url || 'https://www.google.com',
-        description: 'Open URL',
-        collapsed: false
+        description: 'Open URL'
     };
 
     state.currentTask.blocks.push(block);
@@ -1753,7 +1716,7 @@ function openUrlBlock(url) {
 
 function renderUrlBlock(block, blockDiv, index) {
     blockDiv.innerHTML = `
-        <div class="block-header d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center">
             <h6 class="mb-0">URL Block</h6>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
@@ -1780,7 +1743,6 @@ function renderUrlBlock(block, blockDiv, index) {
         e.stopPropagation();
         removeBlock(blockDiv);
     });
-    makeBlockCollapsible(blockDiv, block);
     return blockDiv;
 }
 
@@ -1807,7 +1769,6 @@ function addUrlBlock() {
     const block = {
         type: 'url',
         url: 'https://www.google.com'  // Default URL,
-        collapsed: false
     };
 
     state.currentTask.blocks.push(block);

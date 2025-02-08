@@ -102,7 +102,40 @@ body {
     padding-left: 10px;
     border-left: 2px solid var(--bs-gray);
     margin-top: 10px;
+    transition: max-height 0.3s ease-out;
+    overflow: hidden;
+    max-height: 1000px; /* Large enough to contain content */
 }
+
+.nested-blocks.collapsed {
+    max-height: 0;
+}
+
+.block {
+    position: relative;
+}
+
+.block .header-clickable {
+    cursor: pointer;
+    padding: 8px;
+    margin: -8px;
+    border-radius: 4px;
+}
+
+.block .header-clickable:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.block .collapse-indicator {
+    margin-left: 8px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.block.collapsed .collapse-indicator {
+    transform: rotate(-90deg);
+}
+
 
 /* Console output */
 .live-console {
@@ -276,7 +309,6 @@ body {
     transition: box-shadow 0.2s ease;
 }
 
-
 /* Enhance iteration controls */
 .input-group-sm .btn {
     padding: 0.25rem 0.5rem;
@@ -356,42 +388,4 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
         transform: translate(-50%, -50%) scale(2);
         opacity: 0;
     }
-}
-
-/* Add collapsible styles */
-.nested-blocks {
-    transition: height 0.3s ease-in-out, opacity 0.3s ease-in-out;
-    overflow: hidden;
-    height: auto;
-    opacity: 1;
-}
-
-.nested-blocks.collapsed {
-    height: 0;
-    opacity: 0;
-}
-
-/* Make block headers clickable */
-.block .block-header {
-    cursor: pointer;
-    user-select: none;
-    padding: 0.5rem;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-}
-
-.block .block-header:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Add collapse indicator */
-.block .block-header::after {
-    content: '▼';
-    float: right;
-    transition: transform 0.3s ease;
-    margin-left: 0.5rem;
-}
-
-.block.collapsed .block-header::after {
-    transform: rotate(-90deg);
 }

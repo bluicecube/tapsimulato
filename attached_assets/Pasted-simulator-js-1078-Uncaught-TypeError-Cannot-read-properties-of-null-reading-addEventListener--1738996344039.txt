@@ -1,0 +1,53 @@
+simulator.js:1078 Uncaught TypeError: Cannot read properties of null (reading 'addEventListener')
+    at simulator.js:1078:41Understand this errorAI
+simulator.js:260 Load task error: ReferenceError: deserializeBlock is not defined
+    at loadTask (simulator.js:242:32)
+    at async loadTasks (simulator.js:167:13)
+loadTask @ simulator.js:260Understand this errorAI
+simulator.js:173 Error loading tasks: ReferenceError: deserializeBlock is not defined
+    at loadTask (simulator.js:242:32)
+    at async loadTasks (simulator.js:167:13)
+loadTasks @ simulator.js:173Understand this errorAI
+simulator.js:102 Initial state setup complete: Object
+simulator.js:535 Save task error: ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)
+saveCurrentTask @ simulator.js:535Understand this errorAI
+simulator.js:260 Load task error: ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)
+loadTask @ simulator.js:260Understand this errorAI
+simulator.js:523 Uncaught (in promise) ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)Understand this errorAI
+simulator.js:535 Save task error: ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)
+saveCurrentTask @ simulator.js:535Understand this errorAI
+simulator.js:260 Load task error: ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)
+loadTask @ simulator.js:260Understand this errorAI
+simulator.js:523 Uncaught (in promise) ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)Understand this errorAI
+simulator.js:535 Save task error: ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)
+saveCurrentTask @ simulator.js:535Understand this errorAI
+simulator.js:260 Load task error: ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)
+loadTask @ simulator.js:260Understand this errorAI
+simulator.js:523 Uncaught (in promise) ReferenceError: serializeBlock is not defined
+    at saveCurrentTask (simulator.js:523:53)
+    at loadTask (simulator.js:232:19)
+    at HTMLDivElement.<anonymous> (simulator.js:286:17)

@@ -33,6 +33,17 @@ with app.app_context():
     from models import Task, Block, Function
     db.create_all()
 
+def serialize_block(block):
+    """Serialize a block into a dictionary format"""
+    data = {
+        'id': block.id,
+        'type': block.type,
+        'name': block.name,
+        'data': block.data or {},
+        'order': block.order
+    }
+    return data
+
 def compare_images(img1_data, img2_data):
     """Compare two images and return similarity percentage"""
     # Convert base64 strings to numpy arrays
@@ -57,7 +68,7 @@ def compare_images(img1_data, img2_data):
 def index():
     return render_template('index.html')
 
-# Function-related endpoints
+# Function-related endpoints remain unchanged
 @app.route('/api/functions', methods=['GET'])
 def get_functions():
     functions = Function.query.filter_by(is_active=True).all()
@@ -203,6 +214,16 @@ def delete_all_tasks():
         app.logger.error(f"Error deleting all tasks: {str(e)}")
         return jsonify({'error': 'Failed to delete all tasks'}), 500
 
+@app.route('/api/tasks/<int:task_id>/blocks', methods=['GET'])
+def get_blocks(task_id):
+    try:
+        task = Task.query.get_or_404(task_id)
+        blocks = Block.query.filter_by(task_id=task_id, parent_id=None).order_by(Block.order).all()
+        return jsonify([serialize_block(block) for block in blocks])
+    except Exception as e:
+        logger.error(f"Error getting blocks: {str(e)}")
+        return jsonify({'error': 'Failed to load blocks'}), 500
+
 @app.route('/api/tasks/<int:task_id>/blocks', methods=['POST'])
 def save_blocks(task_id):
     try:
@@ -224,12 +245,16 @@ def save_blocks(task_id):
                 order=order
             )
             db.session.add(block)
-            db.session.flush()
+            db.session.flush()  # Get the block ID without committing
 
+            # Handle nested blocks
             if block_data['type'] in ['loop', 'function'] and 'blocks' in block_data:
                 for i, child_data in enumerate(block_data['blocks']):
                     save_block(child_data, block.id, i)
 
+            return block
+
+        # Save new blocks
         for i, block_data in enumerate(blocks):
             save_block(block_data, None, i)
 
@@ -237,32 +262,10 @@ def save_blocks(task_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Error saving blocks: {str(e)}")
+        logger.error(f"Error saving blocks: {str(e)}")
         return jsonify({'error': 'Failed to save blocks'}), 500
 
-@app.route('/api/tasks/<int:task_id>/blocks', methods=['GET'])
-def get_blocks(task_id):
-    try:
-        task = Task.query.get_or_404(task_id)
-
-        def format_block(block):
-            data = {
-                'id': block.id,
-                'type': block.type,
-                'name': block.name,
-                'data': block.data,
-                'order': block.order
-            }
-            if block.type in ['loop', 'function']:
-                data['blocks'] = [format_block(child) for child in sorted(block.children, key=lambda x: x.order)]
-            return data
-
-        blocks = Block.query.filter_by(task_id=task_id, parent_id=None).order_by(Block.order).all()
-        return jsonify([format_block(block) for block in blocks])
-    except Exception as e:
-        app.logger.error(f"Error getting blocks: {str(e)}")
-        return jsonify({'error': 'Failed to load blocks'}), 500
-
+# Other endpoints remain unchanged
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
