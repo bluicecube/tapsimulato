@@ -82,12 +82,9 @@ function serializeBlock(block) {
         type: block.type,
         name: block.name || null,
         data: {},
-        order: block.order || 0
+        order: block.order || 0,
+        collapsed: block.collapsed || false
     };
-
-    if (block.collapsed !== undefined) {
-        serializedBlock.collapsed = block.collapsed;
-    }
 
     // Save type-specific data
     switch (block.type) {
@@ -706,16 +703,18 @@ function renderBlock(block, index) {
     blockDiv.dataset.index = index;
 
     if (block.type === 'function') {
-        // Create overlay div
+        // Create overlay div first
         const overlay = document.createElement('div');
         overlay.className = 'overlay';
-        overlay.textContent = block.name;
-        overlay.addEventListener('click', (e) => {
-            e.stopPropagation();
+        overlay.textContent = block.name || 'Unnamed Function';
+
+        // Add click handler to expand
+        overlay.addEventListener('click', () => {
             block.collapsed = false;
             blockDiv.classList.remove('collapsed');
             scheduleAutosave();
         });
+
         blockDiv.appendChild(overlay);
 
         blockDiv.innerHTML += `
@@ -739,7 +738,7 @@ function renderBlock(block, index) {
             scheduleAutosave();
         });
 
-        // Add event listeners
+        // Add delete handler
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
@@ -758,67 +757,7 @@ function renderBlock(block, index) {
     } else if (block.type === 'tap') {
         return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'loop') {
-        blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-        `;
-
-        // Add event listeners
-        const iterationsInput = blockDiv.querySelector('.iterations-input');
-        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
-        const increaseBtn = blockDiv.querySelector('.increase-iterations');
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-
-        if (iterationsInput && decreaseBtn && increaseBtn) {
-            decreaseBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const currentValue = parseInt(iterationsInput.value) || 1;
-                if (currentValue > 1) {
-                    iterationsInput.value = currentValue - 1;
-                    handleIterationsChange(block, currentValue - 1, iterationsInput);
-                }
-            });
-
-            increaseBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const currentValue = parseInt(iterationsInput.value) || 1;
-                iterationsInput.value = currentValue + 1;
-                handleIterationsChange(block, currentValue + 1, iterationsInput);
-            });
-
-            iterationsInput.addEventListener('change', (e) => {
-                e.stopPropagation();
-                const value = parseInt(e.target.value) || 1;
-                handleIterationsChange(block, value, iterationsInput);
-            });
-        }
-
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
-
-        // Render nested blocks
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
+        return renderLoopBlock(block, blockDiv, index);
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -1954,7 +1893,7 @@ function renderLoopBlock(block, blockDiv, index) {
             iterationsInput.addEventListener('change', (e) => {
                 e.stopPropagation();
                 const value = parseInt(e.target.value) || 1;
-                handleIterationsChange(block, value, iterationsInput);
+                handleIterationsChange(block, value,iterationsInput);
             });
         }
 
@@ -1973,4 +1912,5 @@ function renderLoopBlock(block, blockDiv, index) {
             });
         }
         return blockDiv;
+    }
 }
