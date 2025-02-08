@@ -68,7 +68,7 @@ def compare_images(img1_data, img2_data):
 def index():
     return render_template('index.html')
 
-# Function-related endpoints remain unchanged
+# Function-related endpoints
 @app.route('/api/functions', methods=['GET'])
 def get_functions():
     functions = Function.query.filter_by(is_active=True).all()
@@ -99,6 +99,22 @@ def create_function():
         'created_at': function.created_at.isoformat(),
         'updated_at': function.updated_at.isoformat()
     })
+
+@app.route('/api/functions/<int:function_id>', methods=['GET'])
+def get_function(function_id):
+    try:
+        function = Function.query.get_or_404(function_id)
+        return jsonify({
+            'id': function.id,
+            'name': function.name,
+            'description': function.description,
+            'blocks': function.blocks,
+            'created_at': function.created_at.isoformat(),
+            'updated_at': function.updated_at.isoformat()
+        })
+    except Exception as e:
+        app.logger.error(f"Error getting function {function_id}: {str(e)}")
+        return jsonify({'error': f'Failed to load function {function_id}'}), 500
 
 @app.route('/api/functions/<int:function_id>', methods=['PUT'])
 def update_function(function_id):
@@ -265,7 +281,7 @@ def save_blocks(task_id):
         logger.error(f"Error saving blocks: {str(e)}")
         return jsonify({'error': 'Failed to save blocks'}), 500
 
-# Other endpoints remain unchanged
+# Other endpoints
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:

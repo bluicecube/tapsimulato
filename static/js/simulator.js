@@ -18,6 +18,53 @@ window.state = {
 // Functions state
 let functions = [];
 
+// Add these helper functions at the top level
+async function loadFunctionData(functionId) {
+    console.log('Loading function data for ID:', functionId);
+    try {
+        const response = await fetch(`/api/functions/${functionId}`);
+        if (!response.ok) throw new Error(`Failed to load function ${functionId}`);
+        const functionData = await response.json();
+        console.log('Loaded function data:', functionData);
+        return functionData;
+    } catch (error) {
+        console.error('Error loading function:', error);
+        throw error;
+    }
+}
+
+async function executeBlock(block) {
+    console.log('Executing block type:', block.type);
+
+    if (block.type === 'function') {
+        console.log('Executing function block:', block);
+        try {
+            const functionData = await loadFunctionData(block.data.functionId);
+            if (functionData.blocks) {
+                for (const functionBlock of functionData.blocks) {
+                    const deserializedBlock = deserializeBlock(functionBlock);
+                    console.log('Executing function block:', deserializedBlock);
+                    await executeBlock(deserializedBlock);
+                }
+            }
+        } catch (error) {
+            logToConsole(`Failed to execute function: ${error.message}`, 'error');
+            throw error;
+        }
+    } else if (block.type === 'tap' && block.region) {
+        console.log('Executing tap at region:', block.region);
+        await simulateTap(block.region);
+    } else if (block.type === 'loop' && block.blocks) {
+        console.log('Executing loop block:', block);
+        for (let i = 0; i < block.iterations; i++) {
+            console.log(`Loop iteration ${i + 1}/${block.iterations}`);
+            for (const nestedBlock of block.blocks) {
+                await executeBlock(nestedBlock);
+            }
+        }
+    }
+}
+
 // Move these functions to the top level for global access
 function serializeBlock(block) {
     const serializedBlock = {
@@ -639,6 +686,8 @@ function finishSelection(endX, endY) {
         y2: Math.max(selectionStartY, endY)
     };
 
+    if (!state.pendingBlockConfiguration) return;
+
     const blockIndex = state.pendingBlockConfiguration.dataset.index;
     const indices = blockIndex.split('.');
     let targetBlock;
@@ -650,19 +699,27 @@ function finishSelection(endX, endY) {
         if (i === indices.length - 1) {
             targetBlock = currentBlocks[index];
         } else {
-            currentBlocks = currentBlocks[index].blocks;
+            currentBlocks = currentBlocks[index].blocks || [];
         }
     }
 
     if (targetBlock) {
-        targetBlock.region = region;
-        state.pendingBlockConfiguration = null;
+        // For function blocks, we need to update the blocks array
+        if (targetBlock.type === 'function' && targetBlock.blocks) {
+            const lastBlock = targetBlock.blocks[targetBlock.blocks.length - 1];
+            if (lastBlock && lastBlock.type === 'tap') {
+                lastBlock.region = region;
+                lastBlock.data.region = region;
+            }
+        } else {
+            targetBlock.region = region;
+            targetBlock.data = targetBlock.data || {};
+            targetBlock.data.region = region;
+        }
 
-        // Show selection box for the newly set region
+        state.pendingBlockConfiguration = null;
         showSelectionBox(region);
         updateTaskDisplay();
-
-        // Save immediately after region update
         saveCurrentTask().then(() => {
             logToConsole('Region updated and saved', 'success');
         }).catch(error => {
@@ -1088,24 +1145,18 @@ async function executeBlock(block) {
 
     if (block.type === 'function') {
         console.log('Executing function block:', block);
-        // Fetch fresh function data from the server
-        const functionResponse = await fetch(`/api/functions/${block.data.functionId}`);
-        if (!functionResponse.ok) {
-            throw new Error(`Failed to load function ${block.data.functionId}`);
-        }
-
-        const functionData = await functionResponse.json();
-        console.log('Loaded function data:', functionData);
-
-        if (functionData.blocks) {
-            const deserializedBlocks = functionData.blocks.map(b => deserializeBlock(b));
-            console.log('Deserialized function blocks:', deserializedBlocks);
-
-            // Execute each block in the function
-            for (const functionBlock of deserializedBlocks) {
-                console.log('Executing function block:', functionBlock);
-                await executeBlock(functionBlock);
+        try {
+            const functionData = await loadFunctionData(block.data.functionId);
+            if (functionData.blocks) {
+                for (const functionBlock of functionData.blocks) {
+                    const deserializedBlock = deserializeBlock(functionBlock);
+                    console.log('Executing function block:', deserializedBlock);
+                    await executeBlock(deserializedBlock);
+                }
             }
+        } catch (error) {
+            logToConsole(`Failed to execute function: ${error.message}`, 'error');
+            throw error;
         }
     } else if (block.type === 'tap' && block.region) {
         console.log('Executing tap at region:', block.region);
@@ -1412,122 +1463,47 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFunctions();
 });
 
-function addBlockToFunction(type, parentElement = null) {
-    const container = parentElement ?
-        parentElement.querySelector('.nested-blocks') :
-        document.getElementById('functionBlocks');
+function addBlockToFunction(blockType, functionBlock) {
+    console.log('Adding block to function:', blockType, functionBlock);
+    const index = functionBlock.dataset.index;
+    const indices = index.split('.');
+    let targetBlock;
+    let currentBlocks = state.currentTask.blocks;
 
-    if (!container) {
-        logToConsole('Error: Could not find container for new block', 'error');
-        return;
+    // Navigate to the correct function block
+    for (let i = 0; i < indices.length; i++) {
+        targetBlock = currentBlocks[indices[i]];
+        if (i < indices.length - 1) {
+            currentBlocks = targetBlock.blocks;
+        }
     }
 
-    const block = {
-        type: type,
-        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
-    };
-
-    if (type === 'loop') {
-        block.iterations = 1;
-        block.blocks = [];
+    if (!targetBlock.blocks) {
+        targetBlock.blocks = [];
     }
 
-    const blockElement = document.createElement('div');
-    blockElement.className = `block ${type}-block`;
-
-    if (type === 'loop') {
-        blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input" 
-                               value="1" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-            <div class="btn-group mt-2 w-100">
-                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-            </div>
-        `;
-
-        // Add event listeners for nested block buttons
-        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            addBlockToFunction('tap', blockElement);
-        });
-
-        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            addBlockToFunction('loop', blockElement);
-        });
-
-        // Add event listeners for iterations
-        const iterationsInput = blockElement.querySelector('.iterations-input');
-        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
-        const increaseBtn = blockElement.querySelector('.increase-iterations');
-
-        decreaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                block.iterations = currentValue - 1;
-                scheduleAutosave();
-            }
-        });
-
-        increaseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            block.iterations = currentValue + 1;
-            scheduleAutosave();
-        });
-
-        iterationsInput.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            if (value < 1) {
-                e.target.value = 1;
-                block.iterations = 1;
-            } else {
-                block.iterations = value;
-            }
-            scheduleAutosave();
-        });
-    } else { // Tap block
-        blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Tap Block</h6>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-                </div>
-            </div>
-            <small class="text-muted">No region set</small>
-        `;
-
-        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            startTapRegionSelection(blockElement);
-        });
+    if (blockType === 'tap') {
+        const tapBlock = {
+            type: 'tap',
+            name: 'Tap Block',
+            data: {},
+            order: targetBlock.blocks.length
+        };
+        targetBlock.blocks.push(tapBlock);
+    } else if (blockType === 'loop') {
+        const loopBlock = {
+            type: 'loop',
+            name: 'Loop Block',
+            blocks: [],
+            iterations: 1,
+            data: { iterations: 1 },
+            order: targetBlock.blocks.length
+        };
+        targetBlock.blocks.push(loopBlock);
     }
 
-    // Add remove button handler
-    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        blockElement.remove();
-        scheduleAutosave();
-    });
-
-    container.appendChild(blockElement);
+    updateTaskDisplay();
+    scheduleAutosave();
 }
 
 async function saveFunction() {
