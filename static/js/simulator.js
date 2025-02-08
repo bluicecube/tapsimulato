@@ -263,17 +263,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskTitle = document.getElementById('taskTitle');
 
     // Set up event listeners
-    document.getElementById('executeTaskBtn')?.addEventListener('click', executeTask);
-    document.getElementById('addTapBtn')?.addEventListener('click', () => addTapBlock());
-    document.getElementById('addLoopBtn')?.addEventListener('click', () => addLoopBlock());
-    document.getElementById('newTaskBtn')?.addEventListener('click', async () => { await createNewTask(); });
-    document.getElementById('addFunctionTapBtn')?.addEventListener('click', () => addBlockToFunction('tap'));
-    document.getElementById('addFunctionLoopBtn')?.addEventListener('click', () => addBlockToFunction('loop'));
-    document.getElementById('saveFunctionBtn')?.addEventListener('click', saveFunction);
+    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
+    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
+    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
+    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
+    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
+    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
+    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
 
 
     // Add task title change handler
-    taskTitle?.addEventListener('change', async () => {
+    taskTitle.addEventListener('change', async () => {
         if (state.currentTask) {
             try {
                 const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
@@ -301,8 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Selection events
-    simulator?.addEventListener('mousedown', startSelection);
-    simulator?.addEventListener('mousemove', updateSelection);
+    simulator.addEventListener('mousedown', startSelection);
+    simulator.addEventListener('mousemove', updateSelection);
 
     // Listen for mouseup on document to catch out-of-bounds releases
     document.addEventListener('mouseup', (event) => {
@@ -321,14 +321,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Continue selection when mouse re-enters simulator
-    simulator?.addEventListener('mouseenter', (event) => {
+    simulator.addEventListener('mouseenter', (event) => {
         if (isSelecting) {
             updateSelection(event);
         }
     });
 
     // Remove the mouseleave handler that was forcing selection completion
-    simulator?.removeEventListener('mouseleave', () => {});
+    simulator.removeEventListener('mouseleave', () => {});
 
 
     // Setup video sharing
@@ -362,23 +362,20 @@ document.addEventListener('DOMContentLoaded', () => {
             <label for="functionOverlayToggle">Collapse Function Blocks</label>
         `;
         functionBtn.parentNode.insertBefore(overlayControl, functionBtn);
-
-        // Add event listener for overlay toggle after creating the element
-        const overlayToggle = document.getElementById('functionOverlayToggle');
-        if (overlayToggle) {
-            overlayToggle.addEventListener('change', (e) => {
-                state.functionOverlaysEnabled = e.target.checked;
-                const functionBlocks = document.querySelectorAll('.function-block');
-                functionBlocks.forEach(block => {
-                    if (e.target.checked) {
-                        block.classList.add('collapsed');
-                    } else {
-                        block.classList.remove('collapsed');
-                    }
-                });
-            });
-        }
     }
+
+    // Add event listener for overlay toggle
+    document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
+        state.functionOverlaysEnabled = e.target.checked;
+        const functionBlocks = document.querySelectorAll('.function-block');
+        functionBlocks.forEach(block => {
+            if (e.target.checked) {
+                block.classList.add('collapsed');
+            } else {
+                block.classList.remove('collapsed');
+            }
+        });
+    });
 });
 
 // Make functions available globally
@@ -533,7 +530,7 @@ function updateTaskList() {
 }
 
 // Add delete all tasks functionality
-document.getElementById('deleteAllTasksBtn')?.addEventListener('click', async () => {
+document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
     if (!confirm('Are you sure you want to delete all tasks?')) {
         return;
     }
@@ -815,8 +812,6 @@ function renderBlock(block, index) {
     const blockDiv = document.createElement('div');
     blockDiv.className = `block ${block.type}-block`;
     blockDiv.dataset.index = index;
-    blockDiv.index = index; // Added for easier access in executeBlocks
-
 
     function hasUndefinedValues(block) {
         if (!block) return true;
@@ -835,6 +830,7 @@ function renderBlock(block, index) {
 
         return false;
     }
+
 
     if (block.type === 'function') {
         if (hasUndefinedValues(block)) {
@@ -867,7 +863,7 @@ function renderBlock(block, index) {
         const overlay = blockDiv.querySelector('.function-overlay');
 
         // Add overlay click handler
-        overlay?.addEventListener('click', (e) => {
+        overlay.addEventListener('click', (e) => {
             e.stopPropagation();
             blockDiv.classList.remove('collapsed');
         });
@@ -969,12 +965,13 @@ function renderBlock(block, index) {
             });
         }
 
-        // Render nested blocks        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        // Render nested blocks
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
         if (block.blocks) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
-        }
+                }
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -1009,7 +1006,7 @@ function renderBlock(block, index) {
 
         // Add event listeners
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
-        captureBtn?.addEventListener('click', async (e) => {
+        captureBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const imageData = captureVideoFrame();
 
@@ -1033,7 +1030,7 @@ function renderBlock(block, index) {
 
         // Add threshold change handler
         const thresholdInput = blockDiv.querySelector('.threshold-input');
-        thresholdInput?.addEventListener('change', (e) => {
+        thresholdInput.addEventListener('change', (e) => {
             block.data.threshold = parseInt(e.target.value) || 90;
             scheduleAutosave();
         });
@@ -1049,11 +1046,11 @@ function renderBlock(block, index) {
 
         // Add buttons for then/else blocks
         ['then', 'else'].forEach(section => {
-            blockDiv.querySelector(`.add-${section}-tap-btn`)?.addEventListener('click', () => {
+            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
                 addTapBlock(index, `${section}Blocks`);
             });
 
-            blockDiv.querySelector(`.add-${section}-loop-btn`)?.addEventListener('click', () => {
+            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
                 addLoopBlock(index, `${section}Blocks`);
             });
         });
@@ -1111,7 +1108,7 @@ function renderTapBlock(block, blockDiv, index) {
 
     // Add dedicated button for region selection
     const setRegionBtn = blockDiv.querySelector('.set-region-btn');
-    setRegionBtn?.addEventListener('click', (e) => {
+    setRegionBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startTapRegionSelection(blockDiv);
         if (block.region) {
@@ -1120,7 +1117,7 @@ function renderTapBlock(block, blockDiv, index) {
     });
 
     const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    removeBtn?.addEventListener('click', (e) => {
+    removeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         removeBlock(blockDiv);
     });
@@ -1230,7 +1227,7 @@ function showTapFeedback(region) {
     feedback.style.left = `${x}px`;
     feedback.style.top = `${y}px`;
 
-    document.getElementById('simulator')?.appendChild(feedback);
+    document.getElementById('simulator').appendChild(feedback);
     feedback.addEventListener('animationend', () => feedback.remove());
 
     // Return the actual coordinates used for logging
@@ -1240,9 +1237,9 @@ function showTapFeedback(region) {
 // Fix the video sharing configuration
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource')?.addEventListener('click', async () => {
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
         try {
-            if (video?.srcObject) {
+            if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
             const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -1264,8 +1261,8 @@ function logToConsole(message, type = 'info') {
     const messageEl = document.createElement('div');
     messageEl.className = `text-${type}`;
     messageEl.textContent = message;
-    console?.appendChild(messageEl);
-    console?.scrollTo(0, console.scrollHeight);
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
 }
 
 // Update scheduleAutosave to use the new save function
@@ -1320,8 +1317,8 @@ async function deleteTask(taskId) {
 }
 
 // Add delete button event listener 
-document.getElementById('deleteTaskBtn')?.addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active')?.dataset.taskId;
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
     deleteTask(taskId);
 });
 
@@ -1436,7 +1433,7 @@ function updateFunctionsList() {
 
             // Add function to task when name is clicked
             const nameSpan = item.querySelector('.function-name');
-            nameSpan?.addEventListener('click', () => {
+            nameSpan.addEventListener('click', () => {
                 if (!state.currentTask) {
                     logToConsole('Please create or select a task first', 'error');
                     return;
@@ -1446,7 +1443,7 @@ function updateFunctionsList() {
 
             // Delete function when delete button is clicked
             const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn?.addEventListener('click', (e) => {
+            deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 deleteFunction(func.id);
             });
@@ -1533,12 +1530,12 @@ function addBlockToFunction(type, parentElement = null) {
         `;
 
         // Add event listeners for nested block buttons
-        blockElement.querySelector('.add-tap-btn')?.addEventListener('click', (e) => {
+        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             addBlockToFunction('tap', blockElement);
         });
 
-        blockElement.querySelector('.add-loop-btn')?.addEventListener('click', (e) => {
+        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             addBlockToFunction('loop', blockElement);
         });
@@ -1548,7 +1545,7 @@ function addBlockToFunction(type, parentElement = null) {
         const decreaseBtn = blockElement.querySelector('.decrease-iterations');
         const increaseBtn = blockElement.querySelector('.increase-iterations');
 
-        decreaseBtn?.addEventListener('click', (e) => {
+        decreaseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
@@ -1558,7 +1555,7 @@ function addBlockToFunction(type, parentElement = null) {
             }
         });
 
-        increaseBtn?.addEventListener('click', (e) => {
+        increaseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             iterationsInput.value = currentValue + 1;
@@ -1566,7 +1563,7 @@ function addBlockToFunction(type, parentElement = null) {
             scheduleAutosave();
         });
 
-        iterationsInput?.addEventListener('change', (e) => {
+        iterationsInput.addEventListener('change', (e) => {
             e.stopPropagation();
             const value = parseInt(e.target.value) || 1;
             if (value < 1) {
@@ -1589,14 +1586,14 @@ function addBlockToFunction(type, parentElement = null) {
             <small class="text-muted">No region set</small>
         `;
 
-        blockElement.querySelector('.select-region-btn')?.addEventListener('click', (e) => {
+        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             startTapRegionSelection(blockElement);
         });
     }
 
     // Add remove button handler
-    blockElement.querySelector('.remove-block-btn')?.addEventListener('click', (e) => {
+    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         blockElement.remove();
         scheduleAutosave();
@@ -1610,8 +1607,8 @@ async function saveFunction() {
     const descriptionInput = document.getElementById('functionDescription');
     const blocksContainer = document.getElementById('functionBlocks');
 
-    const name = nameInput?.value.trim();
-    const description = descriptionInput?.value.trim();
+    const name = nameInput.value.trim();
+    const description = descriptionInput.value.trim();
 
     if (!name) {
         logToConsole('Function name is required', 'error');
@@ -1629,7 +1626,7 @@ async function saveFunction() {
 
             if (type === 'loop') {
                 const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.iterations = parseInt(iterationsInput?.value) || 1;
+                block.iterations = parseInt(iterationsInput.value) || 1;
                 block.blocks = [];
 
                 const nestedContainer = blockElement.querySelector('.nested-blocks');
@@ -1760,10 +1757,10 @@ async function saveBlocks(taskId, blocks) {
 function captureVideoFrame() {
     const video = document.getElementById('bgVideo');
     const canvas = document.createElement('canvas');
-    canvas.width = video?.videoWidth || 0;
-    canvas.height = video?.videoHeight || 0;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0);
     return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
 }
 
@@ -1790,782 +1787,83 @@ function addConditionalBlock() {
     logToConsole('Conditional block added', 'success');
 }
 
-// Add executeBlocks function after the window.processBlocks function
-async function executeBlocks(blocks, parentBlock = null) {
-    if (!blocks || !Array.isArray(blocks)) {
-        console.error('Invalid blocks array:', blocks);
-        return;
-    }
-
-    for (const block of blocks) {
-        if (parentBlock) {
-            parentBlock.classList.add('executing');
-        }
-
-        try {
-            switch (block.type) {
-                case 'tap':
-                    if (block.region) {
-                        const centerX = (block.region.x1 + block.region.x2) / 2;
-                        const centerY = (block.region.y1 + block.region.y2) / 2;
-                        await showTapFeedback(centerX, centerY);
-                        await new Promise(resolve => setTimeout(resolve, 500)); // Add delay between taps
-                    }
-                    break;
-
-                case 'loop':
-                    const iterations = block.iterations || 1;
-                    for (let i = 0; i < iterations; i++) {
-                        if (block.blocks) {
-                            await executeBlocks(block.blocks, document.querySelector(`[data-index="${block.index}"]`));
-                        }
-                        // Add small delay between iterations
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    }
-                    break;
-
-                case 'function':
-                    const functionElement = document.querySelector(`[data-index="${block.index}"]`);
-                    if (functionElement) {
-                        functionElement.classList.add('executing');
-                        if (block.blocks) {
-                            await executeBlocks(block.blocks, functionElement);
-                        }
-                        functionElement.classList.remove('executing');
-                    }
-                    break;
-
-                case 'conditional':
-                    if (block.data && block.data.referenceImage) {
-                        const currentImage = captureVideoFrame();
-                        if (currentImage) {
-                            try {
-                                const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ image: currentImage })
-                                });
-                                const result = await response.json();
-
-                                if (result.similarity >= result.threshold) {
-                                    if (block.data.thenBlocks) {
-                                        await executeBlocks(block.data.thenBlocks, document.querySelector(`[data-index="${block.index}"]`));
-                                    }
-                                } else {
-                                    if (block.data.elseBlocks) {
-                                        await executeBlocks(block.data.elseBlocks, document.querySelector(`[data-index="${block.index}"]`));
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('Error comparing images:', error);
-                            }
-                        }
-                    }
-                    break;
-            }
-        } catch (error) {
-            console.error('Error executing block:', error);
-            logToConsole(`Error executing ${block.type} block: ${error.message}`, 'error');
-        }
-    }
-
-    if (parentBlock) {
-        parentBlock.classList.remove('executing');
-    }
-}
-
-// Add executeTask function
 async function executeTask() {
-    if (!state.currentTask || !state.currentTask.blocks) {
-        logToConsole('No task selected or task has no blocks', 'error');
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
         return;
     }
 
-    try {
-        logToConsole('Starting task execution...', 'info');
-        await executeBlocks(state.currentTask.blocks);
-        logToConsole('Task execution completed', 'success');
-    } catch (error) {
-        console.error('Task execution error:', error);
-        logToConsole('Task execution failed: ' + error.message, 'error');
-    }
-}
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800;
 
-// Update event listener for execute button
-document.getElementById('executeTaskBtn')?.addEventListener('click', executeTask);
+    async function executeBlocks(blocks, parentIndex = null) {
+        for (const [index, block] of blocks.entries()) {
+            const blockIndex = parentIndex ? `${parentIndex}.${index}` : index.toString();
+            const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
 
-// Utilities
-function showTapFeedback(x, y) {
-    const feedback = document.createElement('div');
-    feedback.className = 'tap-feedback';
-    feedback.style.left = `${x}px`;
-    feedback.style.top = `${y}px`;
-
-    document.getElementById('simulator')?.appendChild(feedback);
-    feedback.addEventListener('animationend', () => feedback.remove());
-
-    return { x, y };
-}
-
-// Fix the video sharing configuration
-function setupVideoSharing() {
-    const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource')?.addEventListener('click', async () => {
-        try {
-            if (video?.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
+            if (blockElement) {
+                blockElement.classList.add('executing');
             }
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: "always"
-                },
-                audio: false
-            });
-            video.srcObject = stream;
-            logToConsole('Screen sharing started', 'success');
-        } catch (error) {
-            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        }
-    });
-}
 
-function logToConsole(message, type = 'info') {
-    const console = document.getElementById('liveConsole');
-    const messageEl = document.createElement('div');
-    messageEl.className = `text-${type}`;
-    messageEl.textContent = message;
-    console?.appendChild(messageEl);
-    console?.scrollTo(0, console.scrollHeight);
-}
-
-// Update scheduleAutosave to use the new save function
-function scheduleAutosave() {
-    if (state.autoSaveTimeout) {
-        clearTimeout(state.autoSaveTimeout);
-    }
-
-    state.autoSaveTimeout = setTimeout(async () => {
-        if (state.currentTask) {
-            try {
-                await saveCurrentTask();
-            } catch (error) {
-                console.error('Autosave failed:', error);
-            }
-        }
-    }, 1000);
-}
-
-async function deleteTask(taskId) {
-    if (!taskId) {
-        logToConsole('No task selected to delete', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete task');
-
-        // Remove task from state
-        state.tasks = state.tasks.filter(t => t.id !== taskId);
-        updateTaskList();
-
-        // If the deleted task was the current task, clear it
-        if (state.currentTask && state.currentTask.id === taskId) {
-            state.currentTask = null;
-            updateTaskDisplay();
-        }
-
-        logToConsole('Task deleted successfully', 'success');
-
-        // Load another task if available
-        if (state.tasks.length > 0) {
-            await loadTask(state.tasks[0].id);
-        }
-    } catch (error) {
-        logToConsole('Error deleting task', 'error');
-    }
-}
-
-// Add delete button event listener 
-document.getElementById('deleteTaskBtn')?.addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active')?.dataset.taskId;
-    deleteTask(taskId);
-});
-
-// Add new function to show selection box for existing region
-function showSelectionBox(region) {
-    const selectionBox = document.getElementById('selectionBox');
-    if (!selectionBox) return;
-
-    selectionBox.style.left = `${region.x1}px`;
-    selectionBox.style.top = `${region.y1}px`;
-    selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height = `${region.y2 - region.y1}px`;
-    selectionBox.classList.remove('d-none');
-}
-
-// Update task list with active task highlighting
-function updateTaskList() {
-    const taskList = document.getElementById('taskList');
-    if (!taskList) {
-        console.warn('Task list element not found');
-        return;
-    }
-
-    taskList.innerHTML = state.tasks.map(task => `
-        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
-             data-task-id="${task.id}">
-            <span>${task.name}</span>
-            <div class="btn-group">
-                <button class="btn btn-sm btn-outline-danger delete-task-btn" 
-                        data-task-id="${task.id}">×</button>
-            </div>
-        </div>
-    `).join('');
-
-    // Add click handlers for task selection
-    taskList.querySelectorAll('.task-list-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn')) {
-                const taskId = parseInt(item.dataset.taskId);
-                loadTask(taskId);
-            }
-        });
-    });
-
-    // Add delete handlers
-    taskList.querySelectorAll('.delete-task-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const taskId = parseInt(btn.dataset.taskId);
-            deleteTask(taskId);
-        });
-    });
-}
-
-// Save current task function
-async function saveCurrentTask() {
-    if (!state.currentTask) return;
-
-    try {
-        const blocks = state.currentTask.blocks.map(serializeBlock);
-
-        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blocks })
-        });
-
-        if (!response.ok) throw new Error('Failed to save blocks');
-        logToConsole('Task saved', 'success');
-    } catch (error) {
-        logToConsole('Failed to save task', 'error');
-        console.error('Save task error:', error);
-        throw error;
-    }
-}
-
-// Remove the current dropdown implementation and replace with new version
-function updateFunctionsList() {
-    const functionsList = document.getElementById('functionsList');
-    if (!functionsList) return;
-
-    // Clear existing content
-    functionsList.innerHTML = '';
-
-    // Add "Delete All" option if there are functions
-    if (functions && functions.length > 0) {
-        // Add delete all button
-        const deleteAllItem = document.createElement('li');
-        deleteAllItem.innerHTML = `
-            <div class="dropdown-item">
-                <button class="btn btn-danger btn-sm w-100" id="deleteAllFunctionsBtn">
-                    Delete All Functions
-                </button>
-            </div>
-        `;
-        functionsList.appendChild(deleteAllItem);
-
-        // Add divider
-        const divider = document.createElement('li');
-        divider.innerHTML = '<hr class="dropdown-divider">';
-        functionsList.appendChild(divider);
-
-        // Add each function with its delete button
-        functions.forEach(func => {
-            const item = document.createElement('li');
-            item.innerHTML = `
-                <div class="dropdown-item d-flex justify-content-between align-items-center">
-                    <span class="function-name" style="cursor: pointer">${func.name}</span>
-                    <button class="btn btn-danger btn-sm delete-function-btn ms-2">×</button>
-                </div>
-            `;
-
-            // Add function to task when name is clicked
-            const nameSpan = item.querySelector('.function-name');
-            nameSpan?.addEventListener('click', () => {
-                if (!state.currentTask) {
-                    logToConsole('Please create or select a task first', 'error');
-                    return;
+            if (block.type === 'function') {
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    await executeBlocks(func.blocks, blockIndex);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
                 }
-                addFunctionToTask(func);
-            });
-
-            // Delete function when delete button is clicked
-            const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteFunction(func.id);
-            });
-
-            functionsList.appendChild(item);
-        });
-    } else {
-        // Show "No functions" message if no functions exist
-        const emptyItem = document.createElement('li');
-        emptyItem.innerHTML = '<span class="dropdown-item text-muted">No functions available</span>';
-        functionsList.appendChild(emptyItem);
-    }
-
-    // Add delete all functions event handler
-    const deleteAllBtn = document.getElementById('deleteAllFunctionsBtn');
-    if (deleteAllBtn) {
-        deleteAllBtn.addEventListener('click', deleteAllFunctions);
-    }
-}
-
-// Update the functions array and refresh the list
-async function loadFunctions() {
-    try {
-        const response = await fetch('/api/functions');
-        if (!response.ok) throw new Error('Failed to load functions');
-
-        functions = await response.json();
-        updateFunctionsList();
-    } catch (error) {
-        console.error('Error loading functions:', error);
-        logToConsole('Failed to load functions', 'error');
-    }
-}
-
-// Make sure to call loadFunctions when the page loads and after any function changes
-document.addEventListener('DOMContentLoaded', () => {
-    // Add to existing DOMContentLoaded event listener
-    loadFunctions();
-});
-
-function addBlockToFunction(type, parentElement = null) {
-    const container = parentElement ?
-        parentElement.querySelector('.nested-blocks') :
-        document.getElementById('functionBlocks');
-
-    if (!container) {
-        logToConsole('Error: Could not find container for new block', 'error');
-        return;
-    }
-
-    const block = {
-        type: type,
-        name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
-    };
-
-    if (type === 'loop') {
-        block.iterations = 1;
-        block.blocks = [];
-    }
-
-    const blockElement = document.createElement('div');
-    blockElement.className = `block ${type}-block`;
-
-    if (type === 'loop') {
-        blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Loop Block</h6>
-                <div class="iteration-controls">
-                    <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
-                        <input type="number" class="form-control iterations-input" 
-                               value="1" min="1">
-                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
-                    </div>
-                    <span class="ms-2">times</span>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
-                </div>
-            </div>
-            <div class="nested-blocks mt-2"></div>
-            <div class="btn-group mt-2 w-100">
-                <button class="btn btn-sm btn-outline-primary add-tap-btn">Add Tap</button>
-                <button class="btn btn-sm btn-outline-success add-loop-btn">Add Loop</button>
-            </div>
-        `;
-
-        // Add event listeners for nested block buttons
-        blockElement.querySelector('.add-tap-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            addBlockToFunction('tap', blockElement);
-        });
-
-        blockElement.querySelector('.add-loop-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            addBlockToFunction('loop', blockElement);
-        });
-
-        // Add event listeners for iterations
-        const iterationsInput = blockElement.querySelector('.iterations-input');
-        const decreaseBtn = blockElement.querySelector('.decrease-iterations');
-        const increaseBtn = blockElement.querySelector('.increase-iterations');
-
-        decreaseBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            if (currentValue > 1) {
-                iterationsInput.value = currentValue - 1;
-                block.iterations = currentValue - 1;
-                scheduleAutosave();
-            }
-        });
-
-        increaseBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const currentValue = parseInt(iterationsInput.value) || 1;
-            iterationsInput.value = currentValue + 1;
-            block.iterations = currentValue + 1;
-            scheduleAutosave();
-        });
-
-        iterationsInput?.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const value = parseInt(e.target.value) || 1;
-            if (value < 1) {
-                e.target.value = 1;
-                block.iterations = 1;
-            } else {
-                block.iterations = value;
-            }
-            scheduleAutosave();
-        });
-    } else { // Tap block
-        blockElement.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Tap Block</h6>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-                </div>
-            </div>
-            <small class="text-muted">No region set</small>
-        `;
-
-        blockElement.querySelector('.select-region-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            startTapRegionSelection(blockElement);
-        });
-    }
-
-    // Add remove button handler
-    blockElement.querySelector('.remove-block-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        blockElement.remove();
-        scheduleAutosave();
-    });
-
-    container.appendChild(blockElement);
-}
-
-async function saveFunction() {
-    const nameInput = document.getElementById('functionName');
-    const descriptionInput = document.getElementById('functionDescription');
-    const blocksContainer = document.getElementById('functionBlocks');
-
-    const name = nameInput?.value.trim();
-    const description = descriptionInput?.value.trim();
-
-    if (!name) {
-        logToConsole('Function name is required', 'error');
-        return;
-    }
-
-    // Collect blocks from the container with nested structure
-    function collectBlocks(container) {
-        return Array.from(container.children).map(blockElement => {
-            const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
-            const block = {
-                type,
-                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
-            };
-
-            if (type === 'loop') {
-                const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.iterations = parseInt(iterationsInput?.value) || 1;
-                block.blocks = [];
-
-                const nestedContainer = blockElement.querySelector('.nested-blocks');
-                if (nestedContainer) {
-                    block.blocks = collectBlocks(nestedContainer);
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks, blockIndex);
                 }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                await new Promise(resolve => setTimeout(() => {
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                    resolve();
+                }, delayIncrement));
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute, blockIndex);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
+            } else if (block.type === 'url') {
+                await executeUrlBlock(block);
             }
-            return block;
-        });
-    }
 
-    const blocks = collectBlocks(blocksContainer);
-
-    try {
-        const response = await fetch('/api/functions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name,
-                description,
-                blocks
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to save function');
-
-        const savedFunction = await response.json();
-        functions.push(savedFunction);
-        updateFunctionsList();
-
-        // Close modal and reset form
-        const modal = document.getElementById('functionModal');
-        const bsModal = bootstrap.Modal.getInstance(modal);
-        if (bsModal) {
-            bsModal.hide();
-        }
-
-        nameInput.value = '';
-        descriptionInput.value = '';
-        blocksContainer.innerHTML = '';
-
-        logToConsole('Function saved successfully', 'success');
-    } catch (error) {
-        logToConsole('Error saving function: ' + error.message, 'error');
-    }
-}
-
-async function addFunctionBlock(functionId) {
-    const func = functions.find(f => f.id === functionId);
-    if (!func) {
-        logToConsole('Function not found', 'error');
-        return;
-    }
-
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'function',
-        name: func.name,
-        description: func.description || '',
-        blocks: func.blocks, // Store the function's blocks for reference
-        functionId: func.id
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole(`Added function: ${func.name}`, 'success');
-}
-
-function collectBlockData(block) {
-    const data = {
-        type: block.type,
-        name: block.name
-    };
-
-    if (block.type === 'tap' && block.region) {
-        data.region = block.region;
-    } else if (block.type === 'loop') {
-        data.iterations = block.iterations || 1;
-        if (block.blocks) {
-            data.blocks = block.blocks.map(b => collectBlockData(b));
-        }
-    } else if (block.type === 'function') {
-        data.description = block.description;
-        data.functionId = block.functionId;
-        if (block.blocks) {
-            data.blocks = block.blocks.map(b => collectBlockData(b));
-        }
-    } else if (block.type === 'conditional') {
-        data.threshold = block.data.threshold;
-        data.referenceImage = block.data.referenceImage;
-        if (block.data.thenBlocks) {
-            data.thenBlocks = block.data.thenBlocks.map(b => collectBlockData(b));
-        }
-        if (block.data.elseBlocks) {
-            data.elseBlocks = block.data.elseBlocks.map(b => collectBlockData(b));
-        }
-    } else if (block.type === 'url') {
-        data.url = block.url;
-    }
-
-    return data;
-}
-
-async function saveBlocks(taskId, blocks) {
-    try {
-        const processedBlocks = blocks.map(block => collectBlockData(block));
-
-        const response = await fetch(`/api/tasks/${taskId}/blocks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                blocks: processedBlocks
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to save blocks');
-        logToConsole('Blocks saved successfully', 'success');
-    } catch (error) {
-        logToConsole('Error saving blocks: ' + error.message, 'error');
-    }
-}
-
-function captureVideoFrame() {
-    const video = document.getElementById('bgVideo');
-    const canvas = document.createElement('canvas');
-    canvas.width = video?.videoWidth || 0;
-    canvas.height = video?.videoHeight || 0;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
-}
-
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        name: 'Conditional Block',
-        data: {
-            threshold: 90,  // Default similarity threshold
-            referenceImage: null,
-            thenBlocks: [],  // Blocks to execute if similarity >= threshold
-            elseBlocks: []   // Blocks to execute if similarity < threshold
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
-// Add executeBlocks function after the window.processBlocks function
-async function executeBlocks(blocks, parentBlock = null) {
-    if (!blocks || !Array.isArray(blocks)) {
-        console.error('Invalid blocks array:', blocks);
-        return;
-    }
-
-    for (const block of blocks) {
-        if (parentBlock) {
-            parentBlock.classList.add('executing');
-        }
-
-        try {
-            switch (block.type) {
-                case 'tap':
-                    if (block.region) {
-                        const centerX = (block.region.x1 + block.region.x2) / 2;
-                        const centerY = (block.region.y1 + block.region.y2) / 2;
-                        await showTapFeedback(centerX, centerY);
-                        await new Promise(resolve => setTimeout(resolve, 500)); // Add delay between taps
-                    }
-                    break;
-
-                case 'loop':
-                    const iterations = block.iterations || 1;
-                    for (let i = 0; i < iterations; i++) {
-                        if (block.blocks) {
-                            await executeBlocks(block.blocks, document.querySelector(`[data-index="${block.index}"]`));
-                        }
-                        // Add small delay between iterations
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    }
-                    break;
-
-                case 'function':
-                    const functionElement = document.querySelector(`[data-index="${block.index}"]`);
-                    if (functionElement) {
-                        functionElement.classList.add('executing');
-                        if (block.blocks) {
-                            await executeBlocks(block.blocks, functionElement);
-                        }
-                        functionElement.classList.remove('executing');
-                    }
-                    break;
-
-                case 'conditional':
-                    if (block.data && block.data.referenceImage) {
-                        const currentImage = captureVideoFrame();
-                        if (currentImage) {
-                            try {
-                                const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ image: currentImage })
-                                });
-                                const result = await response.json();
-
-                                if (result.similarity >= result.threshold) {
-                                    if (block.data.thenBlocks) {
-                                        await executeBlocks(block.data.thenBlocks, document.querySelector(`[data-index="${block.index}"]`));
-                                    }
-                                } else {
-                                    if (block.data.elseBlocks) {
-                                        await executeBlocks(block.data.elseBlocks, document.querySelector(`[data-index="${block.index}"]`));
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('Error comparing images:', error);
-                            }
-                        }
-                    }
-                    break;
+            if (blockElement) {
+                blockElement.classList.remove('executing');
             }
-        } catch (error) {
-            console.error('Error executing block:', error);
-            logToConsole(`Error executing ${block.type} block: ${error.message}`, 'error');
         }
     }
 
-    if (parentBlock) {
-        parentBlock.classList.remove('executing');
-    }
-}
-
-// Add executeTask function
-async function executeTask() {
-    if (!state.currentTask || !state.currentTask.blocks) {
-        logToConsole('No task selected or task has no blocks', 'error');
-        return;
-    }
-
-    try {
-        logToConsole('Starting task execution...', 'info');
-        await executeBlocks(state.currentTask.blocks);
-        logToConsole('Task execution completed', 'success');
-    } catch (error) {
-        console.error('Task execution error:', error);
-        logToConsole('Task execution failed: ' + error.message, 'error');
-    }
+    await executeBlocks(state.currentTask.blocks);
+    logToConsole('Task execution completed', 'success');
 }
 
 // Add button to UI
-document.getElementById('addFunctionBtn')?.insertAdjacentHTML('beforebegin', `
-    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>`);
+document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
+    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
+`);
 
-document.getElementById('addConditionalBtn')?.addEventListener('click', addConditionalBlock);
+document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
 
 // Add beforeunload event listener
 window.addEventListener('beforeunload', async (e) => {
@@ -2586,7 +1884,7 @@ function showTapFeedback(region) {
     feedback.style.left = `${x}px`;
     feedback.style.top = `${y}px`;
 
-    document.getElementById('simulator')?.appendChild(feedback);
+    document.getElementById('simulator').appendChild(feedback);
     feedback.addEventListener('animationend', () => feedback.remove());
 
     // Return the actual coordinates used for logging
@@ -2693,7 +1991,7 @@ function renderUrlBlock(block, blockDiv, index) {
 
     // Add event handlers
     const editUrlBtn = blockDiv.querySelector('.edit-url-btn');
-    editUrlBtn?.addEventListener('click', (e) => {
+    editUrlBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const url = prompt('Enter URL:', block.url || 'https://www.google.com');
         if (url) {
@@ -2704,7 +2002,7 @@ function renderUrlBlock(block, blockDiv, index) {
     });
 
     const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    removeBtn?.addEventListener('click', (e) => {
+    removeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         removeBlock(blockDiv);
     });
@@ -2752,7 +2050,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGroup = document.querySelector('.btn-group.w-100.mb-3');
     if (btnGroup) {
         btnGroup.appendChild(addUrlBtn);
-        addUrlBtn?.addEventListener('click', addUrlBlock);
+        addUrlBtn.addEventListener('click', addUrlBlock);
     }
 });
 
