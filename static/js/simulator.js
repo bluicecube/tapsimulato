@@ -1067,7 +1067,7 @@ async function loadFunctions() {
         const response = await fetch('/api/functions');
         if (!response.ok) throw new Error('Failed to load functions');
 
-        functions = await response.json();
+        window.functions = await response.json();
         updateFunctionsList();
     } catch (error) {
         logToConsole('Error loading functions', 'error');
@@ -1296,42 +1296,27 @@ function addBlockToFunction(type, parentElement = null) {
 }
 
 async function saveFunction() {
-    const nameInput = document.getElementById('functionName');
-    const descriptionInput = document.getElementById('functionDescription');
-    const blocksContainer = document.getElementById('functionBlocks');
-
-    const name = nameInput.value.trim();
-    const description = descriptionInput.value.trim();
+    const name = document.getElementById('functionName').value;
+    const description = document.getElementById('functionDescription').value;
+    const functionBlocksContainer = document.getElementById('functionBlocks');
 
     if (!name) {
-        logToConsole('Function name is required', 'error');
+        logToConsole('Please enter a function name', 'error');
         return;
     }
 
-    // Collect blocks from the container with nested structure
-    function collectBlocks(container) {
-        return Array.from(container.children).map(blockElement => {
-            const type = blockElement.classList.contains('tap-block') ? 'tap' : 'loop';
-            const block = {
-                type,
-                name: `${type.charAt(0).toUpperCase() + type.slice(1)} Block`
-            };
-
-            if (type === 'loop') {
-                const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.iterations = parseInt(iterationsInput.value) || 1;
-                block.blocks = [];
-
-                const nestedContainer = blockElement.querySelector('.nested-blocks');
-                if (nestedContainer) {
-                    block.blocks = collectBlocks(nestedContainer);
-                }
-            }
-            return block;
-        });
-    }
-
-    const blocks = collectBlocks(blocksContainer);
+    const blocks = Array.from(functionBlocksContainer.children).map(child => {
+        const block = {
+            type: child.classList.contains('tap-block') ? 'tap' : 'loop',
+        };
+        if (block.type === 'tap') {
+            block.region = child.dataset.region ? JSON.parse(child.dataset.region) : null;
+        } else if (block.type === 'loop') {
+            block.iterations = parseInt(child.querySelector('.iterations-input').value) || 1;
+            block.blocks = []; // Add nested blocks if needed
+        }
+        return block;
+    });
 
     try {
         const response = await fetch('/api/functions', {
@@ -1347,23 +1332,38 @@ async function saveFunction() {
         if (!response.ok) throw new Error('Failed to save function');
 
         const savedFunction = await response.json();
-        functions.push(savedFunction);
+        // Update local functions array
+        if (!window.functions) window.functions = [];
+        window.functions.push(savedFunction);
+
+        // Close modal and update UI
+        const modal = bootstrap.Modal.getInstance(document.getElementById('functionModal'));
+        modal.hide();
+
+        // Clear form
+        document.getElementById('functionName').value = '';
+        document.getElementById('functionDescription').value = '';
+        document.getElementById('functionBlocks').innerHTML = '';
+
+        // Update functions list
         updateFunctionsList();
-
-        // Close modal and reset form
-        const modal = document.getElementById('functionModal');
-        const bsModal = bootstrap.Modal.getInstance(modal);
-        if (bsModal) {
-            bsModal.hide();
-        }
-
-        nameInput.value = '';
-        descriptionInput.value = '';
-        blocksContainer.innerHTML = '';
-
         logToConsole('Function saved successfully', 'success');
     } catch (error) {
-        logToConsole('Error saving function: ' + error.message, 'error');
+        logToConsole('Failed to save function', 'error');
+        console.error('Save function error:', error);
+    }
+}
+
+// Add loadFunctions function if not already present
+async function loadFunctions() {
+    try {
+        const response = await fetch('/api/functions');
+        if (!response.ok) throw new Error('Failed to load functions');
+        window.functions = await response.json();
+        updateFunctionsList();
+    } catch (error) {
+        console.error('Load functions error:', error);
+        logToConsole('Failed to load functions', 'error');
     }
 }
 
