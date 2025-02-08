@@ -1078,27 +1078,32 @@ async function executeTask() {
                 blockElement.classList.add('executing');
             }
 
-            if (block.type === 'function') {
-                const func = functions.find(f => f.name === block.name);
-                if (func && func.blocks) {
-                    await executeBlocks(func.blocks, blockIndex);
-                } else {
-                    logToConsole(`Function "${block.name}" not found`, 'error');
-                }
-            } else if (block.type === 'loop') {
-                for (let i = 0; i < block.iterations; i++) {
-                    await executeBlocks(block.blocks, blockIndex);
-                }
-            } else if (block.type === 'tap' && block.region) {
-                delay += delayIncrement;
-                await new Promise(resolve => setTimeout(() => {
-                    const coords = showTapFeedback(block.region);
-                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                    resolve();
-                }, delayIncrement));
-            } else if (block.type === 'conditional') {
-                const currentImage = captureVideoFrame();
-                try {
+            try {
+                // Handle region data stored in data object
+                const region = block.region || (block.data && block.data.region);
+                const iterations = block.iterations || (block.data && block.data.iterations) || 1;
+                const nestedBlocks = block.blocks || (block.data && block.data.blocks) || [];
+
+                if (block.type === 'function') {
+                    const func = functions.find(f => f.name === block.name);
+                    if (func && func.blocks) {
+                        await executeBlocks(func.blocks, blockIndex);
+                    } else {
+                        logToConsole(`Function "${block.name}" not found`, 'error');
+                    }
+                } else if (block.type === 'loop') {
+                    for (let i = 0; i < iterations; i++) {
+                        await executeBlocks(nestedBlocks, blockIndex);
+                    }
+                } else if (block.type === 'tap' && region) {
+                    delay += delayIncrement;
+                    await new Promise(resolve => setTimeout(() => {
+                        const coords = showTapFeedback(region);
+                        logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                        resolve();
+                    }, delayIncrement));
+                } else if (block.type === 'conditional') {
+                    const currentImage = captureVideoFrame();
                     const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1113,11 +1118,11 @@ async function executeTask() {
 
                     logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
                     await executeBlocks(blocksToExecute, blockIndex);
-                } catch (error) {
-                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                } else if (block.type === 'url') {
+                    await executeUrlBlock(block);
                 }
-            } else if (block.type === 'url') {
-                await executeUrlBlock(block);
+            } catch (error) {
+                logToConsole(`Error executing block: ${error.message}`, 'error');
             }
 
             if (blockElement) {
@@ -1720,27 +1725,32 @@ async function executeTask() {
                 blockElement.classList.add('executing');
             }
 
-            if (block.type === 'function') {
-                const func = functions.find(f => f.name === block.name);
-                if (func && func.blocks) {
-                    await executeBlocks(func.blocks, blockIndex);
-                } else {
-                    logToConsole(`Function "${block.name}" not found`, 'error');
-                }
-            } else if (block.type === 'loop') {
-                for (let i = 0; i < block.iterations; i++) {
-                    await executeBlocks(block.blocks, blockIndex);
-                }
-            } else if (block.type === 'tap' && block.region) {
-                delay += delayIncrement;
-                await new Promise(resolve => setTimeout(() => {
-                    const coords = showTapFeedback(block.region);
-                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
-                    resolve();
-                }, delayIncrement));
-            } else if (block.type === 'conditional') {
-                const currentImage = captureVideoFrame();
-                try {
+            try {
+                // Handle region data stored in data object
+                const region = block.region || (block.data && block.data.region);
+                const iterations = block.iterations || (block.data && block.data.iterations) || 1;
+                const nestedBlocks = block.blocks || (block.data && block.data.blocks) || [];
+
+                if (block.type === 'function') {
+                    const func = functions.find(f => f.name === block.name);
+                    if (func && func.blocks) {
+                        await executeBlocks(func.blocks, blockIndex);
+                    } else {
+                        logToConsole(`Function "${block.name}" not found`, 'error');
+                    }
+                } else if (block.type === 'loop') {
+                    for (let i = 0; i < iterations; i++) {
+                        await executeBlocks(nestedBlocks, blockIndex);
+                    }
+                } else if (block.type === 'tap' && region) {
+                    delay += delayIncrement;
+                    await new Promise(resolve => setTimeout(() => {
+                        const coords = showTapFeedback(region);
+                        logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                        resolve();
+                    }, delayIncrement));
+                } else if (block.type === 'conditional') {
+                    const currentImage = captureVideoFrame();
                     const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1755,11 +1765,11 @@ async function executeTask() {
 
                     logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
                     await executeBlocks(blocksToExecute, blockIndex);
-                } catch (error) {
-                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                } else if (block.type === 'url') {
+                    await executeUrlBlock(block);
                 }
-            } else if (block.type === 'url') {
-                await executeUrlBlock(block);
+            } catch (error) {
+                logToConsole(`Error executing block: ${error.message}`, 'error');
             }
 
             if (blockElement) {
@@ -1874,8 +1884,7 @@ async function deleteAllFunctions() {
 
 // Add URL opening functionality at the end of the file
 function openUrlBlock(url) {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
+    if (!state.currentTask) {        logToConsole('Please create or select a task first', 'error');
         return;
     }
 
