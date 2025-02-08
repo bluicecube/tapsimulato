@@ -516,6 +516,7 @@ function finishSelection(endX, endY) {
         // Show selection box for the newly set region
         showSelectionBox(region);
         updateTaskDisplay();
+
         // Save immediately after region update
         saveCurrentTask().then(() => {
             logToConsole('Region updated and saved', 'success');
@@ -651,36 +652,7 @@ function renderBlock(block, index) {
             });
         }
     } else if (block.type === 'tap') {
-        const regionText = block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
-            'No region set';
-
-        blockDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Tap Block</h6>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
-                </div>
-            </div>
-            <small class="text-muted">Region: ${regionText}</small>
-        `;
-
-        // Make the entire block clickable for region selection
-        blockDiv.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn')) {
-                e.stopPropagation();
-                setBlockFocus(block, blockDiv);
-                enableDrawingMode(block, blockDiv);
-            }
-        });
-
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
+        return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -836,6 +808,47 @@ function renderBlock(block, index) {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
         }
+    }
+
+    return blockDiv;
+}
+
+function renderTapBlock(block, blockDiv, index) {
+    const regionText = block.region ?
+        `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+        'No region set';
+
+    blockDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Tap Block</h6>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+            </div>
+        </div>
+        <small class="text-muted">Region: ${regionText}</small>
+    `;
+
+    // Make the entire block clickable for region selection
+    blockDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.btn')) {
+            e.stopPropagation();
+            const wasAlreadyFocused = blockDiv.classList.contains('focused');
+            setBlockFocus(block, blockDiv);
+
+            // Start region selection immediately if block is already focused
+            if (wasAlreadyFocused || !block.region) {
+                startTapRegionSelection(blockDiv);
+            }
+            enableDrawingMode(block, blockDiv);
+        }
+    });
+
+    const removeBtn = blockDiv.querySelector('.remove-block-btn');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeBlock(blockDiv);
+        });
     }
 
     return blockDiv;
