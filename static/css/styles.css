@@ -102,13 +102,6 @@ body {
     padding-left: 10px;
     border-left: 2px solid var(--bs-gray);
     margin-top: 10px;
-    transition: max-height 0.3s ease-out;
-    overflow: hidden;
-    max-height: none; /* Allow blocks to be visible by default */
-}
-
-.collapsed .nested-blocks {
-    max-height: 0;
 }
 
 .block {

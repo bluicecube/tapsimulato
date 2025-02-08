@@ -126,36 +126,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Add task title change handler
-    taskTitle.addEventListener('change', async () => {
-        if (state.currentTask) {
-            try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: taskTitle.value
-                    })
-                });
+    if (taskTitle) {
+        taskTitle.addEventListener('change', async () => {
+            if (state.currentTask) {
+                try {
+                    const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: taskTitle.value
+                        })
+                    });
 
-                if (!response.ok) throw new Error('Failed to update task name');
+                    if (!response.ok) throw new Error('Failed to update task name');
 
-                const updatedTask = await response.json();
-                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
-                if (taskIndex !== -1) {
-                    state.tasks[taskIndex] = updatedTask;
-                    updateTaskList();
+                    const updatedTask = await response.json();
+                    const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                    if (taskIndex !== -1) {
+                        state.tasks[taskIndex] = updatedTask;
+                        updateTaskList();
+                    }
+
+                    logToConsole('Task name updated', 'success');
+                } catch (error) {
+                    logToConsole('Failed to update task name', 'error');
                 }
-
-                logToConsole('Task name updated', 'success');
-            } catch (error) {
-                logToConsole('Failed to update task name', 'error');
             }
-        }
-    });
+        });
+    }
 
     // Selection events
-    simulator.addEventListener('mousedown', startSelection);
-    simulator.addEventListener('mousemove', updateSelection);
+    if (simulator) {
+        simulator.addEventListener('mousedown', startSelection);
+        simulator.addEventListener('mousemove', updateSelection);
+    }
 
     // Listen for mouseup on document to catch out-of-bounds releases
     document.addEventListener('mouseup', (event) => {
@@ -216,12 +220,13 @@ window.processBlocks = function(blocks) {
 
     try {
         blocks.forEach(block => {
-            if (block.type === 'loop') {
-                addLoopBlock(block.iterations, block.blocks);
-            } else if (block.type === 'tap') {
-                addTapBlock(null, block.region);
-            } else if (block.type === 'url') {
-                addUrlBlock(block.url);
+            const deserializedBlock = deserializeBlock(block);
+            if (deserializedBlock.type === 'loop') {
+                addLoopBlock(deserializedBlock.iterations, deserializedBlock.blocks);
+            } else if (deserializedBlock.type === 'tap') {
+                addTapBlock(null, deserializedBlock.region);
+            } else if (deserializedBlock.type === 'url') {
+                addUrlBlock(deserializedBlock.url);
             }
         });
         updateTaskDisplay();
@@ -709,7 +714,9 @@ function renderBlock(block, index) {
                 </div>
             </div>
             <small class="text-muted">${block.description || ''}</small>
-            <div class="nested-blocks mt-2"></div>
+            <div class="nested-blocks mt-2" style="display: block;">
+                ${block.blocks ? block.blocks.map((b, i) => renderBlock(b, `${index}.${i}`).outerHTML).join('') : ''}
+            </div>
             <div class="btn-group mt-2 w-100">
                 <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
                 <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
@@ -725,10 +732,10 @@ function renderBlock(block, index) {
             if (!e.target.closest('.btn')) {
                 blockDiv.classList.toggle('collapsed');
                 if (blockDiv.classList.contains('collapsed')) {
-                    nestedBlocks.style.maxHeight = '0';
+                    nestedBlocks.style.display = 'none';
                     indicator.style.transform = 'rotate(-90deg)';
                 } else {
-                    nestedBlocks.style.maxHeight = nestedBlocks.scrollHeight + 'px';
+                    nestedBlocks.style.display = 'block';
                     indicator.style.transform = 'rotate(0)';
                 }
             }
@@ -760,15 +767,6 @@ function renderBlock(block, index) {
             });
         }
 
-        // Render nested blocks
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks && block.blocks.length > 0) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
-    } else if (block.type === 'tap') {
-        return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'loop') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -787,7 +785,9 @@ function renderBlock(block, index) {
                     <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
                 </div>
             </div>
-            <div class="nested-blocks mt-2"></div>
+            <div class="nested-blocks mt-2" style="display: block;">
+                ${block.blocks ? block.blocks.map((b, i) => renderBlock(b, `${index}.${i}`).outerHTML).join('') : ''}
+            </div>
         `;
 
         // Add click handler for collapse
@@ -799,10 +799,10 @@ function renderBlock(block, index) {
             if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
                 blockDiv.classList.toggle('collapsed');
                 if (blockDiv.classList.contains('collapsed')) {
-                    nestedBlocks.style.maxHeight = '0';
+                    nestedBlocks.style.display = 'none';
                     indicator.style.transform = 'rotate(-90deg)';
                 } else {
-                    nestedBlocks.style.maxHeight = nestedBlocks.scrollHeight + 'px';
+                    nestedBlocks.style.display = 'block';
                     indicator.style.transform = 'rotate(0)';
                 }
             }
@@ -845,13 +845,8 @@ function renderBlock(block, index) {
             });
         }
 
-        // Render nested blocks
-        const nestedContainer = blockDiv.querySelector('.nested-blocks');
-        if (block.blocks && block.blocks.length > 0) {
-            block.blocks.forEach((nestedBlock, nestedIndex) => {
-                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
-            });
-        }
+    } else if (block.type === 'tap') {
+        return renderTapBlock(block, blockDiv, index);
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -937,7 +932,7 @@ function renderBlock(block, index) {
 
         // Render nested blocks
         if (block.data.thenBlocks) {
-            const thenContainer = blockDiv.querySelector('.then-blocks');
+            const thenContainer = blockDiv.querySelector('..then-blocks');
             block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
                 thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
             });
@@ -1871,7 +1866,7 @@ function renderUrlBlock(block, blockDiv, index) {
     const editUrlBtn = blockDiv.querySelector('.edit-url-btn');
     editUrlBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const url = prompt('Enter URL:', block.url || 'https://www.google.com');
+        const url = prompt('Enter URL:', block.url ||'https://www.google.com');
         if (url) {
             block.url = url;
             blockDiv.querySelector('.url-text').textContent = url;
