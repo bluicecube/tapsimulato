@@ -1,13 +1,4 @@
-// Initialize state
-const state = {
-    currentTask: null,
-    tasks: [],
-    autoSaveTimeout: null,
-    pendingBlockConfiguration: null,
-    focusedBlock: null,
-    lastTaskId: null
-};
-
+<replit_final_file>
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
     const selectionBox = document.getElementById('selectionBox');
@@ -26,9 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add task title change handler
     taskTitle.addEventListener('change', async () => {
-        if (state.currentTask) {
+        if (window.appState.currentTask) {
             try {
-                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                const response = await fetch(`/api/tasks/${window.appState.currentTask.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -39,9 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error('Failed to update task name');
 
                 const updatedTask = await response.json();
-                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                const taskIndex = window.appState.tasks.findIndex(t => t.id === updatedTask.id);
                 if (taskIndex !== -1) {
-                    state.tasks[taskIndex] = updatedTask;
+                    window.appState.tasks[taskIndex] = updatedTask;
                     updateTaskList();
                 }
 
@@ -114,27 +105,28 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadTasks() {
     try {
         const response = await fetch('/api/tasks');
-        if (!response.ok) throw new Error('Failed to load tasks');
+        if (!response.ok) {
+            throw new Error('Failed to fetch tasks');
+        }
 
-        state.tasks = await response.json();
+        const tasksData = await response.json();
+        window.appState.tasks = tasksData;
+
+        console.log('Tasks loaded:', tasksData);
         updateTaskList();
 
-        // Load last task or create new one
-        if (state.tasks.length > 0) {
-            let taskToLoad;
+        if (tasksData.length > 0) {
+            // Try to load the last active task
+            const lastTaskId = window.appState.lastTaskId;
+            const taskToLoad = lastTaskId ?
+                tasksData.find(t => t.id === parseInt(lastTaskId)) :
+                tasksData[0];
 
-            // Try to load last opened task
-            const lastTaskId = localStorage.getItem('lastTaskId');
-            if (lastTaskId) {
-                taskToLoad = state.tasks.find(t => t.id === parseInt(lastTaskId));
+            if (taskToLoad) {
+                await loadTask(taskToLoad.id);
+            } else {
+                await createNewTask();
             }
-
-            // If no last task or it doesn't exist, load most recent
-            if (!taskToLoad) {
-                taskToLoad = state.tasks[0];
-            }
-
-            await loadTask(taskToLoad.id);
         } else {
             await createNewTask();
         }
@@ -142,19 +134,58 @@ async function loadTasks() {
         logToConsole('Tasks loaded successfully', 'success');
     } catch (error) {
         console.error('Error loading tasks:', error);
-        logToConsole('Error loading tasks', 'error');
+        logToConsole('Failed to load tasks. Creating new task...', 'error');
+        await createNewTask();
+    }
+}
 
-        // Create new task as fallback
-        if (!state.currentTask) {
-            await createNewTask();
+async function loadTask(taskId) {
+    if (!taskId) {
+        logToConsole('Invalid task ID', 'error');
+        return;
+    }
+
+    try {
+        // Save current task before loading new one
+        if (window.appState.currentTask) {
+            await saveCurrentTask();
         }
+
+        const response = await fetch(`/api/tasks/${taskId}/blocks`);
+        if (!response.ok) {
+            throw new Error('Failed to load task blocks');
+        }
+
+        const blocks = await response.json();
+        window.appState.currentTask = {
+            id: taskId,
+            blocks: blocks || []
+        };
+
+        // Save as last opened task
+        window.appState.lastTaskId = taskId;
+        localStorage.setItem('lastTaskId', taskId);
+
+        // Update UI
+        const taskTitle = document.getElementById('taskTitle');
+        const currentTask = window.appState.tasks.find(t => t.id === taskId);
+        if (currentTask && taskTitle) {
+            taskTitle.value = currentTask.name || '';
+        }
+
+        updateTaskDisplay();
+        updateTaskList();
+        logToConsole(`Task ${taskId} loaded successfully`, 'success');
+    } catch (error) {
+        console.error('Error loading task:', error);
+        logToConsole('Failed to load task', 'error');
     }
 }
 
 async function createNewTask() {
     try {
         // Find highest task number
-        const taskNumbers = state.tasks
+        const taskNumbers = window.appState.tasks
             .map(t => {
                 const match = t.name.match(/^Task (\d+)$/);
                 return match ? parseInt(match[1]) : 0;
@@ -174,14 +205,14 @@ async function createNewTask() {
         if (!response.ok) throw new Error('Failed to create task');
 
         const task = await response.json();
-        state.tasks.push(task);
-        state.currentTask = {
+        window.appState.tasks.push(task);
+        window.appState.currentTask = {
             id: task.id,
             blocks: []
         };
 
         // Save last opened task ID
-        state.lastTaskId = task.id;
+        window.appState.lastTaskId = task.id;
         localStorage.setItem('lastTaskId', task.id);
 
         updateTaskList();
@@ -195,13 +226,13 @@ async function createNewTask() {
     }
 }
 
-// Task list update function
+
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
 
-    taskList.innerHTML = state.tasks.map(task => `
-        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
+    taskList.innerHTML = window.appState.tasks.map(task => `
+        <div class="task-list-item ${window.appState.currentTask && window.appState.currentTask.id === task.id ? 'active' : ''}" 
              data-task-id="${task.id}">
             <span>${task.name}</span>
             <div class="btn-group">
@@ -212,69 +243,155 @@ function updateTaskList() {
     `).join('');
 }
 
-// Task loading function
-async function loadTask(taskId) {
-    try {
-        // Save current task before loading new one
-        if (state.currentTask) {
-            await saveCurrentTask();
-        }
-
-        const response = await fetch(`/api/tasks/${taskId}/blocks`);
-        if (!response.ok) throw new Error('Failed to load task blocks');
-
-        const blocks = await response.json();
-        state.currentTask = {
-            id: taskId,
-            blocks: blocks
-        };
-
-        // Save last opened task ID
-        localStorage.setItem('lastTaskId', taskId);
-
-        const taskTitle = document.getElementById('taskTitle');
-        const currentTask = state.tasks.find(t => t.id === taskId);
-        if (currentTask) {
-            taskTitle.value = currentTask.name || '';
-        }
-
-        updateTaskDisplay();
-        updateTaskList();
-        logToConsole(`Loaded task ${taskId}`, 'success');
-    } catch (error) {
-        logToConsole('Error loading task blocks', 'error');
-        console.error('Load task error:', error);
+document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete all tasks?')) {
+        return;
     }
+
+    try {
+        const response = await fetch('/api/tasks/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all tasks');
+
+        // Clear tasks from state
+        window.appState.tasks = [];
+        window.appState.currentTask = null;
+        updateTaskList();
+        updateTaskDisplay();
+
+        logToConsole('All tasks deleted successfully', 'success');
+
+        // Create a new task since all are deleted
+        await createNewTask();
+    } catch (error) {
+        logToConsole('Error deleting all tasks', 'error');
+    }
+});
+
+function startTapRegionSelection(blockElement) {
+    if (!window.appState.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    // Reset selection state
+    isSelecting = false;
+    selectionStartX = 0;
+    selectionStartY = 0;
+
+    // Clear any existing selection box
+    const selectionBox = document.getElementById('selectionBox');
+    selectionBox.classList.add('d-none');
+    selectionBox.style.width = '0';
+    selectionBox.style.height = '0';
+
+    window.appState.pendingBlockConfiguration = blockElement;
+    logToConsole('Select tap region on the simulator', 'info');
 }
 
-// UI Updates
+function addTapBlock(parentLoopIndex = null, region = null) {
+    if (!window.appState.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'tap',
+        description: 'Click to set region',
+        region: region
+    };
+
+    if (parentLoopIndex !== null) {
+        // Add to loop block
+        window.appState.currentTask.blocks[parentLoopIndex].blocks.push(block);
+    } else {
+        // Add to root level
+        window.appState.currentTask.blocks.push(block);
+    }
+
+    updateTaskDisplay();
+    logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
+
+    // Auto-enable drawing mode for the new block
+    setTimeout(() => {
+        const lastBlockDiv = document.querySelector('.tap-block:last-child');
+        if (lastBlockDiv) {
+            startTapRegionSelection(lastBlockDiv);
+            if (region) {
+                showSelectionBox(region);
+            }
+        }
+    }, 100);
+}
+
+function addLoopBlock(iterations = 1, blocks = []) {
+    if (!window.appState.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'loop',
+        iterations: iterations,
+        blocks: blocks
+    };
+
+    window.appState.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Loop block added', 'success');
+}
+
+function addConditionalBlock() {
+    if (!window.appState.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'conditional',
+        data: {
+            referenceImage: null,
+            threshold: 90,
+            thenBlocks: [],
+            elseBlocks: []
+        }
+    };
+
+    window.appState.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('Conditional block added', 'success');
+}
+
 function updateTaskDisplay() {
     const currentTaskElement = document.getElementById('currentTask');
     const taskTitle = document.getElementById('taskTitle');
     if (!currentTaskElement) return;
 
     currentTaskElement.innerHTML = '';
-    if (state.currentTask) {
-        taskTitle.value = state.tasks.find(t => t.id === state.currentTask.id)?.name || '';
+    if (window.appState.currentTask) {
+        taskTitle.value = window.appState.tasks.find(t => t.id === window.appState.currentTask.id)?.name || '';
     }
 
-    if (state.currentTask && state.currentTask.blocks) {
-        state.currentTask.blocks.forEach((block, index) => {
+    if (window.appState.currentTask && window.appState.currentTask.blocks) {
+        window.appState.currentTask.blocks.forEach((block, index) => {
             currentTaskElement.appendChild(renderBlock(block, index.toString()));
         });
     }
 }
 
-// Remove block functionality
 function removeBlock(blockElement) {
     const index = blockElement.dataset.index;
     const indices = index.split('.');
 
     if (indices.length === 1) {
-        state.currentTask.blocks.splice(indices[0], 1);
+        window.appState.currentTask.blocks.splice(indices[0], 1);
     } else {
         // Handle nested blocks in loops
-        const parentBlock = state.currentTask.blocks[indices[0]];
+        const parentBlock = window.appState.currentTask.blocks[indices[0]];
         parentBlock.blocks.splice(indices[1], 1);
     }
 
@@ -287,13 +404,12 @@ function removeBlock(blockElement) {
     });
 }
 
-// Selection Handling
 let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
 
 function startSelection(event) {
-    if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
+    if (!window.appState.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
 
     isSelecting = true;
     const rect = event.target.getBoundingClientRect();
@@ -336,7 +452,7 @@ function finishSelection(endX, endY) {
         y2: Math.max(selectionStartY, endY)
     };
 
-    const blockIndex = state.pendingBlockConfiguration.dataset.index;
+    const blockIndex = window.appState.pendingBlockConfiguration.dataset.index;
     const indices = blockIndex.split('.');
 
     // Navigate through nested blocks and update the region
@@ -358,10 +474,10 @@ function finishSelection(endX, endY) {
     }
 
     // Update the region in the current task's blocks
-    if (state.currentTask) {
-        const updated = updateBlockRegion(state.currentTask.blocks, indices);
+    if (window.appState.currentTask) {
+        const updated = updateBlockRegion(window.appState.currentTask.blocks, indices);
         if (updated) {
-            state.pendingBlockConfiguration = null;
+            window.appState.pendingBlockConfiguration = null;
             showSelectionBox(region);
             updateTaskDisplay();
 
@@ -376,16 +492,37 @@ function finishSelection(endX, endY) {
     }
 }
 
-
-// Save blocks functionality
 async function saveCurrentTask() {
-    if (!state.currentTask) return;
+    if (!window.appState.currentTask) return;
 
     try {
-        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+        // Deep clone and prepare blocks for saving
+        function prepareBlocks(blocks) {
+            return blocks.map(block => {
+                const preparedBlock = { ...block };
+
+                // Handle tap blocks
+                if (block.type === 'tap' && block.region) {
+                    preparedBlock.data = { ...preparedBlock.data, region: block.region };
+                }
+
+                // Handle nested blocks in loops and functions
+                if (block.type === 'loop' || block.type === 'function') {
+                    if (block.blocks && block.blocks.length > 0) {
+                        preparedBlock.blocks = prepareBlocks(block.blocks);
+                    }
+                }
+
+                return preparedBlock;
+            });
+        }
+
+        const blocks = prepareBlocks(window.appState.currentTask.blocks);
+
+        const response = await fetch(`/api/tasks/${window.appState.currentTask.id}/blocks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blocks: state.currentTask.blocks })
+            body: JSON.stringify({ blocks })
         });
 
         if (!response.ok) throw new Error('Failed to save blocks');
@@ -397,7 +534,6 @@ async function saveCurrentTask() {
     }
 }
 
-// Add these utility functions for block interaction
 function setBlockFocus(block, blockDiv) {
     // Remove focus from other blocks
     document.querySelectorAll('.block').forEach(el => {
@@ -408,131 +544,6 @@ function setBlockFocus(block, blockDiv) {
 
     // Add focus to current block
     blockDiv.classList.add('focused');
-}
-
-// Add delete all tasks functionality
-document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to delete all tasks?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/tasks/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all tasks');
-
-        // Clear tasks from state
-        state.tasks = [];
-        state.currentTask = null;
-        updateTaskList();
-        updateTaskDisplay();
-
-        logToConsole('All tasks deleted successfully', 'success');
-
-        // Create a new task since all are deleted
-        await createNewTask();
-    } catch (error) {
-        logToConsole('Error deleting all tasks', 'error');
-    }
-});
-
-// Block Management
-function startTapRegionSelection(blockElement) {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    // Reset selection state
-    isSelecting = false;
-    selectionStartX = 0;
-    selectionStartY = 0;
-
-    // Clear any existing selection box
-    const selectionBox = document.getElementById('selectionBox');
-    selectionBox.classList.add('d-none');
-    selectionBox.style.width = '0';
-    selectionBox.style.height = '0';
-
-    state.pendingBlockConfiguration = blockElement;
-    logToConsole('Select tap region on the simulator', 'info');
-}
-
-function addTapBlock(parentLoopIndex = null, region = null) {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'tap',
-        description: 'Click to set region',
-        region: region
-    };
-
-    if (parentLoopIndex !== null) {
-        // Add to loop block
-        state.currentTask.blocks[parentLoopIndex].blocks.push(block);
-    } else {
-        // Add to root level
-        state.currentTask.blocks.push(block);
-    }
-
-    updateTaskDisplay();
-    logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
-
-    // Auto-enable drawing mode for the new block
-    setTimeout(() => {
-        const lastBlockDiv = document.querySelector('.tap-block:last-child');
-        if (lastBlockDiv) {
-            startTapRegionSelection(lastBlockDiv);
-            if (region) {
-                showSelectionBox(region);
-            }
-        }
-    }, 100);
-}
-
-function addLoopBlock(iterations = 1, blocks = []) {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'loop',
-        iterations: iterations,
-        blocks: blocks
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Loop block added', 'success');
-}
-
-function addConditionalBlock() {
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        data: {
-            referenceImage: null,
-            threshold: 90,
-            thenBlocks: [],
-            elseBlocks: []
-        }
-    };
-
-    state.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
 }
 
 // Additional functions and logic can be added here as needed
