@@ -19,6 +19,9 @@
                             <video id="bgVideo" autoplay muted></video>
                             <div id="selectionBox" class="selection-box d-none"></div>
                         </div>
+                        <button class="btn btn-sm btn-primary share-screen-btn" id="setVideoSource">
+                            Share Screen
+                        </button>
                     </div>
                 </div>
             </div>
@@ -42,7 +45,7 @@
                         <div class="btn-group w-100 mb-3">
                             <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
                             <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
-                            <button class="btn btn-outline-info" id="addLogicBtn">Add Logic</button>
+                            <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
                             <button class="btn btn-outline-light dropdown-toggle" id="addFunctionBtn" data-bs-toggle="dropdown">
                                 Add Function
                             </button>
@@ -51,12 +54,18 @@
                             </ul>
                         </div>
 
-                        <!-- Function Creation Button -->
+                        <!-- Function Creation Modal Button -->
                         <div class="text-end mb-3">
                             <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#functionModal">
                                 Create New Function
                             </button>
                         </div>
+
+                        <!-- Current Task Blocks -->
+                        <div id="currentTask" class="current-task"></div>
+
+                        <!-- Console Output -->
+                        <div id="liveConsole" class="live-console mt-3"></div>
                     </div>
                 </div>
             </div>

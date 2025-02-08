@@ -357,8 +357,3 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
         opacity: 0;
     }
 }
-
-/* Hide ghost conditional button */
-#addConditionalBtn {
-    display: none !important;
-}
