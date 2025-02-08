@@ -64,16 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (addConditionalBtn) {
-        addConditionalBtn.addEventListener('click', () => {
-            if (!state.currentTask) {
-                logToConsole('Please create or select a task first', 'error');
-                return;
-            }
-            addConditionalBlock();
-        });
-    }
-
     if (newTaskBtn) {
         newTaskBtn.addEventListener('click', () => {
             createNewTask().catch(error => {
