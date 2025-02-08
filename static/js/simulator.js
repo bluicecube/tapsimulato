@@ -21,7 +21,7 @@ window.state = {
 // Functions state
 let functions = [];
 
-// Add Logic Block
+// Logic block implementation
 function addLogicBlock() {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
@@ -49,7 +49,7 @@ function addLogicBlock() {
     logToConsole('Added Logic block', 'success');
 }
 
-// State management
+// Event listener setup 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize UI elements
     const selectionBox = document.getElementById('selectionBox');
@@ -67,137 +67,114 @@ document.addEventListener('DOMContentLoaded', function() {
     const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
     const saveFunctionBtn = document.getElementById('saveFunctionBtn');
 
-    if (executeTaskBtn) {
-        executeTaskBtn.addEventListener('click', executeTask);
-    }
+    executeTaskBtn.addEventListener('click', executeTask);
 
-    if (addTapBtn) {
-        addTapBtn.addEventListener('click', () => {
-            if (!state.currentTask) {
-                logToConsole('Please create or select a task first', 'error');
-                return;
-            }
-            addTapBlock();
-        });
-    }
+    addTapBtn.addEventListener('click', () => {
+        if (!state.currentTask) {
+            logToConsole('Please create or select a task first', 'error');
+            return;
+        }
+        addTapBlock();
+    });
 
-    if (addLoopBtn) {
-        addLoopBtn.addEventListener('click', () => {
-            if (!state.currentTask) {
-                logToConsole('Please create or select a task first', 'error');
-                return;
-            }
-            addLoopBlock();
-        });
-    }
+    addLoopBtn.addEventListener('click', () => {
+        if (!state.currentTask) {
+            logToConsole('Please create or select a task first', 'error');
+            return;
+        }
+        addLoopBlock();
+    });
 
-    if (addLogicBtn) {
-        addLogicBtn.addEventListener('click', addLogicBlock);
-    }
+    addLogicBtn.addEventListener('click', addLogicBlock);
 
-    if (newTaskBtn) {
-        newTaskBtn.addEventListener('click', async () => {
+    newTaskBtn.addEventListener('click', async () => {
+        try {
+            await createNewTask();
+            logToConsole('New task created successfully', 'success');
+        } catch (error) {
+            logToConsole('Failed to create new task: ' + error.message, 'error');
+        }
+    });
+
+    deleteAllTasksBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to delete all tasks?')) {
+            return;
+        }
+        try {
+            const response = await fetch('/api/tasks/all', {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) throw new Error('Failed to delete all tasks');
+
+            // Clear tasks from state
+            state.tasks = [];
+            state.currentTask = null;
+
+            // Create a new task
+            const newTask = await createNewTask();
+            await loadTask(newTask.id);
+
+            updateTaskList();
+            updateTaskDisplay();
+            logToConsole('All tasks deleted and new task created', 'success');
+        } catch (error) {
+            logToConsole('Error deleting all tasks', 'error');
+        }
+    });
+
+    taskTitle.addEventListener('change', async () => {
+        if (state.currentTask) {
             try {
-                await createNewTask();
-                logToConsole('New task created successfully', 'success');
-            } catch (error) {
-                logToConsole('Failed to create new task: ' + error.message, 'error');
-            }
-        });
-    }
-
-    if (deleteAllTasksBtn) {
-        deleteAllTasksBtn.addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to delete all tasks?')) {
-                return;
-            }
-            try {
-                const response = await fetch('/api/tasks/all', {
-                    method: 'DELETE'
+                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: taskTitle.value
+                    })
                 });
 
-                if (!response.ok) throw new Error('Failed to delete all tasks');
+                if (!response.ok) throw new Error('Failed to update task name');
 
-                // Clear tasks from state
-                state.tasks = [];
-                state.currentTask = null;
-
-                // Create a new task
-                const newTask = await createNewTask();
-                await loadTask(newTask.id);
-
-                updateTaskList();
-                updateTaskDisplay();
-                logToConsole('All tasks deleted and new task created', 'success');
-            } catch (error) {
-                logToConsole('Error deleting all tasks', 'error');
-            }
-        });
-    }
-
-    // Add task title change handler
-    if (taskTitle) {
-        taskTitle.addEventListener('change', async () => {
-            if (state.currentTask) {
-                try {
-                    const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            name: taskTitle.value
-                        })
-                    });
-
-                    if (!response.ok) throw new Error('Failed to update task name');
-
-                    const updatedTask = await response.json();
-                    const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
-                    if (taskIndex !== -1) {
-                        state.tasks[taskIndex] = updatedTask;
-                        updateTaskList();
-                    }
-
-                    logToConsole('Task name updated', 'success');
-                } catch (error) {
-                    logToConsole('Failed to update task name', 'error');
+                const updatedTask = await response.json();
+                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                if (taskIndex !== -1) {
+                    state.tasks[taskIndex] = updatedTask;
+                    updateTaskList();
                 }
-            }
-        });
-    }
 
-    // Selection events
-    if (simulator) {
-        simulator.addEventListener('mousedown', startSelection);
-        simulator.addEventListener('mousemove', updateSelection);
-        simulator.addEventListener('mouseup', stopSelection);
-        simulator.addEventListener('mouseleave', (event) => {
-            if (isSelecting) {
-                const rect = simulator.getBoundingClientRect();
-                const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-                const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-                finishSelection(lastKnownY, lastKnownX); // Note: X and Y coordinates were swapped
+                logToConsole('Task name updated', 'success');
+            } catch (error) {
+                logToConsole('Failed to update task name', 'error');
             }
-        });
-    }
+        }
+    });
 
-    // Initialize
+    simulator.addEventListener('mousedown', startSelection);
+    simulator.addEventListener('mousemove', updateSelection);
+    simulator.addEventListener('mouseup', stopSelection);
+    simulator.addEventListener('mouseleave', (event) => {
+        if (isSelecting) {
+            const rect = simulator.getBoundingClientRect();
+            const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+            const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+            finishSelection(lastKnownY, lastKnownX); // Note: X and Y coordinates were swapped
+        }
+    });
+
     setupVideoSharing();
     loadFunctions();
     loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
     });
-    // Initialize function modal
     const functionModal = document.getElementById('functionModal');
     if (functionModal) {
         new bootstrap.Modal(functionModal);
     }
 
-    // Add save function button handler
-    if (saveFunctionBtn) {
-        saveFunctionBtn.addEventListener('click', saveFunction);
-    }
-    if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
-    if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
+    saveFunctionBtn.addEventListener('click', saveFunction);
+    addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
+    addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
 });
 
 // Make functions available globally
@@ -353,7 +330,7 @@ async function loadTask(taskId) {
                             region: nestedBlock.region || null
                         }))
                     };
-                } else if (block.type === 'conditional') {
+                } else if (block.type === 'logic') {
                     return {
                         ...block,
                         data: {
