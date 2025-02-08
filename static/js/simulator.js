@@ -400,7 +400,12 @@ function removeBlock(blockElement) {
     }
 
     updateTaskDisplay();
-    scheduleAutosave();
+    // Save immediately after block removal
+    saveCurrentTask().then(() => {
+        logToConsole('Block removed and saved', 'success');
+    }).catch(error => {
+        logToConsole('Failed to save after block removal', 'error');
+    });
 }
 
 
@@ -428,16 +433,14 @@ function startSelection(event) {
 function updateSelection(event) {
     if (!isSelecting) return;
 
-    const selectionBox = document.getElementById('selectionBox');
     const rect = event.target.getBoundingClientRect();
-
-    // Calculate position relative to simulator
     let currentX = event.clientX - rect.left;
     let currentY = event.clientY - rect.top;
 
     const width = currentX - selectionStartX;
     const height = currentY - selectionStartY;
 
+    const selectionBox = document.getElementById('selectionBox');
     selectionBox.style.width = `${Math.abs(width)}px`;
     selectionBox.style.height = `${Math.abs(height)}px`;
     selectionBox.style.left = `${width < 0 ? currentX : selectionStartX}px`;
@@ -682,8 +685,7 @@ function renderBlock(block, index) {
             const currentValue = parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
                 iterationsInput.value = currentValue - 1;
-                block.iterations = currentValue - 1;
-                scheduleAutosave();
+                handleIterationsChange(block, currentValue - 1, iterationsInput);
             }
         });
 
@@ -691,20 +693,13 @@ function renderBlock(block, index) {
             e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             iterationsInput.value = currentValue + 1;
-            block.iterations = currentValue + 1;
-            scheduleAutosave();
+            handleIterationsChange(block, currentValue + 1, iterationsInput);
         });
 
         iterationsInput.addEventListener('change', (e) => {
             e.stopPropagation();
             const value = parseInt(e.target.value) || 1;
-            if (value < 1) {
-                e.target.value = 1;
-                block.iterations = 1;
-            } else {
-                block.iterations = value;
-            }
-            scheduleAutosave();
+            handleIterationsChange(block, value, iterationsInput);
         });
 
         const removeBtn = blockDiv.querySelector('.remove-block-btn');
@@ -1108,6 +1103,7 @@ function addBlockToFunction(type, parentElement = null) {
             if (currentValue > 1) {
                 iterationsInput.value = currentValue - 1;
                 block.iterations = currentValue - 1;
+                scheduleAutosave();
             }
         });
 
@@ -1116,6 +1112,7 @@ function addBlockToFunction(type, parentElement = null) {
             const currentValue = parseInt(iterationsInput.value) || 1;
             iterationsInput.value = currentValue + 1;
             block.iterations = currentValue + 1;
+            scheduleAutosave();
         });
 
         iterationsInput.addEventListener('change', (e) => {
@@ -1127,6 +1124,7 @@ function addBlockToFunction(type, parentElement = null) {
             } else {
                 block.iterations = value;
             }
+            scheduleAutosave();
         });
     } else { // Tap block
         blockElement.innerHTML = `
@@ -1150,6 +1148,7 @@ function addBlockToFunction(type, parentElement = null) {
     blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         blockElement.remove();
+        scheduleAutosave();
     });
 
     container.appendChild(blockElement);
@@ -1432,4 +1431,21 @@ function showTapFeedback(region) {
 
     // Return the actual coordinates used for logging
     return { x, y };
+}
+
+// Update iterations change handler to save immediately
+function handleIterationsChange(block, value, iterationsInput) {
+    if (value < 1) {
+        iterationsInput.value = 1;
+        block.iterations = 1;
+    } else {
+        block.iterations = value;
+    }
+
+    // Save immediately after iterations change
+    saveCurrentTask().then(() => {
+        logToConsole('Iterations updated and saved', 'success');
+    }).catch(error => {
+        logToConsole('Failed to save iterations update', 'error');
+    });
 }
