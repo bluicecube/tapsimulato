@@ -98,8 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load functions and tasks
     loadFunctions();
+    // Load tasks when the page loads
     loadTasks().then(() => {
-        console.log('Initial state setup complete:', window.state);
+        console.log('Initial tasks loaded');
+    }).catch(error => {
+        console.error('Failed to load initial tasks:', error);
     });
 
     // Initialize function modal
@@ -112,6 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveFunctionBtn = document.getElementById('saveFunctionBtn');
     if (saveFunctionBtn) {
         saveFunctionBtn.addEventListener('click', saveFunction);
+    }
+
+    // Add click handler for task list items
+    const taskList = document.getElementById('taskList');
+    if (taskList) {
+        taskList.addEventListener('click', (e) => {
+            const taskItem = e.target.closest('.task-list-item');
+            if (taskItem && !e.target.closest('.btn')) {
+                const taskId = parseInt(taskItem.dataset.taskId);
+                loadTask(taskId);
+            }
+        });
     }
 });
 
@@ -282,14 +297,7 @@ function updateTaskList() {
     `).join('');
 
     // Add click handlers for task selection
-    taskList.querySelectorAll('.task-list-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn')) {
-                const taskId = parseInt(item.dataset.taskId);
-                loadTask(taskId);
-            }
-        });
-    });
+
 }
 
 // Add delete all tasks functionality
@@ -834,8 +842,8 @@ function renderTapBlock(block, blockDiv, index) {
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted region-text">Region: ${block.region ? 
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` : 
+        <small class="text-muted region-text">Region: ${block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set'}</small>
     `;
 
