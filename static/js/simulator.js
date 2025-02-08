@@ -266,30 +266,28 @@ document.addEventListener('DOMContentLoaded', () => {
         saveFunctionBtn.addEventListener('click', saveFunction);
     }
 
-    // Add function overlay control after the buttons
-    const actionButtonsContainer = document.querySelector('.btn-group-vertical');
-    if (actionButtonsContainer) {
-        const overlayControl = document.createElement('div');
-        overlayControl.className = 'function-overlay-control';
-        overlayControl.innerHTML = `
-            <input type="checkbox" id="functionOverlayToggle" checked>
-            <label for="functionOverlayToggle">Collapse Function Blocks</label>
-        `;
-        actionButtonsContainer.insertAdjacentElement('afterend', overlayControl);
+    // Add function overlay control
+    const taskSection = document.getElementById('currentTask').parentElement;
+    const overlayControl = document.createElement('div');
+    overlayControl.className = 'function-overlay-control';
+    overlayControl.innerHTML = `
+        <input type="checkbox" id="functionOverlayToggle" checked>
+        <label for="functionOverlayToggle">Collapse Function Blocks</label>
+    `;
+    taskSection.insertBefore(overlayControl, taskSection.firstChild);
 
-        // Add event listener for overlay toggle
-        document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
-            state.functionOverlaysEnabled = e.target.checked;
-            const functionBlocks = document.querySelectorAll('.function-block');
-            functionBlocks.forEach(block => {
-                if (e.target.checked) {
-                    block.classList.add('collapsed');
-                } else {
-                    block.classList.remove('collapsed');
-                }
-            });
+    // Add event listener for overlay toggle
+    document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
+        state.functionOverlaysEnabled = e.target.checked;
+        const functionBlocks = document.querySelectorAll('.function-block');
+        functionBlocks.forEach(block => {
+            if (e.target.checked) {
+                block.classList.add('collapsed');
+            } else {
+                block.classList.remove('collapsed');
+            }
         });
-    }
+    });
 });
 
 // Make functions available globally
@@ -1883,7 +1881,8 @@ function renderUrlBlock(block, blockDiv, index) {
 }
 
 async function executeUrlBlock(block) {
-    if (!block.url) {logToConsole('No URL specified for URL block', 'error');
+    if (!block.url) {
+        logToConsole('No URL specified for URL block', 'error');
         return;
     }
 
