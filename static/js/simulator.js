@@ -237,7 +237,7 @@ async function createNewTask() {
     }
 }
 
-// Add autosave before loading new task
+// Update loadTask to handle blocks properly
 async function loadTask(taskId) {
     try {
         // Save current task before loading new one
@@ -295,9 +295,6 @@ function updateTaskList() {
             </div>
         </div>
     `).join('');
-
-    // Add click handlers for task selection
-
 }
 
 // Add delete all tasks functionality
