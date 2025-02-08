@@ -34,34 +34,46 @@ async function loadFunctionData(functionId) {
 }
 
 async function executeBlock(block) {
-    console.log('Executing block type:', block.type);
+    console.log('Executing block type:', block.type, 'Block data:', block.data);
 
     if (block.type === 'function') {
-        console.log('Executing function block:', block);
+        console.log('Executing function block with ID:', block.data?.functionId);
         try {
-            const functionData = await loadFunctionData(block.data.functionId);
-            if (functionData.blocks) {
-                for (const functionBlock of functionData.blocks) {
-                    const deserializedBlock = deserializeBlock(functionBlock);
-                    console.log('Executing function block:', deserializedBlock);
-                    await executeBlock(deserializedBlock);
-                }
+            const functionData = await loadFunctionData(block.data?.functionId);
+            console.log('Loaded function data:', functionData);
+
+            if (!functionData.blocks || !Array.isArray(functionData.blocks)) {
+                throw new Error('Invalid function blocks data');
+            }
+
+            logToConsole(`Executing function: ${functionData.name}`, 'info');
+
+            for (const functionBlock of functionData.blocks) {
+                const deserializedBlock = deserializeBlock(functionBlock);
+                console.log('Executing nested function block:', deserializedBlock);
+                await executeBlock(deserializedBlock);
             }
         } catch (error) {
+            console.error('Function execution error:', error);
             logToConsole(`Failed to execute function: ${error.message}`, 'error');
             throw error;
         }
-    } else if (block.type === 'tap' && block.region) {
-        console.log('Executing tap at region:', block.region);
-        await simulateTap(block.region);
+    } else if (block.type === 'tap' && block.data?.region) {
+        console.log('Executing tap with region:', block.data.region);
+        await simulateTap(block.data.region);
+        logToConsole(`Executed tap at ${JSON.stringify(block.data.region)}`, 'success');
     } else if (block.type === 'loop' && block.blocks) {
-        console.log('Executing loop block:', block);
-        for (let i = 0; i < block.iterations; i++) {
-            console.log(`Loop iteration ${i + 1}/${block.iterations}`);
+        const iterations = block.data?.iterations || 1;
+        console.log(`Executing loop block with ${iterations} iterations`);
+        logToConsole(`Starting loop with ${iterations} iterations`, 'info');
+
+        for (let i = 0; i < iterations; i++) {
+            console.log(`Loop iteration ${i + 1}/${iterations}`);
             for (const nestedBlock of block.blocks) {
                 await executeBlock(nestedBlock);
             }
         }
+        logToConsole(`Completed loop with ${iterations} iterations`, 'success');
     }
 }
 
@@ -453,6 +465,7 @@ async function createNewTask() {
 // Add autosave before loading new task
 
 
+
 // UI Updates
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
@@ -552,7 +565,7 @@ function addTapBlock(parentLoopIndex = null, region = null) {
     const block = {
         type: 'tap',
         description: 'Click to set region',
-        region: region
+        data: { region: region } // Updated to use data.region
     };
 
     if (parentLoopIndex !== null) {
@@ -586,7 +599,7 @@ function addLoopBlock(iterations = 1, blocks = []) {
 
     const block = {
         type: 'loop',
-        iterations: iterations,
+        data: { iterations: iterations },
         blocks: blocks
     };
 
@@ -712,7 +725,6 @@ function finishSelection(endX, endY) {
                 lastBlock.data.region = region;
             }
         } else {
-            targetBlock.region = region;
             targetBlock.data = targetBlock.data || {};
             targetBlock.data.region = region;
         }
@@ -769,8 +781,8 @@ function setBlockFocus(block, blockDiv) {
 
     // Show region if it exists
     if (block.type === 'tap') {
-        if (block.region) {
-            showSelectionBox(block.region);
+        if (block.data?.region) {
+            showSelectionBox(block.data.region);
         } else {
             // If no region is set, hide the selection box
             const selectionBox = document.getElementById('selectionBox');
@@ -789,7 +801,7 @@ function renderBlock(block, index) {
     function hasUndefinedValues(block) {
         if (!block) return true;
 
-        if (block.type === 'tap' && !block.region) {
+        if (block.type === 'tap' && !block.data?.region) {
             return true;
         }
 
@@ -891,7 +903,7 @@ function renderBlock(block, index) {
                     <div class="input-group input-group-sm">
                         <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
                         <input type="number" class="form-control iterations-input"
-                            value="${block.iterations}" min="1">
+                            value="${block.data?.iterations}" min="1">
                         <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
                     </div>
                     <span class="ms-2">times</span>
@@ -1051,8 +1063,8 @@ function renderBlock(block, index) {
 
 function renderTapBlock(block, blockDiv, index) {
     const updateRegionDisplay = () => {
-        const regionText = block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+        const regionText = block.data?.region ?
+            `(${Math.round(block.data.region.x1)},${Math.round(block.data.region.y1)}) to (${Math.round(block.data.region.x2)},${Math.round(block.data.region.y2)})` :
             'No region set';
 
         blockDiv.querySelector('.region-text').textContent = `Region: ${regionText}`;
@@ -1066,8 +1078,8 @@ function renderTapBlock(block, blockDiv, index) {
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted region-text">Region: ${block.region ?
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+        <small class="text-muted region-text">Region: ${block.data?.region ?
+            `(${Math.round(block.data.region.x1)},${Math.round(block.data.region.y1)}) to (${Math.round(block.data.region.x2)},${Math.round(block.data.region.y2)})` :
             'No region set'}</small>
     `;
 
@@ -1084,8 +1096,8 @@ function renderTapBlock(block, blockDiv, index) {
     setRegionBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startTapRegionSelection(blockDiv);
-        if (block.region) {
-            showSelectionBox(block.region);
+        if (block.data?.region) {
+            showSelectionBox(block.data.region);
         }
     });
 
@@ -1096,8 +1108,8 @@ function renderTapBlock(block, blockDiv, index) {
     });
 
     // Update region display when the block's region changes
-    if (block.region) {
-        showSelectionBox(block.region);
+    if (block.data?.region) {
+        showSelectionBox(block.data.region);
     }
     return blockDiv;
 }
@@ -1106,8 +1118,8 @@ function enableDrawingMode(block, blockDiv) {
     // If it's a tap block, start region selection immediately
     if (block.type === 'tap') {
         startTapRegionSelection(blockDiv);
-        if (block.region) {
-            showSelectionBox(block.region);
+        if (block.data?.region) {
+            showSelectionBox(block.data.region);
         }
     }
 }
@@ -1141,42 +1153,57 @@ async function executeTask() {
 }
 
 async function executeBlock(block) {
-    console.log('Executing block type:', block.type);
+    console.log('Executing block type:', block.type, 'Block data:', block.data);
 
     if (block.type === 'function') {
-        console.log('Executing function block:', block);
+        console.log('Executing function block with ID:', block.data?.functionId);
         try {
-            const functionData = await loadFunctionData(block.data.functionId);
-            if (functionData.blocks) {
-                for (const functionBlock of functionData.blocks) {
-                    const deserializedBlock = deserializeBlock(functionBlock);
-                    console.log('Executing function block:', deserializedBlock);
-                    await executeBlock(deserializedBlock);
-                }
+            const functionData = await loadFunctionData(block.data?.functionId);
+            console.log('Loaded function data:', functionData);
+
+            if (!functionData.blocks || !Array.isArray(functionData.blocks)) {
+                throw new Error('Invalid function blocks data');
+            }
+
+            logToConsole(`Executing function: ${functionData.name}`, 'info');
+
+            for (const functionBlock of functionData.blocks) {
+                const deserializedBlock = deserializeBlock(functionBlock);
+                console.log('Executing nested function block:', deserializedBlock);
+                await executeBlock(deserializedBlock);
             }
         } catch (error) {
+            console.error('Function execution error:', error);
             logToConsole(`Failed to execute function: ${error.message}`, 'error');
             throw error;
         }
-    } else if (block.type === 'tap' && block.region) {
-        console.log('Executing tap at region:', block.region);
-        await simulateTap(block.region);
+    } else if (block.type === 'tap' && block.data?.region) {
+        console.log('Executing tap with region:', block.data.region);
+        await simulateTap(block.data.region);
+        logToConsole(`Executed tap at ${JSON.stringify(block.data.region)}`, 'success');
     } else if (block.type === 'loop' && block.blocks) {
-        console.log('Executing loop block:', block);
-        for (let i = 0; i < block.iterations; i++) {
-            console.log(`Loop iteration ${i + 1}/${block.iterations}`);
+        const iterations = block.data?.iterations || 1;
+        console.log(`Executing loop block with ${iterations} iterations`);
+        logToConsole(`Starting loop with ${iterations} iterations`, 'info');
+
+        for (let i = 0; i < iterations; i++) {
+            console.log(`Loop iteration ${i + 1}/${iterations}`);
             for (const nestedBlock of block.blocks) {
                 await executeBlock(nestedBlock);
             }
         }
+        logToConsole(`Completed loop with ${iterations} iterations`, 'success');
     }
 }
 
 async function simulateTap(region) {
     return new Promise((resolve) => {
-        console.log('Simulating tap at:', region);
-        const centerX = (region.x1 + region.x2) / 2;
-        const centerY = (region.y1 + region.y2) / 2;
+        console.log('Simulating tap at region:', region);
+        // Handle both direct region and data.region formats
+        const tapRegion = region.x1 !== undefined ? region : region.region || region;
+
+        const centerX = (tapRegion.x1 + tapRegion.x2) / 2;
+        const centerY = (tapRegion.y1 + tapRegion.y2) / 2;
 
         // Create tap feedback effect
         const feedback = document.createElement('div');
@@ -1530,7 +1557,7 @@ async function saveFunction() {
 
             if (type === 'loop') {
                 const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.iterations = parseInt(iterationsInput.value) || 1;
+                block.data = { iterations: parseInt(iterationsInput.value) || 1 };
                 block.blocks = [];
 
                 const nestedContainer = blockElement.querySelector('.nested-blocks');
@@ -1595,7 +1622,7 @@ async function addFunctionBlock(functionId) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks, // Store the function's blocks for reference
-        functionId: func.id
+        data: { functionId: func.id }
     };
 
     state.currentTask.blocks.push(block);
@@ -1610,16 +1637,16 @@ function collectBlockData(block) {
         name: block.name
     };
 
-    if (block.type === 'tap' && block.region) {
-        data.region = block.region;
+    if (block.type === 'tap' && block.data?.region) {
+        data.region = block.data.region;
     } else if (block.type === 'loop') {
-        data.iterations = block.iterations || 1;
+        data.iterations = block.data?.iterations || 1;
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
     } else if (block.type === 'function') {
         data.description = block.description;
-        data.functionId = block.functionId;
+        data.functionId = block.data?.functionId;
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
@@ -1727,9 +1754,9 @@ function showTapFeedback(region) {
 function handleIterationsChange(block, value, iterationsInput) {
     if (value < 1) {
         iterationsInput.value = 1;
-        block.iterations = 1;
+        block.data.iterations = 1;
     } else {
-        block.iterations = value;
+        block.data.iterations = value;
     }
 
     // Save immediately after iterations change
@@ -1746,7 +1773,7 @@ async function addFunctionToTask(func) {
         name: func.name,
         description: func.description || '',
         blocks: func.blocks,
-        functionId: func.id
+        data: { functionId: func.id }
     };
 
     state.currentTask.blocks.push(block);
