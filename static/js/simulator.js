@@ -17,6 +17,66 @@ window.state = {
 let functions = [];
 
 // Add serialization functions
+async function loadTask(taskId) {
+    try {
+        // Save current task before loading new one
+        if (state.currentTask) {
+            await saveCurrentTask();
+        }
+
+        const response = await fetch(`/api/tasks/${taskId}/blocks`);
+        if (!response.ok) throw new Error('Failed to load task blocks');
+
+        const blocks = await response.json();
+        console.log('Loaded blocks:', blocks);
+
+        state.currentTask = {
+            id: taskId,
+            blocks: blocks.map(deserializeBlock)
+        };
+
+        // Save last opened task ID
+        state.lastTaskId = taskId;
+        localStorage.setItem('lastTaskId', taskId);
+
+        const taskTitle = document.getElementById('taskTitle');
+        const currentTask = state.tasks.find(t => t.id === taskId);
+        if (currentTask && taskTitle) {
+            taskTitle.value = currentTask.name || '';
+        }
+
+        updateTaskDisplay();
+        updateTaskList();
+        logToConsole(`Loaded task ${taskId}`, 'success');
+    } catch (error) {
+        logToConsole('Error loading task blocks', 'error');
+        console.error('Load task error:', error);
+        throw error;
+    }
+}
+
+// Save current task function
+async function saveCurrentTask() {
+    if (!state.currentTask) return;
+
+    try {
+        const blocks = state.currentTask.blocks.map(serializeBlock);
+
+        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blocks })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Task saved', 'success');
+    } catch (error) {
+        logToConsole('Failed to save task', 'error');
+        console.error('Save task error:', error);
+        throw error;
+    }
+}
+
 function serializeBlock(block) {
     const serializedBlock = {
         type: block.type,
@@ -316,43 +376,6 @@ async function createNewTask() {
 }
 
 // Add autosave before loading new task
-async function loadTask(taskId) {
-    try {
-        // Save current task before loading new one
-        if (state.currentTask) {
-            await saveCurrentTask();
-        }
-
-        const response = await fetch(`/api/tasks/${taskId}/blocks`);
-        if (!response.ok) throw new Error('Failed to load task blocks');
-
-        const blocks = await response.json();
-        console.log('Loaded blocks:', blocks);
-
-        state.currentTask = {
-            id: taskId,
-            blocks: blocks.map(deserializeBlock)
-        };
-
-        // Save last opened task ID
-        state.lastTaskId = taskId;
-        localStorage.setItem('lastTaskId', taskId);
-
-        const taskTitle = document.getElementById('taskTitle');
-        const currentTask = state.tasks.find(t => t.id === taskId);
-        if (currentTask && taskTitle) {
-            taskTitle.value = currentTask.name || '';
-        }
-
-        updateTaskDisplay();
-        updateTaskList();
-        logToConsole(`Loaded task ${taskId}`, 'success');
-    } catch (error) {
-        logToConsole('Error loading task blocks', 'error');
-        console.error('Load task error:', error);
-        throw error;
-    }
-}
 
 // UI Updates
 function updateTaskList() {
@@ -620,26 +643,6 @@ function finishSelection(endX, endY) {
 }
 
 // Save blocks functionality
-async function saveCurrentTask() {
-    if (!state.currentTask) return;
-
-    try {
-        const blocks = state.currentTask.blocks.map(serializeBlock);
-
-        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blocks })
-        });
-
-        if (!response.ok) throw new Error('Failed to save blocks');
-        logToConsole('Task saved', 'success');
-    } catch (error) {
-        logToConsole('Failed to save task', 'error');
-        console.error('Save task error:', error);
-        throw error;
-    }
-}
 
 // Enhanced scheduleAutosave to provide immediate feedback
 function scheduleAutosave() {

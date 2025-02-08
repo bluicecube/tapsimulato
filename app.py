@@ -219,7 +219,7 @@ def get_blocks(task_id):
     try:
         task = Task.query.get_or_404(task_id)
         blocks = Block.query.filter_by(task_id=task_id, parent_id=None).order_by(Block.order).all()
-        return jsonify([serialize_block(block) for block in blocks])
+        return jsonify([block.to_dict() for block in blocks])
     except Exception as e:
         logger.error(f"Error getting blocks: {str(e)}")
         return jsonify({'error': 'Failed to load blocks'}), 500
@@ -248,7 +248,7 @@ def save_blocks(task_id):
             db.session.flush()  # Get the block ID without committing
 
             # Handle nested blocks
-            if block_data['type'] in ['loop', 'function'] and 'blocks' in block_data:
+            if block_data.get('blocks'):
                 for i, child_data in enumerate(block_data['blocks']):
                     save_block(child_data, block.id, i)
 
