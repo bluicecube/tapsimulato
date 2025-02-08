@@ -2,11 +2,6 @@
 const DEVICE_WIDTH = 320;
 const DEVICE_HEIGHT = 720;
 
-// State management
-let isSelecting = false;
-let selectionStartX = 0;
-let selectionStartY = 0;
-
 // Initialize state
 window.state = {
     currentTask: null,
@@ -28,130 +23,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const simulator = document.getElementById('simulator');
     const taskTitle = document.getElementById('taskTitle');
 
-    // Setup event listeners for task controls
-    const executeTaskBtn = document.getElementById('executeTaskBtn');
-    const addTapBtn = document.getElementById('addTapBtn');
-    const addLoopBtn = document.getElementById('addLoopBtn');
-    const addConditionalBtn = document.getElementById('addConditionalBtn');
-    const newTaskBtn = document.getElementById('newTaskBtn');
-    const deleteAllTasksBtn = document.getElementById('deleteAllTasksBtn');
-    const addFunctionTapBtn = document.getElementById('addFunctionTapBtn');
-    const addFunctionLoopBtn = document.getElementById('addFunctionLoopBtn');
-    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    // Set up event listeners
+    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
+    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
+    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
+    document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
+    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
+    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
+    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
 
-
-    if (executeTaskBtn) {
-        executeTaskBtn.addEventListener('click', executeTask);
-    }
-
-    if (addTapBtn) {
-        addTapBtn.addEventListener('click', () => {
-            if (!state.currentTask) {
-                logToConsole('Please create or select a task first', 'error');
-                return;
-            }
-            addTapBlock();
-        });
-    }
-
-    if (addLoopBtn) {
-        addLoopBtn.addEventListener('click', () => {
-            if (!state.currentTask) {
-                logToConsole('Please create or select a task first', 'error');
-                return;
-            }
-            addLoopBlock();
-        });
-    }
-
-    if (newTaskBtn) {
-        newTaskBtn.addEventListener('click', () => {
-            createNewTask().catch(error => {
-                logToConsole('Failed to create new task: ' + error.message, 'error');
-            });
-        });
-    }
-
-    if (deleteAllTasksBtn) {
-        deleteAllTasksBtn.addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to delete all tasks?')) {
-                return;
-            }
-            try {
-                const response = await fetch('/api/tasks/all', {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) throw new Error('Failed to delete all tasks');
-
-                // Clear tasks from state
-                state.tasks = [];
-                state.currentTask = null;
-
-                // Create a new task
-                const newTask = await createNewTask();
-                await loadTask(newTask.id);
-
-                updateTaskList();
-                updateTaskDisplay();
-                logToConsole('All tasks deleted and new task created', 'success');
-            } catch (error) {
-                logToConsole('Error deleting all tasks', 'error');
-            }
-        });
-    }
 
     // Add task title change handler
-    if (taskTitle) {
-        taskTitle.addEventListener('change', async () => {
-            if (state.currentTask) {
-                try {
-                    const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            name: taskTitle.value
-                        })
-                    });
+    taskTitle.addEventListener('change', async () => {
+        if (state.currentTask) {
+            try {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: taskTitle.value
+                    })
+                });
 
-                    if (!response.ok) throw new Error('Failed to update task name');
+                if (!response.ok) throw new Error('Failed to update task name');
 
-                    const updatedTask = await response.json();
-                    const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
-                    if (taskIndex !== -1) {
-                        state.tasks[taskIndex] = updatedTask;
-                        updateTaskList();
-                    }
-
-                    logToConsole('Task name updated', 'success');
-                } catch (error) {
-                    logToConsole('Failed to update task name', 'error');
+                const updatedTask = await response.json();
+                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
+                if (taskIndex !== -1) {
+                    state.tasks[taskIndex] = updatedTask;
+                    updateTaskList();
                 }
+
+                logToConsole('Task name updated', 'success');
+            } catch (error) {
+                logToConsole('Failed to update task name', 'error');
             }
-        });
-    }
+        }
+    });
 
     // Selection events
-    if (simulator) {
-        simulator.addEventListener('mousedown', startSelection);
-        simulator.addEventListener('mousemove', updateSelection);
-        simulator.addEventListener('mouseup', stopSelection);
-        simulator.addEventListener('mouseleave', (event) => {
-            if (isSelecting) {
-                const rect = simulator.getBoundingClientRect();
-                const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-                const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-                finishSelection(lastKnownX, lastKnownY);
-            }
-        });
-    }
+    simulator.addEventListener('mousedown', startSelection);
+    simulator.addEventListener('mousemove', updateSelection);
+    simulator.addEventListener('mouseup', stopSelection);
+    simulator.addEventListener('mouseleave', () => {
+        if (isSelecting) {
+            const rect = simulator.getBoundingClientRect();
+            const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+            const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+            finishSelection(lastKnownX, lastKnownY);
+        }
+    });
 
-    // Initialize
+    // Setup video sharing
     setupVideoSharing();
+
+    // Load functions and tasks
     loadFunctions();
     loadTasks().then(() => {
         console.log('Initial state setup complete:', window.state);
     });
+
     // Initialize function modal
     const functionModal = document.getElementById('functionModal');
     if (functionModal) {
@@ -159,12 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Add save function button handler
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
     if (saveFunctionBtn) {
         saveFunctionBtn.addEventListener('click', saveFunction);
     }
-    if (addFunctionTapBtn) addFunctionTapBtn.addEventListener('click', () => addBlockToFunction('tap'));
-    if (addFunctionLoopBtn) addFunctionLoopBtn.addEventListener('click', () => addBlockToFunction('loop'));
-
 });
 
 // Make functions available globally
@@ -292,36 +222,7 @@ async function loadTask(taskId) {
         const blocks = await response.json();
         state.currentTask = {
             id: taskId,
-            blocks: blocks.map(block => {
-                // Ensure all properties are properly loaded
-                if (block.type === 'tap') {
-                    return {
-                        ...block,
-                        region: block.region || null
-                    };
-                } else if (block.type === 'loop') {
-                    return {
-                        ...block,
-                        iterations: block.iterations || 1,
-                        blocks: (block.blocks || []).map(nestedBlock => ({
-                            ...nestedBlock,
-                            region: nestedBlock.region || null
-                        }))
-                    };
-                } else if (block.type === 'conditional') {
-                    return {
-                        ...block,
-                        data: {
-                            ...block.data,
-                            threshold: block.data.threshold || 90,
-                            referenceImage: block.data.referenceImage || null,
-                            thenBlocks: block.data.thenBlocks || [],
-                            elseBlocks: block.data.elseBlocks || []
-                        }
-                    }
-                }
-                return block;
-            })
+            blocks: blocks
         };
 
         // Save last opened task ID
@@ -363,6 +264,34 @@ function updateTaskList() {
         });
     });
 }
+
+// Add delete all tasks functionality
+document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete all tasks?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/tasks/all', {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete all tasks');
+
+        // Clear tasks from state
+        state.tasks = [];
+        state.currentTask = null;
+        updateTaskList();
+        updateTaskDisplay();
+
+        logToConsole('All tasks deleted successfully', 'success');
+
+        // Create a new task since all are deleted
+        await createNewTask();
+    } catch (error) {
+        logToConsole('Error deleting all tasks', 'error');
+    }
+});
 
 
 // Block Management
@@ -408,7 +337,6 @@ function addTapBlock(parentLoopIndex = null, region = null) {
     }
 
     updateTaskDisplay();
-    scheduleAutosave();
     logToConsole('Tap block added. Click "Set Region" to configure it.', 'success');
 
     // Auto-enable drawing mode for the new block
@@ -464,27 +392,16 @@ function removeBlock(blockElement) {
     const index = blockElement.dataset.index;
     const indices = index.split('.');
 
-    let targetBlocks = state.currentTask.blocks;
-    let targetIndex = parseInt(indices[0]);
-
-    // Handle nested blocks in conditionals
-    if (indices.length > 1) {
-        if (indices[1] === 'then' || indices[1] === 'else') {
-            const parentBlock = targetBlocks[indices[0]];
-            targetBlocks = parentBlock.data[`${indices[1]}Blocks`];
-            targetIndex = parseInt(indices[2]);
-        } else {
-            // Handle nested blocks in loops
-            const parentBlock = targetBlocks[indices[0]];
-            targetBlocks = parentBlock.blocks;
-            targetIndex = parseInt(indices[1]);
-        }
+    if (indices.length === 1) {
+        state.currentTask.blocks.splice(indices[0], 1);
+    } else {
+        // Handle nested blocks in loops
+        const parentBlock = state.currentTask.blocks[indices[0]];
+        parentBlock.blocks.splice(indices[1], 1);
     }
 
-    targetBlocks.splice(targetIndex, 1);
     updateTaskDisplay();
     scheduleAutosave();
-    logToConsole('Block removed', 'success');
 }
 
 
@@ -802,10 +719,10 @@ function renderBlock(block, index) {
                 <h6 class="mb-0">Conditional Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
-                        ${block.data?.referenceImage ? 'Update Reference' : 'Capture Reference'}
+                        ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
                     </button>
                     <input type="number" class="form-control form-control-sm threshold-input" 
-                           value="${block.data?.threshold || 90}" min="0" max="100" style="width: 70px">
+                           value="${block.data.threshold}" min="0" max="100" style="width: 70px">
                     <span class="ms-2 me-2">% similar</span>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
                 </div>
@@ -828,16 +745,7 @@ function renderBlock(block, index) {
             </div>
         `;
 
-        // Add delete button handler
-        const removeBtn = blockDiv.querySelector('.remove-block-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeBlock(blockDiv);
-            });
-        }
-
-        // Rest of the conditional block event handlers...
+        // Add event listeners
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
         captureBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -861,6 +769,7 @@ function renderBlock(block, index) {
             }
         });
 
+        // Add threshold change handler
         const thresholdInput = blockDiv.querySelector('.threshold-input');
         thresholdInput.addEventListener('change', (e) => {
             block.data.threshold = parseInt(e.target.value) || 90;
@@ -977,12 +886,13 @@ async function executeTask() {
 
 // Utilities
 function showTapFeedback(region) {
-    const coordinates = getRandomCoordinatesInRegion(region);
+    const centerX = (region.x1 + region.x2) / 2;
+    const centerY = (region.y1 + region.y2) / 2;
 
     const feedback = document.createElement('div');
     feedback.className = 'tap-feedback';
-    feedback.style.left = `${coordinates.x}px`;
-    feedback.style.top = `${coordinates.y}px`;
+    feedback.style.left = `${centerX}px`;
+    feedback.style.top = `${centerY}px`;
 
     document.getElementById('simulator').appendChild(feedback);
 
@@ -1004,8 +914,9 @@ function setupVideoSharing() {
                 audio: false
             });
             video.srcObject = stream;
-            logToConsole('Screen sharing started','success');        } catch (error) {
-            logToConsole('Screen sharing error: ' +error.message, 'error');
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Screen sharing error: ' + error.message, 'error');
         }
     });
 }
@@ -1037,7 +948,9 @@ function scheduleAutosave() {
 }
 
 async function deleteTask(taskId) {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+    if (!taskId) {
+        logToConsole('No task selected to delete', 'error');        return;
+    }
 
     try {
         const response = await fetch(`/api/tasks/${taskId}`, {
@@ -1048,57 +961,29 @@ async function deleteTask(taskId) {
 
         // Remove task from state
         state.tasks = state.tasks.filter(t => t.id !== taskId);
+        updateTaskList();
 
-        if (state.tasks.length === 0) {
-            // If no tasks remain, create a new one
-            const newTask = await createNewTask();
-            await loadTask(newTask.id);
-            logToConsole('Created new task after deletion', 'success');
-        } else if (state.currentTask && state.currentTask.id === taskId) {
-            // If deleted current task, load the most recent task
-            const mostRecentTask = state.tasks.reduce((latest, current) => {
-                const latestDate = new Date(latest.updated_at);
-                const currentDate = new Date(current.updated_at);
-                return currentDate > latestDate ? current : latest;
-            }, state.tasks[0]);
-
-            await loadTask(mostRecentTask.id);
+        // If the deleted task was the current task, clear it
+        if (state.currentTask && state.currentTask.id === taskId) {
+            state.currentTask = null;
+            updateTaskDisplay();
         }
 
-        updateTaskList();
         logToConsole('Task deleted successfully', 'success');
+
+        // Load another task if available
+        if (state.tasks.length > 0) {
+            await loadTask(state.tasks[0].id);
+        }
     } catch (error) {
         logToConsole('Error deleting task', 'error');
     }
 }
 
-// Update delete all tasks handler
-document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
-    if (!confirm('Are you sure you want to delete all tasks?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/tasks/all', {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) throw new Error('Failed to delete all tasks');
-
-        // Clear tasks from state
-        state.tasks = [];
-        state.currentTask = null;
-
-        // Create a new task since all are deleted
-        const newTask = await createNewTask();
-        await loadTask(newTask.id);
-
-        updateTaskList();
-        updateTaskDisplay();
-        logToConsole('All tasks deleted and new task created', 'success');
-    } catch (error) {
-        logToConsole('Error deleting all tasks', 'error');
-    }
+// Add delete button event listener 
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
+    deleteTask(taskId);
 });
 
 // Add new function to show selection box for existing region
@@ -1501,25 +1386,4 @@ document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
     <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
 `);
 
-// Add this utility function for random coordinates
-function getRandomCoordinatesInRegion(region) {
-    return {
-        x: region.x1 + Math.random() * (region.x2 - region.x1),
-        y: region.y1 + Math.random() * (region.y2 - region.y1)
-    };
-}
-
-// Update showTapFeedback to use random coordinates
-function showTapFeedback(region) {
-    const coordinates = getRandomCoordinatesInRegion(region);
-
-    const feedback = document.createElement('div');
-    feedback.className = 'tap-feedback';
-    feedback.style.left = `${coordinates.x}px`;
-    feedback.style.top = `${coordinates.y}px`;
-
-    document.getElementById('simulator').appendChild(feedback);
-
-    // Remove the feedback element after animation completes
-    feedback.addEventListener('animationend', () => feedback.remove());
-}
+document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
