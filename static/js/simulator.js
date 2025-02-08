@@ -1,4 +1,22 @@
-<replit_final_file>
+// Device dimensions
+const DEVICE_WIDTH = 320;
+const DEVICE_HEIGHT = 720;
+
+// Initial state setup
+window.state = {
+    currentTask: null,
+    tasks: [],
+    autoSaveTimeout: null,
+    pendingBlockConfiguration: null,
+    focusedBlock: null,
+    lastTaskId: localStorage.getItem('lastTaskId'),
+    currentFrame: null
+};
+
+// Functions state
+let functions = [];
+
+// State management
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI elements
     const selectionBox = document.getElementById('selectionBox');
@@ -15,11 +33,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
     document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
 
+
     // Add task title change handler
     taskTitle.addEventListener('change', async () => {
-        if (window.appState.currentTask) {
+        if (state.currentTask) {
             try {
-                const response = await fetch(`/api/tasks/${window.appState.currentTask.id}`, {
+                const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -30,9 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error('Failed to update task name');
 
                 const updatedTask = await response.json();
-                const taskIndex = window.appState.tasks.findIndex(t => t.id === updatedTask.id);
+                const taskIndex = state.tasks.findIndex(t => t.id === updatedTask.id);
                 if (taskIndex !== -1) {
-                    window.appState.tasks[taskIndex] = updatedTask;
+                    state.tasks[taskIndex] = updatedTask;
                     updateTaskList();
                 }
 
@@ -70,16 +89,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Remove the mouseleave handler that was forcing selection completion
+    simulator.removeEventListener('mouseleave', () => {});
+
+
     // Setup video sharing
     setupVideoSharing();
 
     // Load functions and tasks
     loadFunctions();
-    // Load tasks when the page loads
     loadTasks().then(() => {
-        console.log('Initial tasks loaded');
-    }).catch(error => {
-        console.error('Failed to load initial tasks:', error);
+        console.log('Initial state setup complete:', window.state);
     });
 
     // Initialize function modal
@@ -88,104 +108,80 @@ document.addEventListener('DOMContentLoaded', () => {
         new bootstrap.Modal(functionModal);
     }
 
-    // Add click handler for task list items
-    const taskList = document.getElementById('taskList');
-    if (taskList) {
-        taskList.addEventListener('click', (e) => {
-            const taskItem = e.target.closest('.task-list-item');
-            if (taskItem && !e.target.closest('.btn')) {
-                const taskId = parseInt(taskItem.dataset.taskId);
-                loadTask(taskId);
-            }
-        });
+    // Add save function button handler
+    const saveFunctionBtn = document.getElementById('saveFunctionBtn');
+    if (saveFunctionBtn) {
+        saveFunctionBtn.addEventListener('click', saveFunction);
     }
 });
+
+// Make functions available globally
+window.processBlocks = function(blocks) {
+    console.log('Processing blocks in simulator:', blocks);
+    if (!window.state.currentTask) {
+        console.error('No active task available');
+        return false;
+    }
+
+    try {
+        blocks.forEach(block => {
+            if (block.type === 'loop') {
+                addLoopBlock(block.iterations, block.blocks);
+            } else if (block.type === 'tap') {
+                addTapBlock(null, block.region);
+            }
+        });
+        updateTaskDisplay();
+        scheduleAutosave();
+        return true;
+    } catch (error) {
+        console.error('Error processing blocks:', error);
+        return false;
+    }
+};
 
 // Task Management
 async function loadTasks() {
     try {
         const response = await fetch('/api/tasks');
-        if (!response.ok) {
-            throw new Error('Failed to fetch tasks');
-        }
+        if (!response.ok) throw new Error('Failed to load tasks');
 
-        const tasksData = await response.json();
-        window.appState.tasks = tasksData;
-
-        console.log('Tasks loaded:', tasksData);
+        state.tasks = await response.json();
         updateTaskList();
 
-        if (tasksData.length > 0) {
-            // Try to load the last active task
-            const lastTaskId = window.appState.lastTaskId;
-            const taskToLoad = lastTaskId ?
-                tasksData.find(t => t.id === parseInt(lastTaskId)) :
-                tasksData[0];
+        if (state.tasks.length > 0) {
+            let taskToLoad;
 
-            if (taskToLoad) {
-                await loadTask(taskToLoad.id);
-            } else {
-                await createNewTask();
+            // Try to load last opened task
+            if (state.lastTaskId) {
+                taskToLoad = state.tasks.find(t => t.id === parseInt(state.lastTaskId));
             }
+
+            // If no last task or it doesn't exist, load most recent
+            if (!taskToLoad) {
+                taskToLoad = state.tasks[0];
+            }
+
+            await loadTask(taskToLoad.id);
         } else {
+            // Only create a new task if there are no existing tasks
             await createNewTask();
         }
-
-        logToConsole('Tasks loaded successfully', 'success');
     } catch (error) {
         console.error('Error loading tasks:', error);
-        logToConsole('Failed to load tasks. Creating new task...', 'error');
-        await createNewTask();
-    }
-}
+        logToConsole('Error loading tasks', 'error');
 
-async function loadTask(taskId) {
-    if (!taskId) {
-        logToConsole('Invalid task ID', 'error');
-        return;
-    }
-
-    try {
-        // Save current task before loading new one
-        if (window.appState.currentTask) {
-            await saveCurrentTask();
+        // Create a new task as fallback
+        if (!state.currentTask) {
+            await createNewTask();
         }
-
-        const response = await fetch(`/api/tasks/${taskId}/blocks`);
-        if (!response.ok) {
-            throw new Error('Failed to load task blocks');
-        }
-
-        const blocks = await response.json();
-        window.appState.currentTask = {
-            id: taskId,
-            blocks: blocks || []
-        };
-
-        // Save as last opened task
-        window.appState.lastTaskId = taskId;
-        localStorage.setItem('lastTaskId', taskId);
-
-        // Update UI
-        const taskTitle = document.getElementById('taskTitle');
-        const currentTask = window.appState.tasks.find(t => t.id === taskId);
-        if (currentTask && taskTitle) {
-            taskTitle.value = currentTask.name || '';
-        }
-
-        updateTaskDisplay();
-        updateTaskList();
-        logToConsole(`Task ${taskId} loaded successfully`, 'success');
-    } catch (error) {
-        console.error('Error loading task:', error);
-        logToConsole('Failed to load task', 'error');
     }
 }
 
 async function createNewTask() {
     try {
         // Find highest task number
-        const taskNumbers = window.appState.tasks
+        const taskNumbers = state.tasks
             .map(t => {
                 const match = t.name.match(/^Task (\d+)$/);
                 return match ? parseInt(match[1]) : 0;
@@ -205,14 +201,14 @@ async function createNewTask() {
         if (!response.ok) throw new Error('Failed to create task');
 
         const task = await response.json();
-        window.appState.tasks.push(task);
-        window.appState.currentTask = {
+        state.tasks.push(task);
+        state.currentTask = {
             id: task.id,
             blocks: []
         };
 
         // Save last opened task ID
-        window.appState.lastTaskId = task.id;
+        state.lastTaskId = task.id;
         localStorage.setItem('lastTaskId', task.id);
 
         updateTaskList();
@@ -226,13 +222,56 @@ async function createNewTask() {
     }
 }
 
+// Add autosave before loading new task
+async function loadTask(taskId) {
+    try {
+        // Save current task before loading new one
+        if (state.currentTask) {
+            await saveCurrentTask();
+        }
 
+        const response = await fetch(`/api/tasks/${taskId}/blocks`);
+        if (!response.ok) throw new Error('Failed to load task blocks');
+
+        const blocks = await response.json();
+        state.currentTask = {
+            id: taskId,
+            blocks: blocks.map(block => {
+                // Ensure all block data is properly loaded
+                if (block.type === 'tap' && block.data && block.data.region) {
+                    block.region = block.data.region;
+                }
+                return block;
+            }) || []
+        };
+
+        // Save last opened task ID
+        state.lastTaskId = taskId;
+        localStorage.setItem('lastTaskId', taskId);
+
+        const taskTitle = document.getElementById('taskTitle');
+        const currentTask = state.tasks.find(t => t.id === taskId);
+        if (currentTask) {
+            taskTitle.value = currentTask.name || '';
+        }
+
+        updateTaskDisplay();
+        updateTaskList();
+        logToConsole(`Loaded task ${taskId}`, 'success');
+    } catch (error) {
+        logToConsole('Error loading task blocks', 'error');
+        console.error('Load task error:', error);
+        throw error;
+    }
+}
+
+// UI Updates
 function updateTaskList() {
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
 
-    taskList.innerHTML = window.appState.tasks.map(task => `
-        <div class="task-list-item ${window.appState.currentTask && window.appState.currentTask.id === task.id ? 'active' : ''}" 
+    taskList.innerHTML = state.tasks.map(task => `
+        <div class="task-list-item ${state.currentTask && state.currentTask.id === task.id ? 'active' : ''}" 
              data-task-id="${task.id}">
             <span>${task.name}</span>
             <div class="btn-group">
@@ -241,8 +280,19 @@ function updateTaskList() {
             </div>
         </div>
     `).join('');
+
+    // Add click handlers for task selection
+    taskList.querySelectorAll('.task-list-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                const taskId = parseInt(item.dataset.taskId);
+                loadTask(taskId);
+            }
+        });
+    });
 }
 
+// Add delete all tasks functionality
 document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
     if (!confirm('Are you sure you want to delete all tasks?')) {
         return;
@@ -256,8 +306,8 @@ document.getElementById('deleteAllTasksBtn').addEventListener('click', async () 
         if (!response.ok) throw new Error('Failed to delete all tasks');
 
         // Clear tasks from state
-        window.appState.tasks = [];
-        window.appState.currentTask = null;
+        state.tasks = [];
+        state.currentTask = null;
         updateTaskList();
         updateTaskDisplay();
 
@@ -270,8 +320,10 @@ document.getElementById('deleteAllTasksBtn').addEventListener('click', async () 
     }
 });
 
+
+// Block Management
 function startTapRegionSelection(blockElement) {
-    if (!window.appState.currentTask) {
+    if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
     }
@@ -287,12 +339,12 @@ function startTapRegionSelection(blockElement) {
     selectionBox.style.width = '0';
     selectionBox.style.height = '0';
 
-    window.appState.pendingBlockConfiguration = blockElement;
+    state.pendingBlockConfiguration = blockElement;
     logToConsole('Select tap region on the simulator', 'info');
 }
 
 function addTapBlock(parentLoopIndex = null, region = null) {
-    if (!window.appState.currentTask) {
+    if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
     }
@@ -305,10 +357,10 @@ function addTapBlock(parentLoopIndex = null, region = null) {
 
     if (parentLoopIndex !== null) {
         // Add to loop block
-        window.appState.currentTask.blocks[parentLoopIndex].blocks.push(block);
+        state.currentTask.blocks[parentLoopIndex].blocks.push(block);
     } else {
         // Add to root level
-        window.appState.currentTask.blocks.push(block);
+        state.currentTask.blocks.push(block);
     }
 
     updateTaskDisplay();
@@ -327,7 +379,7 @@ function addTapBlock(parentLoopIndex = null, region = null) {
 }
 
 function addLoopBlock(iterations = 1, blocks = []) {
-    if (!window.appState.currentTask) {
+    if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
         return;
     }
@@ -338,60 +390,40 @@ function addLoopBlock(iterations = 1, blocks = []) {
         blocks: blocks
     };
 
-    window.appState.currentTask.blocks.push(block);
+    state.currentTask.blocks.push(block);
     updateTaskDisplay();
     scheduleAutosave();
     logToConsole('Loop block added', 'success');
 }
 
-function addConditionalBlock() {
-    if (!window.appState.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
-    const block = {
-        type: 'conditional',
-        data: {
-            referenceImage: null,
-            threshold: 90,
-            thenBlocks: [],
-            elseBlocks: []
-        }
-    };
-
-    window.appState.currentTask.blocks.push(block);
-    updateTaskDisplay();
-    scheduleAutosave();
-    logToConsole('Conditional block added', 'success');
-}
-
+// UI Updates
 function updateTaskDisplay() {
     const currentTaskElement = document.getElementById('currentTask');
     const taskTitle = document.getElementById('taskTitle');
     if (!currentTaskElement) return;
 
     currentTaskElement.innerHTML = '';
-    if (window.appState.currentTask) {
-        taskTitle.value = window.appState.tasks.find(t => t.id === window.appState.currentTask.id)?.name || '';
+    if (state.currentTask) {
+        taskTitle.value = state.tasks.find(t => t.id === state.currentTask.id)?.name || '';
     }
 
-    if (window.appState.currentTask && window.appState.currentTask.blocks) {
-        window.appState.currentTask.blocks.forEach((block, index) => {
+    if (state.currentTask && state.currentTask.blocks) {
+        state.currentTask.blocks.forEach((block, index) => {
             currentTaskElement.appendChild(renderBlock(block, index.toString()));
         });
     }
 }
 
+// Remove block functionality
 function removeBlock(blockElement) {
     const index = blockElement.dataset.index;
     const indices = index.split('.');
 
     if (indices.length === 1) {
-        window.appState.currentTask.blocks.splice(indices[0], 1);
+        state.currentTask.blocks.splice(indices[0], 1);
     } else {
         // Handle nested blocks in loops
-        const parentBlock = window.appState.currentTask.blocks[indices[0]];
+        const parentBlock = state.currentTask.blocks[indices[0]];
         parentBlock.blocks.splice(indices[1], 1);
     }
 
@@ -404,12 +436,13 @@ function removeBlock(blockElement) {
     });
 }
 
+// Selection Handling
 let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
 
 function startSelection(event) {
-    if (!window.appState.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
+    if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
 
     isSelecting = true;
     const rect = event.target.getBoundingClientRect();
@@ -444,6 +477,7 @@ function updateSelection(event) {
     selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
 }
 
+
 function finishSelection(endX, endY) {
     const region = {
         x1: Math.min(selectionStartX, endX),
@@ -452,7 +486,7 @@ function finishSelection(endX, endY) {
         y2: Math.max(selectionStartY, endY)
     };
 
-    const blockIndex = window.appState.pendingBlockConfiguration.dataset.index;
+    const blockIndex = state.pendingBlockConfiguration.dataset.index;
     const indices = blockIndex.split('.');
 
     // Navigate through nested blocks and update the region
@@ -474,10 +508,10 @@ function finishSelection(endX, endY) {
     }
 
     // Update the region in the current task's blocks
-    if (window.appState.currentTask) {
-        const updated = updateBlockRegion(window.appState.currentTask.blocks, indices);
+    if (state.currentTask) {
+        const updated = updateBlockRegion(state.currentTask.blocks, indices);
         if (updated) {
-            window.appState.pendingBlockConfiguration = null;
+            state.pendingBlockConfiguration = null;
             showSelectionBox(region);
             updateTaskDisplay();
 
@@ -492,8 +526,9 @@ function finishSelection(endX, endY) {
     }
 }
 
+// Save blocks functionality
 async function saveCurrentTask() {
-    if (!window.appState.currentTask) return;
+    if (!state.currentTask) return;
 
     try {
         // Deep clone and prepare blocks for saving
@@ -517,9 +552,9 @@ async function saveCurrentTask() {
             });
         }
 
-        const blocks = prepareBlocks(window.appState.currentTask.blocks);
+        const blocks = prepareBlocks(state.currentTask.blocks);
 
-        const response = await fetch(`/api/tasks/${window.appState.currentTask.id}/blocks`, {
+        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ blocks })
@@ -534,16 +569,459 @@ async function saveCurrentTask() {
     }
 }
 
+// Add these utility functions for block interaction
 function setBlockFocus(block, blockDiv) {
     // Remove focus from other blocks
     document.querySelectorAll('.block').forEach(el => {
         if (el !== blockDiv) {
             el.classList.remove('focused');
+            // Hide selection box if switching focus
+            if (state.focusedBlock && state.focusedBlock.type === 'tap') {
+                const selectionBox = document.getElementById('selectionBox');
+                selectionBox.classList.add('d-none');
+            }
         }
     });
 
     // Add focus to current block
     blockDiv.classList.add('focused');
+
+    // Update focused block state
+    window.state.focusedBlock = block;
+
+    // Show region if it exists
+    if (block.type === 'tap') {
+        if (block.region) {
+            showSelectionBox(block.region);
+        } else {
+            // If no region is set, hide the selection box
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.classList.add('d-none');
+        }
+    }
 }
 
-// Additional functions and logic can be added here as needed
+// Enhanced render block function with better iteration controls
+function renderBlock(block, index) {
+    const blockDiv = document.createElement('div');
+    blockDiv.className = `block ${block.type}-block`;
+    blockDiv.dataset.index = index;
+
+    if (block.type === 'function') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${block.name}</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">${block.description || ''}</small>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners with stopPropagation
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        addTapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
+        addLoopBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Render nested blocks
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'tap') {
+        return renderTapBlock(block, blockDiv, index);
+    } else if (block.type === 'loop') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input"
+                            value="${block.iterations}" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+        `;
+
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                handleIterationsChange(block, currentValue - 1, iterationsInput);
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            handleIterationsChange(block, currentValue + 1, iterationsInput);
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            handleIterationsChange(block, value, iterationsInput);
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'conditional') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Logic Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary capture-reference-btn">
+                        ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
+                    </button>
+                    <input type="number" class="form-control form-control-sm threshold-input" 
+                           value="${block.data.threshold}" min="0" max="100" style="width: 70px">
+                    <span class="ms-2 me-2">% similar</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="nested-blocks then-blocks">
+                    <p class="mb-2">If similar enough:</p>
+                    <div class="btn-group w-100 mb-2">
+                        <button class="btn btn-sm btn-outline-primary add-then-tap-btn">Add Tap</button>
+                        <button class="btn btn-sm btn-outline-success add-then-loop-btn">Add Loop</button>
+                    </div>
+                </div>
+                <div class="nested-blocks else-blocks">
+                    <p class="mb-2">If not similar enough:</p>
+                    <div class="btn-group w-100 mb-2">
+                        <button class="btn btn-sm btn-outline-primary add-else-tap-btn">Add Tap</button>
+                        <button class="btn btn-sm btn-outline-success add-else-loop-btn">Add Loop</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        const captureBtn = blockDiv.querySelector('.capture-reference-btn');
+        captureBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const imageData = captureVideoFrame();
+
+            try {
+                const response = await fetch(`/api/blocks/${block.id}/reference-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                if (!response.ok) throw new Error('Failed to save reference image');
+
+                block.data.referenceImage = imageData;
+                captureBtn.textContent = 'Update Reference';
+                scheduleAutosave();
+                logToConsole('Reference image captured', 'success');
+            } catch (error) {
+                logToConsole('Failed to save reference image', 'error');
+            }
+        });
+
+        // Add threshold change handler
+        const thresholdInput = blockDiv.querySelector('.threshold-input');
+        thresholdInput.addEventListener('change', (e) => {
+            block.data.threshold = parseInt(e.target.value) || 90;
+            scheduleAutosave();
+        });
+
+        // Add delete handler
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Add buttons for then/else blocks
+        ['then', 'else'].forEach(section => {
+            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
+                addTapBlock(index, `${section}Blocks`);
+            });
+
+            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
+                addLoopBlock(index, `${section}Blocks`);
+            });
+        });
+
+        // Render nested blocks
+        if (block.data.thenBlocks) {
+            const thenContainer = blockDiv.querySelector('.then-blocks');
+            block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
+                thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
+            });
+        }
+
+        if (block.data.elseBlocks) {
+            const elseContainer = blockDiv.querySelector('.else-blocks');
+            block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
+                elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
+            });
+        }
+    }
+
+    return blockDiv;
+}
+
+function renderTapBlock(block, blockDiv, index) {
+    const updateRegionDisplay = () => {
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            'No region set';
+
+        blockDiv.querySelector('.region-text').textContent = `Region: ${regionText}`;
+    };
+
+    blockDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Tap Block</h6>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary set-region-btn">Set Region</button>
+                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+            </div>
+        </div>
+        <small class="text-muted region-text">Region: ${block.region ? 
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` : 
+            'No region set'}</small>
+    `;
+
+    // Handle block selection and region definition
+    blockDiv.addEventListener('click', (e) => {
+        if (!e.target.closest('.btn')) {
+            e.stopPropagation();
+            setBlockFocus(block, blockDiv);
+        }
+    });
+
+    // Add dedicated button for region selection
+    const setRegionBtn = blockDiv.querySelector('.set-region-btn');
+    setRegionBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startTapRegionSelection(blockDiv);
+        if (block.region) {
+            showSelectionBox(block.region);
+        }
+    });
+
+    const removeBtn = blockDiv.querySelector('.remove-block-btn');
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeBlock(blockDiv);
+    });
+
+    // Update region display when the block's region changes
+    if (block.region) {
+        showSelectionBox(block.region);
+    }
+
+    return blockDiv;
+}
+
+function enableDrawingMode(block, blockDiv) {
+    // If it's a tap block, start region selection immediately
+    if (block.type === 'tap') {
+        startTapRegionSelection(blockDiv);
+        if (block.region) {
+            showSelectionBox(block.region);
+        }
+    }
+}
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
+
+// Task Execution
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800;
+
+    async function executeBlocks(blocks) {
+        for (const block of blocks) {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    await executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                setTimeout(() => {
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                }, delay);
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: currentImage })
+                });
+
+                if (!response.ok) throw new Error('Failed to compare images');
+
+                const result = await response.json();
+                const blocksToExecute = result.similarity >= result.threshold ?
+                    block.data.thenBlocks : block.data.elseBlocks;
+
+                logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                await executeBlocks(blocksToExecute);
+            } catch (error) {
+                logToConsole('Error executing conditional block: ' + error.message, 'error');
+            }
+        }
+    }
+
+    await executeBlocks(state.currentTask.blocks);
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + delayIncrement);
+}
+
+// Add button to UI
+document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
+    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
+`);
+
+document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+
+// Add beforeunload event listener
+window.addEventListener('beforeunload', async (e) => {
+    if (state.currentTask) {
+        e.preventDefault();
+        e.returnValue = '';
+        await saveCurrentTask();
+    }
+});
+
+// Update tap execution to use random coordinates
+function showTapFeedback(region) {
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+    feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
+}
+
+// Update iterations change handler to save immediately
+function handleIterationsChange(block, value, iterationsInput) {
+    if (value < 1) {
+        iterationsInput.value = 1;
+        block.iterations = 1;
+    } else {
+        block.iterations = value;
+    }
+
+    // Save immediately after iterations change
+    saveCurrentTask().then(() => {
+        logToConsole('Iterations updated and saved', 'success');
+    }).catch(error => {
+        logToConsole('Failed to save iterations update', 'error');
+    });
+}
+
+// Add addFunctionToTask function
+async function addFunctionToTask(func) {
+    // Deep clone the function's blocks to ensure we don't modify the original
+    function cloneBlocks(blocks) {
+        return blocks.map(block => {
+            const clonedBlock = { ...block };
+            if (block.blocks) {
+                clonedBlock.blocks = cloneBlocks(block.blocks);
+            }
+            // Ensure tap blocks retain their region data
+            if (block.type === 'tap' && block.data && block.data.region) {
+                clonedBlock.region = block.data.region;
+            }
+            return clonedBlock;
+        });
+    }
+
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: cloneBlocks(func.blocks || [])
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
+}
