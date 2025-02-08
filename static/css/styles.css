@@ -373,3 +373,30 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
         opacity: 0;
     }
 }
+
+/* Block name editing styles */
+.block-name {
+    margin-bottom: 0;
+    transition: background-color 0.2s ease;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.block-name:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.block-name-input {
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+    border: 1px solid var(--bs-primary);
+    margin: -2px 0;
+    padding: 2px 4px;
+}
+
+.block-name-input:focus {
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}

@@ -661,7 +661,9 @@ function renderBlock(block, index) {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="header-clickable d-flex align-items-center" style="flex: 1">
-                    <h6 class="mb-0">Loop Block</h6>
+                    <h6 class="mb-0 block-name" style="cursor: text">${block.name || 'Loop Block'}</h6>
+                    <input type="text" class="form-control form-control-sm block-name-input d-none" 
+                           value="${block.name || 'Loop Block'}" style="width: 150px;">
                     <span class="collapse-indicator">▼</span>
                 </div>
                 <div class="iteration-controls">
@@ -674,22 +676,36 @@ function renderBlock(block, index) {
                     <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
                 </div>
             </div>
-            <div class="nested-blocks mt-2" style="display: block;"></div>
+            <div class="nested-blocks mt-2"></div>
         `;
 
-        const header = blockDiv.querySelector('.header-clickable');
-        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
-        const indicator = blockDiv.querySelector('.collapse-indicator');
+        // Add rename functionality
+        const blockName = blockDiv.querySelector('.block-name');
+        const nameInput = blockDiv.querySelector('.block-name-input');
 
-        // Add click handler for expand/collapse
-        header.addEventListener('click', (e) => {
-            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
-                e.stopPropagation();
-                toggleBlockExpansion(header, nestedBlocks, indicator);
+        blockName.addEventListener('dblclick', () => {
+            blockName.classList.add('d-none');
+            nameInput.classList.remove('d-none');
+            nameInput.focus();
+            nameInput.select();
+        });
+
+        nameInput.addEventListener('blur', () => {
+            blockName.textContent = nameInput.value;
+            block.name = nameInput.value;
+            blockName.classList.remove('d-none');
+            nameInput.classList.add('d-none');
+            scheduleAutosave();
+        });
+
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                nameInput.blur();
             }
         });
 
         // Add nested blocks
+        const nestedBlocks = blockDiv.querySelector('.nested-blocks');
         if (Array.isArray(block.blocks)) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 if (nestedBlock) {
@@ -703,10 +719,22 @@ function renderBlock(block, index) {
 
         // Add iteration controls
         setupIterationControls(blockDiv, block);
+        const header = blockDiv.querySelector('.header-clickable');
+        const indicator = blockDiv.querySelector('.collapse-indicator');
+
+        // Add click handler for expand/collapse
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn') && !e.target.closest('.iteration-controls')) {
+                e.stopPropagation();
+                toggleBlockExpansion(header, nestedBlocks, indicator);
+            }
+        });
     } else if (block.type === 'tap') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Tap Block</h6>
+                <h6 class="mb-0 block-name" style="cursor: text">${block.name || 'Tap Block'}</h6>
+                <input type="text" class="form-control form-control-sm block-name-input d-none" 
+                       value="${block.name || 'Tap Block'}" style="width: 150px;">
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary set-region-btn">
                         ${block.region ? 'Update Region' : 'Set Region'}
@@ -718,6 +746,31 @@ function renderBlock(block, index) {
                 ${block.region ? `Region set: (${Math.round(block.region.x1)},${Math.round(block.region.y1)}) - (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` : 'No region set'}
             </small>
         `;
+
+        // Add rename functionality
+        const blockName = blockDiv.querySelector('.block-name');
+        const nameInput = blockDiv.querySelector('.block-name-input');
+
+        blockName.addEventListener('dblclick', () => {
+            blockName.classList.add('d-none');
+            nameInput.classList.remove('d-none');
+            nameInput.focus();
+            nameInput.select();
+        });
+
+        nameInput.addEventListener('blur', () => {
+            blockName.textContent = nameInput.value;
+            block.name = nameInput.value;
+            blockName.classList.remove('d-none');
+            nameInput.classList.add('d-none');
+            scheduleAutosave();
+        });
+
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                nameInput.blur();
+            }
+        });
 
         // Add region selection
         blockDiv.querySelector('.set-region-btn').addEventListener('click', () => {
@@ -938,7 +991,7 @@ function showSelectionBox(region) {
     selectionBox.style.left = `${region.x1}px`;
     selectionBox.style.top = `${region.y1}px`;
     selectionBox.style.width = `${region.x2 - region.x1}px`;
-    selectionBox.style.height =`${region.y2 - region.y1}px`;
+    selectionBox.style.height = `${region.y2 - region.y1}px`;
     selectionBox.classList.remove('d-none');
 }
 
@@ -1050,7 +1103,9 @@ function addBlockToFunction(type, parentElement = null) {
         blockElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
                 <div class="header-clickable d-flex align-items-center" style="flex: 1">
-                    <h6 class="mb-0">Loop Block</h6>
+                    <h6 class="mb-0 block-name" style="cursor: text">${block.name || 'Loop Block'}</h6>
+                    <input type="text" class="form-control form-control-sm block-name-input d-none" 
+                           value="${block.name || 'Loop Block'}" style="width: 150px;">
                     <span class="collapse-indicator">▼</span>
                 </div>
                 <div class="iteration-controls">
@@ -1129,7 +1184,9 @@ function addBlockToFunction(type, parentElement = null) {
     } else { // Tap block
         blockElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Tap Block</h6>
+                <h6 class="mb-0 block-name" style="cursor: text">${block.name || 'Tap Block'}</h6>
+                <input type="text" class="form-control form-control-sm block-name-input d-none" 
+                       value="${block.name || 'Tap Block'}" style="width: 150px;">
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary select-region-btn">Set Region</button>
                     <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
@@ -1137,6 +1194,31 @@ function addBlockToFunction(type, parentElement = null) {
             </div>
             <small class="text-muted">No region set</small>
         `;
+
+        // Add rename functionality
+        const blockName = blockElement.querySelector('.block-name');
+        const nameInput = blockElement.querySelector('.block-name-input');
+
+        blockName.addEventListener('dblclick', () => {
+            blockName.classList.add('d-none');
+            nameInput.classList.remove('d-none');
+            nameInput.focus();
+            nameInput.select();
+        });
+
+        nameInput.addEventListener('blur', () => {
+            blockName.textContent = nameInput.value;
+            block.name = nameInput.value;
+            blockName.classList.remove('d-none');
+            nameInput.classList.add('d-none');
+            scheduleAutosave();
+        });
+
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                nameInput.blur();
+            }
+        });
 
         blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
             e.stopPropagation();
