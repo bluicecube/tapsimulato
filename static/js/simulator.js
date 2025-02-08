@@ -263,17 +263,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskTitle = document.getElementById('taskTitle');
 
     // Set up event listeners
-    document.getElementById('executeTaskBtn').addEventListener('click', executeTask);
-    document.getElementById('addTapBtn').addEventListener('click', () => addTapBlock());
-    document.getElementById('addLoopBtn').addEventListener('click', () => addLoopBlock());
-    document.getElementById('newTaskBtn').addEventListener('click', async () => { await createNewTask(); });
-    document.getElementById('addFunctionTapBtn').addEventListener('click', () => addBlockToFunction('tap'));
-    document.getElementById('addFunctionLoopBtn').addEventListener('click', () => addBlockToFunction('loop'));
-    document.getElementById('saveFunctionBtn').addEventListener('click', saveFunction);
+    document.getElementById('executeTaskBtn')?.addEventListener('click', executeTask);
+    document.getElementById('addTapBtn')?.addEventListener('click', () => addTapBlock());
+    document.getElementById('addLoopBtn')?.addEventListener('click', () => addLoopBlock());
+    document.getElementById('newTaskBtn')?.addEventListener('click', async () => { await createNewTask(); });
+    document.getElementById('addFunctionTapBtn')?.addEventListener('click', () => addBlockToFunction('tap'));
+    document.getElementById('addFunctionLoopBtn')?.addEventListener('click', () => addBlockToFunction('loop'));
+    document.getElementById('saveFunctionBtn')?.addEventListener('click', saveFunction);
 
 
     // Add task title change handler
-    taskTitle.addEventListener('change', async () => {
+    taskTitle?.addEventListener('change', async () => {
         if (state.currentTask) {
             try {
                 const response = await fetch(`/api/tasks/${state.currentTask.id}`, {
@@ -301,8 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Selection events
-    simulator.addEventListener('mousedown', startSelection);
-    simulator.addEventListener('mousemove', updateSelection);
+    simulator?.addEventListener('mousedown', startSelection);
+    simulator?.addEventListener('mousemove', updateSelection);
 
     // Listen for mouseup on document to catch out-of-bounds releases
     document.addEventListener('mouseup', (event) => {
@@ -321,14 +321,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Continue selection when mouse re-enters simulator
-    simulator.addEventListener('mouseenter', (event) => {
+    simulator?.addEventListener('mouseenter', (event) => {
         if (isSelecting) {
             updateSelection(event);
         }
     });
 
     // Remove the mouseleave handler that was forcing selection completion
-    simulator.removeEventListener('mouseleave', () => {});
+    simulator?.removeEventListener('mouseleave', () => {});
 
 
     // Setup video sharing
@@ -362,20 +362,23 @@ document.addEventListener('DOMContentLoaded', () => {
             <label for="functionOverlayToggle">Collapse Function Blocks</label>
         `;
         functionBtn.parentNode.insertBefore(overlayControl, functionBtn);
-    }
 
-    // Add event listener for overlay toggle
-    document.getElementById('functionOverlayToggle').addEventListener('change', (e) => {
-        state.functionOverlaysEnabled = e.target.checked;
-        const functionBlocks = document.querySelectorAll('.function-block');
-        functionBlocks.forEach(block => {
-            if (e.target.checked) {
-                block.classList.add('collapsed');
-            } else {
-                block.classList.remove('collapsed');
-            }
-        });
-    });
+        // Add event listener for overlay toggle after creating the element
+        const overlayToggle = document.getElementById('functionOverlayToggle');
+        if (overlayToggle) {
+            overlayToggle.addEventListener('change', (e) => {
+                state.functionOverlaysEnabled = e.target.checked;
+                const functionBlocks = document.querySelectorAll('.function-block');
+                functionBlocks.forEach(block => {
+                    if (e.target.checked) {
+                        block.classList.add('collapsed');
+                    } else {
+                        block.classList.remove('collapsed');
+                    }
+                });
+            });
+        }
+    }
 });
 
 // Make functions available globally
@@ -530,7 +533,7 @@ function updateTaskList() {
 }
 
 // Add delete all tasks functionality
-document.getElementById('deleteAllTasksBtn').addEventListener('click', async () => {
+document.getElementById('deleteAllTasksBtn')?.addEventListener('click', async () => {
     if (!confirm('Are you sure you want to delete all tasks?')) {
         return;
     }
@@ -863,7 +866,7 @@ function renderBlock(block, index) {
         const overlay = blockDiv.querySelector('.function-overlay');
 
         // Add overlay click handler
-        overlay.addEventListener('click', (e) => {
+        overlay?.addEventListener('click', (e) => {
             e.stopPropagation();
             blockDiv.classList.remove('collapsed');
         });
@@ -971,7 +974,7 @@ function renderBlock(block, index) {
             block.blocks.forEach((nestedBlock, nestedIndex) => {
                 nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
             });
-                }
+        }
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -1006,7 +1009,7 @@ function renderBlock(block, index) {
 
         // Add event listeners
         const captureBtn = blockDiv.querySelector('.capture-reference-btn');
-        captureBtn.addEventListener('click', async (e) => {
+        captureBtn?.addEventListener('click', async (e) => {
             e.stopPropagation();
             const imageData = captureVideoFrame();
 
@@ -1030,7 +1033,7 @@ function renderBlock(block, index) {
 
         // Add threshold change handler
         const thresholdInput = blockDiv.querySelector('.threshold-input');
-        thresholdInput.addEventListener('change', (e) => {
+        thresholdInput?.addEventListener('change', (e) => {
             block.data.threshold = parseInt(e.target.value) || 90;
             scheduleAutosave();
         });
@@ -1046,11 +1049,11 @@ function renderBlock(block, index) {
 
         // Add buttons for then/else blocks
         ['then', 'else'].forEach(section => {
-            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
+            blockDiv.querySelector(`.add-${section}-tap-btn`)?.addEventListener('click', () => {
                 addTapBlock(index, `${section}Blocks`);
             });
 
-            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
+            blockDiv.querySelector(`.add-${section}-loop-btn`)?.addEventListener('click', () => {
                 addLoopBlock(index, `${section}Blocks`);
             });
         });
@@ -1108,7 +1111,7 @@ function renderTapBlock(block, blockDiv, index) {
 
     // Add dedicated button for region selection
     const setRegionBtn = blockDiv.querySelector('.set-region-btn');
-    setRegionBtn.addEventListener('click', (e) => {
+    setRegionBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         startTapRegionSelection(blockDiv);
         if (block.region) {
@@ -1117,7 +1120,7 @@ function renderTapBlock(block, blockDiv, index) {
     });
 
     const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    removeBtn.addEventListener('click', (e) => {
+    removeBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         removeBlock(blockDiv);
     });
@@ -1227,7 +1230,7 @@ function showTapFeedback(region) {
     feedback.style.left = `${x}px`;
     feedback.style.top = `${y}px`;
 
-    document.getElementById('simulator').appendChild(feedback);
+    document.getElementById('simulator')?.appendChild(feedback);
     feedback.addEventListener('animationend', () => feedback.remove());
 
     // Return the actual coordinates used for logging
@@ -1237,9 +1240,9 @@ function showTapFeedback(region) {
 // Fix the video sharing configuration
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
-    document.getElementById('setVideoSource').addEventListener('click', async () => {
+    document.getElementById('setVideoSource')?.addEventListener('click', async () => {
         try {
-            if (video.srcObject) {
+            if (video?.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
             const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -1261,8 +1264,8 @@ function logToConsole(message, type = 'info') {
     const messageEl = document.createElement('div');
     messageEl.className = `text-${type}`;
     messageEl.textContent = message;
-    console.appendChild(messageEl);
-    console.scrollTop = console.scrollHeight;
+    console?.appendChild(messageEl);
+    console?.scrollTo(0, console.scrollHeight);
 }
 
 // Update scheduleAutosave to use the new save function
@@ -1317,8 +1320,8 @@ async function deleteTask(taskId) {
 }
 
 // Add delete button event listener 
-document.getElementById('deleteTaskBtn').addEventListener('click', () => {
-    const taskId = document.querySelector('.task-list-item.active').dataset.taskId;
+document.getElementById('deleteTaskBtn')?.addEventListener('click', () => {
+    const taskId = document.querySelector('.task-list-item.active')?.dataset.taskId;
     deleteTask(taskId);
 });
 
@@ -1433,7 +1436,7 @@ function updateFunctionsList() {
 
             // Add function to task when name is clicked
             const nameSpan = item.querySelector('.function-name');
-            nameSpan.addEventListener('click', () => {
+            nameSpan?.addEventListener('click', () => {
                 if (!state.currentTask) {
                     logToConsole('Please create or select a task first', 'error');
                     return;
@@ -1443,7 +1446,7 @@ function updateFunctionsList() {
 
             // Delete function when delete button is clicked
             const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn.addEventListener('click', (e) => {
+            deleteBtn?.addEventListener('click', (e) => {
                 e.stopPropagation();
                 deleteFunction(func.id);
             });
@@ -1530,12 +1533,12 @@ function addBlockToFunction(type, parentElement = null) {
         `;
 
         // Add event listeners for nested block buttons
-        blockElement.querySelector('.add-tap-btn').addEventListener('click', (e) => {
+        blockElement.querySelector('.add-tap-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             addBlockToFunction('tap', blockElement);
         });
 
-        blockElement.querySelector('.add-loop-btn').addEventListener('click', (e) => {
+        blockElement.querySelector('.add-loop-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             addBlockToFunction('loop', blockElement);
         });
@@ -1545,7 +1548,7 @@ function addBlockToFunction(type, parentElement = null) {
         const decreaseBtn = blockElement.querySelector('.decrease-iterations');
         const increaseBtn = blockElement.querySelector('.increase-iterations');
 
-        decreaseBtn.addEventListener('click', (e) => {
+        decreaseBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
@@ -1555,7 +1558,7 @@ function addBlockToFunction(type, parentElement = null) {
             }
         });
 
-        increaseBtn.addEventListener('click', (e) => {
+        increaseBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
             const currentValue = parseInt(iterationsInput.value) || 1;
             iterationsInput.value = currentValue + 1;
@@ -1563,7 +1566,7 @@ function addBlockToFunction(type, parentElement = null) {
             scheduleAutosave();
         });
 
-        iterationsInput.addEventListener('change', (e) => {
+        iterationsInput?.addEventListener('change', (e) => {
             e.stopPropagation();
             const value = parseInt(e.target.value) || 1;
             if (value < 1) {
@@ -1586,14 +1589,14 @@ function addBlockToFunction(type, parentElement = null) {
             <small class="text-muted">No region set</small>
         `;
 
-        blockElement.querySelector('.select-region-btn').addEventListener('click', (e) => {
+        blockElement.querySelector('.select-region-btn')?.addEventListener('click', (e) => {
             e.stopPropagation();
             startTapRegionSelection(blockElement);
         });
     }
 
     // Add remove button handler
-    blockElement.querySelector('.remove-block-btn').addEventListener('click', (e) => {
+    blockElement.querySelector('.remove-block-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
         blockElement.remove();
         scheduleAutosave();
@@ -1607,8 +1610,8 @@ async function saveFunction() {
     const descriptionInput = document.getElementById('functionDescription');
     const blocksContainer = document.getElementById('functionBlocks');
 
-    const name = nameInput.value.trim();
-    const description = descriptionInput.value.trim();
+    const name = nameInput?.value.trim();
+    const description = descriptionInput?.value.trim();
 
     if (!name) {
         logToConsole('Function name is required', 'error');
@@ -1626,7 +1629,7 @@ async function saveFunction() {
 
             if (type === 'loop') {
                 const iterationsInput = blockElement.querySelector('.iterations-input');
-                block.iterations = parseInt(iterationsInput.value) || 1;
+                block.iterations = parseInt(iterationsInput?.value) || 1;
                 block.blocks = [];
 
                 const nestedContainer = blockElement.querySelector('.nested-blocks');
@@ -1757,10 +1760,10 @@ async function saveBlocks(taskId, blocks) {
 function captureVideoFrame() {
     const video = document.getElementById('bgVideo');
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video?.videoWidth || 0;
+    canvas.height = video?.videoHeight || 0;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    ctx?.drawImage(video, 0, 0);
     return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
 }
 
@@ -1859,11 +1862,10 @@ async function executeTask() {
 }
 
 // Add button to UI
-document.getElementById('addFunctionBtn').insertAdjacentHTML('beforebegin', `
-    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>
-`);
+document.getElementById('addFunctionBtn')?.insertAdjacentHTML('beforebegin', `
+    <button class="btn btn-outline-info" id="addConditionalBtn">Add Conditional</button>`);
 
-document.getElementById('addConditionalBtn').addEventListener('click', addConditionalBlock);
+document.getElementById('addConditionalBtn')?.addEventListener('click', addConditionalBlock);
 
 // Add beforeunload event listener
 window.addEventListener('beforeunload', async (e) => {
@@ -1884,7 +1886,7 @@ function showTapFeedback(region) {
     feedback.style.left = `${x}px`;
     feedback.style.top = `${y}px`;
 
-    document.getElementById('simulator').appendChild(feedback);
+    document.getElementById('simulator')?.appendChild(feedback);
     feedback.addEventListener('animationend', () => feedback.remove());
 
     // Return the actual coordinates used for logging
@@ -1991,7 +1993,7 @@ function renderUrlBlock(block, blockDiv, index) {
 
     // Add event handlers
     const editUrlBtn = blockDiv.querySelector('.edit-url-btn');
-    editUrlBtn.addEventListener('click', (e) => {
+    editUrlBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         const url = prompt('Enter URL:', block.url || 'https://www.google.com');
         if (url) {
@@ -2002,7 +2004,7 @@ function renderUrlBlock(block, blockDiv, index) {
     });
 
     const removeBtn = blockDiv.querySelector('.remove-block-btn');
-    removeBtn.addEventListener('click', (e) => {
+    removeBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         removeBlock(blockDiv);
     });
@@ -2050,7 +2052,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGroup = document.querySelector('.btn-group.w-100.mb-3');
     if (btnGroup) {
         btnGroup.appendChild(addUrlBtn);
-        addUrlBtn.addEventListener('click', addUrlBlock);
+        addUrlBtn?.addEventListener('click', addUrlBlock);
     }
 });
 
