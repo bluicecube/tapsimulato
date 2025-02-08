@@ -218,7 +218,7 @@ async function loadTask(taskId) {
         const blocks = await response.json();
         state.currentTask = {
             id: taskId,
-            blocks: blocks
+            blocks: blocks || []
         };
 
         // Save last opened task ID
@@ -226,12 +226,17 @@ async function loadTask(taskId) {
         localStorage.setItem('lastTaskId', taskId);
 
         const taskTitle = document.getElementById('taskTitle');
-        taskTitle.value = state.tasks.find(t => t.id === taskId)?.name || '';
+        const currentTask = state.tasks.find(t => t.id === taskId);
+        if (currentTask) {
+            taskTitle.value = currentTask.name || '';
+        }
+
         updateTaskDisplay();
         updateTaskList();
         logToConsole(`Loaded task ${taskId}`, 'success');
     } catch (error) {
         logToConsole('Error loading task blocks', 'error');
+        console.error('Load task error:', error);
         throw error;
     }
 }
@@ -505,7 +510,7 @@ async function saveCurrentTask() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                blocks: state.currentTask.blocks
+                blocks: state.currentTask.blocks || []
             })
         });
 
@@ -513,6 +518,7 @@ async function saveCurrentTask() {
         logToConsole('Task saved', 'success');
     } catch (error) {
         logToConsole('Failed to save task', 'error');
+        console.error('Save task error:', error);
         throw error;
     }
 }
@@ -914,31 +920,506 @@ function showTapFeedback(region) {
     return { x, y };
 }
 
+// Fix the video sharing configuration
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
     document.getElementById('setVideoSource').addEventListener('click', async () => {
-        try {            if (video.srcObject) {
+        try {
+            if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
             const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
-                    cursor:                    cursor: "always"
+                    cursor: "always"
                 },
                 audio: false
             });
             video.srcObject = stream;
             logToConsole('Screen sharing started', 'success');
         } catch (error) {
-            logToConsole('Screen sharing error: ' + error.message, 'error');
+            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
         }
     });
 }
 
-function logToConsole(message, type= 'info') {
+// Remove duplicated functions and fix syntax
+function logToConsole(message, type = 'info') {
     const console = document.getElementById('liveConsole');
     const messageEl = document.createElement('div');
     messageEl.className = `text-${type}`;
-    messageEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    messageEl.textContent = message;
+    console.appendChild(messageEl);
+    console.scrollTop = console.scrollHeight;
+}
+
+// Fix region selection
+function finishSelection(endX, endY) {
+    const region = {
+        x1: Math.min(selectionStartX, endX),
+        y1: Math.min(selectionStartY, endY),
+        x2: Math.max(selectionStartX, endX),
+        y2: Math.max(selectionStartY, endY)
+    };
+
+    const blockIndex = state.pendingBlockConfiguration.dataset.index;
+    const indices = blockIndex.split('.');
+    let targetBlock;
+    let currentBlocks = state.currentTask.blocks;
+
+    for (let i = 0; i < indices.length; i++) {
+        const index = parseInt(indices[i]);
+        if (i === indices.length - 1) {
+            targetBlock = currentBlocks[index];
+        } else {
+            currentBlocks = currentBlocks[index].blocks;
+        }
+    }
+
+    if (targetBlock) {
+        targetBlock.region = region;
+        state.pendingBlockConfiguration = null;
+
+        // Show selection box for the newly set region
+        showSelectionBox(region);
+        updateTaskDisplay();
+        // Save immediately after region update
+        saveCurrentTask().then(() => {
+            logToConsole('Region updated and saved', 'success');
+        }).catch(error => {
+            logToConsole('Failed to save region', 'error');
+        });
+    }
+}
+
+// Save blocks functionality
+async function saveCurrentTask() {
+    if (!state.currentTask) return;
+
+    try {
+        const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                blocks: state.currentTask.blocks || []
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to save blocks');
+        logToConsole('Task saved', 'success');
+    } catch (error) {
+        logToConsole('Failed to save task', 'error');
+        console.error('Save task error:', error);
+        throw error;
+    }
+}
+
+// Add these utility functions for block interaction
+function setBlockFocus(block, blockDiv) {
+    // Remove focus from other blocks
+    document.querySelectorAll('.block').forEach(el => {
+        if (el !== blockDiv) {
+            el.classList.remove('focused');
+            // Hide selection box if switching focus
+            if (state.focusedBlock && state.focusedBlock.type === 'tap') {
+                const selectionBox = document.getElementById('selectionBox');
+                selectionBox.classList.add('d-none');
+            }
+        }
+    });
+
+    // Add focus to current block
+    blockDiv.classList.add('focused');
+
+    // Update focused block state
+    window.state.focusedBlock = block;
+
+    // Show region if it exists
+    if (block.type === 'tap') {
+        if (block.region) {
+            showSelectionBox(block.region);
+        } else {
+            // If no region is set, hide the selection box
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.classList.add('d-none');
+        }
+    }
+}
+
+// Enhanced render block function with better iteration controls
+function renderBlock(block, index) {
+    const blockDiv = document.createElement('div');
+    blockDiv.className = `block ${block.type}-block`;
+    blockDiv.dataset.index = index;
+
+    if (block.type === 'function') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">${block.name}</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">${block.description || ''}</small>
+            <div class="nested-blocks mt-2"></div>
+            <div class="btn-group mt-2 w-100">
+                <button class="btn btn-sm btn-outline-primary add-tap-to-function-btn">Add Tap</button>
+                <button class="btn btn-sm btn-outline-success add-loop-to-function-btn">Add Loop</button>
+            </div>
+        `;
+
+        // Add event listeners with stopPropagation
+        const addTapBtn = blockDiv.querySelector('.add-tap-to-function-btn');
+        addTapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('tap', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const addLoopBtn = blockDiv.querySelector('.add-loop-to-function-btn');
+        addLoopBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addBlockToFunction('loop', blockDiv);
+            updateTaskDisplay();
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Render nested blocks
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'tap') {
+        const regionText = block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
+            'No region set';
+
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Tap Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <small class="text-muted">Region: ${regionText}</small>
+        `;
+
+        // Make the entire block clickable for region selection
+        blockDiv.addEventListener('click', (e) => {
+            if (!e.target.closest('.btn')) {
+                e.stopPropagation();
+                setBlockFocus(block, blockDiv);
+                enableDrawingMode(block, blockDiv);
+            }
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+    } else if (block.type === 'loop') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Loop Block</h6>
+                <div class="iteration-controls">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary decrease-iterations" type="button">-</button>
+                        <input type="number" class="form-control iterations-input"
+                            value="${block.iterations}" min="1">
+                        <button class="btn btn-outline-secondary increase-iterations" type="button">+</button>
+                    </div>
+                    <span class="ms-2">times</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn ms-2">×</button>
+                </div>
+            </div>
+            <div class="nested-blocks mt-2"></div>
+        `;
+
+        const iterationsInput = blockDiv.querySelector('.iterations-input');
+        const decreaseBtn = blockDiv.querySelector('.decrease-iterations');
+        const increaseBtn = blockDiv.querySelector('.increase-iterations');
+
+        decreaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            if (currentValue > 1) {
+                iterationsInput.value = currentValue - 1;
+                block.iterations = currentValue - 1;
+                scheduleAutosave();
+            }
+        });
+
+        increaseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentValue = parseInt(iterationsInput.value) || 1;
+            iterationsInput.value = currentValue + 1;
+            block.iterations = currentValue + 1;
+            scheduleAutosave();
+        });
+
+        iterationsInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const value = parseInt(e.target.value) || 1;
+            if (value < 1) {
+                e.target.value = 1;
+                block.iterations = 1;
+            } else {
+                block.iterations = value;
+            }
+            scheduleAutosave();
+        });
+
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        const nestedContainer = blockDiv.querySelector('.nested-blocks');
+        if (block.blocks) {
+            block.blocks.forEach((nestedBlock, nestedIndex) => {
+                nestedContainer.appendChild(renderBlock(nestedBlock, `${index}.${nestedIndex}`));
+            });
+        }
+    } else if (block.type === 'conditional') {
+        blockDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Logic Block</h6>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary capture-reference-btn">
+                        ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
+                    </button>
+                    <input type="number" class="form-control form-control-sm threshold-input" 
+                           value="${block.data.threshold}" min="0" max="100" style="width: 70px">
+                    <span class="ms-2 me-2">% similar</span>
+                    <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="nested-blocks then-blocks">
+                    <p class="mb-2">If similar enough:</p>
+                    <div class="btn-group w-100 mb-2">
+                        <button class="btn btn-sm btn-outline-primary add-then-tap-btn">Add Tap</button>
+                        <button class="btn btn-sm btn-outline-success add-then-loop-btn">Add Loop</button>
+                    </div>
+                </div>
+                <div class="nested-blocks else-blocks">
+                    <p class="mb-2">If not similar enough:</p>
+                    <div class="btn-group w-100 mb-2">
+                        <button class="btn btn-sm btn-outline-primary add-else-tap-btn">Add Tap</button>
+                        <button class="btn btn-sm btn-outline-success add-else-loop-btn">Add Loop</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        const captureBtn = blockDiv.querySelector('.capture-reference-btn');
+        captureBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const imageData = captureVideoFrame();
+
+            try {
+                const response = await fetch(`/api/blocks/${block.id}/reference-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                if (!response.ok) throw new Error('Failed to save reference image');
+
+                block.data.referenceImage = imageData;
+                captureBtn.textContent = 'Update Reference';
+                scheduleAutosave();
+                logToConsole('Reference image captured', 'success');
+            } catch (error) {
+                logToConsole('Failed to save reference image', 'error');
+            }
+        });
+
+        // Add threshold change handler
+        const thresholdInput = blockDiv.querySelector('.threshold-input');
+        thresholdInput.addEventListener('change', (e) => {
+            block.data.threshold = parseInt(e.target.value) || 90;
+            scheduleAutosave();
+        });
+
+        // Add delete handler
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
+
+        // Add buttons for then/else blocks
+        ['then', 'else'].forEach(section => {
+            blockDiv.querySelector(`.add-${section}-tap-btn`).addEventListener('click', () => {
+                addTapBlock(index, `${section}Blocks`);
+            });
+
+            blockDiv.querySelector(`.add-${section}-loop-btn`).addEventListener('click', () => {
+                addLoopBlock(index, `${section}Blocks`);
+            });
+        });
+
+        // Render nested blocks
+        if (block.data.thenBlocks) {
+            const thenContainer = blockDiv.querySelector('.then-blocks');
+            block.data.thenBlocks.forEach((nestedBlock, nestedIndex) => {
+                thenContainer.appendChild(renderBlock(nestedBlock, `${index}.then.${nestedIndex}`));
+            });
+        }
+
+        if (block.data.elseBlocks) {
+            const elseContainer = blockDiv.querySelector('.else-blocks');
+            block.data.elseBlocks.forEach((nestedBlock, nestedIndex) => {
+                elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
+            });
+        }
+    }
+
+    return blockDiv;
+}
+
+function enableDrawingMode(block, blockDiv) {
+    // If it's a tap block, start region selection immediately
+    if (block.type === 'tap') {
+        startTapRegionSelection(blockDiv);
+        if (block.region) {
+            showSelectionBox(block.region);
+        }
+    }
+}
+
+// Make the simulator's functions available to chatbot.js
+window.setBlockFocus = setBlockFocus;
+window.showSelectionBox = showSelectionBox;
+window.enableDrawingMode = enableDrawingMode;
+
+// Task Execution
+async function executeTask() {
+    if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
+        logToConsole('No blocks to execute', 'error');
+        return;
+    }
+
+    logToConsole('Starting task execution', 'info');
+    let delay = 0;
+    const delayIncrement = 800;
+
+    async function executeBlocks(blocks) {
+        for (const block of blocks) {
+            if (block.type === 'function') {
+                // Find the function definition
+                const func = functions.find(f => f.name === block.name);
+                if (func && func.blocks) {
+                    // Execute the function's blocks
+                    await executeBlocks(func.blocks);
+                } else {
+                    logToConsole(`Function "${block.name}" not found`, 'error');
+                }
+            } else if (block.type === 'loop') {
+                for (let i = 0; i < block.iterations; i++) {
+                    await executeBlocks(block.blocks);
+                }
+            } else if (block.type === 'tap' && block.region) {
+                delay += delayIncrement;
+                setTimeout(() => {
+                    const coords = showTapFeedback(block.region);
+                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                }, delay);
+            } else if (block.type === 'conditional') {
+                const currentImage = captureVideoFrame();
+                try {
+                    const response = await fetch(`/api/blocks/${block.id}/compare-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: currentImage })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to compare images');
+
+                    const result = await response.json();
+                    const blocksToExecute = result.similarity >= result.threshold ?
+                        block.data.thenBlocks : block.data.elseBlocks;
+
+                    logToConsole(`Image similarity: ${result.similarity.toFixed(1)}% (threshold: ${result.threshold}%)`, 'info');
+                    await executeBlocks(blocksToExecute);
+                } catch (error) {
+                    logToConsole('Error executing conditional block: ' + error.message, 'error');
+                }
+            }
+        }
+    }
+
+    await executeBlocks(state.currentTask.blocks);
+    setTimeout(() => {
+        logToConsole('Task execution completed', 'success');
+    }, delay + delayIncrement);
+}
+
+// Utilities
+function showTapFeedback(region) {
+    // Calculate random coordinates within the region
+    const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
+    const y = Math.floor(Math.random() * (region.y2 - region.y1)) + region.y1;
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    document.getElementById('simulator').appendChild(feedback);
+    feedback.addEventListener('animationend', () => feedback.remove());
+
+    // Return the actual coordinates used for logging
+    return { x, y };
+}
+
+// Fix the video sharing configuration
+function setupVideoSharing() {
+    const video = document.getElementById('bgVideo');
+    document.getElementById('setVideoSource').addEventListener('click', async () => {
+        try {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            video.srcObject = stream;
+            logToConsole('Screen sharing started', 'success');
+        } catch (error) {
+            logToConsole('Failed to start screen sharing: ' + error.message, 'error');
+        }
+    });
+}
+
+function logToConsole(message, type = 'info') {
+    const console = document.getElementById('liveConsole');
+    const messageEl = document.createElement('div');
+    messageEl.className = `text-${type}`;
+    messageEl.textContent = message;
     console.appendChild(messageEl);
     console.scrollTop = console.scrollHeight;
 }
@@ -962,7 +1443,8 @@ function scheduleAutosave() {
 
 async function deleteTask(taskId) {
     if (!taskId) {
-        logToConsole('No task selected to delete', 'error');        return;
+        logToConsole('No task selected to delete', 'error');
+        return;
     }
 
     try {
@@ -1035,8 +1517,8 @@ function updateFunctionsList() {
 
 // Added functions from edited snippet
 function addBlockToFunction(type, parentElement = null) {
-    const container = parentElement ? 
-        parentElement.querySelector('.nested-blocks') : 
+    const container = parentElement ?
+        parentElement.querySelector('.nested-blocks') :
         document.getElementById('functionBlocks');
 
     if (!container) {
@@ -1097,7 +1579,7 @@ function addBlockToFunction(type, parentElement = null) {
 
         decreaseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const currentValue= parseInt(iterationsInput.value) || 1;
+            const currentValue = parseInt(iterationsInput.value) || 1;
             if (currentValue > 1) {
                 iterationsInput.value = currentValue - 1;
                 block.iterations = currentValue - 1;
@@ -1351,7 +1833,7 @@ async function executeTask() {
                     // Execute the function's blocks
                     await executeBlocks(func.blocks);
                 } else {
-                    logToConsole(`Function "${block.name}" not found`, 'error');
+                    logToConsole(`Function "${block`.name}" not found`, 'error');
                 }
             } else if (block.type === 'loop') {
                 for (let i = 0; i < block.iterations; i++) {
