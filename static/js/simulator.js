@@ -855,8 +855,8 @@ function renderTapBlock(block, blockDiv, index) {
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted region-text">Region: ${block.region ? 
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` : 
+        <small class="text-muted region-text">Region: ${block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set'}</small>
     `;
 
@@ -922,7 +922,7 @@ async function executeTask() {
         for (const block of blocks) {
             if (block.type === 'function') {
                 // Find the function definition
-                const func = functions.find(f => f.name === block.name);
+                const func = window.functions.find(f => f.name === block.name);
                 if (func && func.blocks) {
                     // Execute the function's blocks
                     await executeBlocks(func.blocks);
@@ -933,11 +933,11 @@ async function executeTask() {
                 for (let i = 0; i < block.iterations; i++) {
                     await executeBlocks(block.blocks);
                 }
-            } else if (block.type === 'tap'` && block.region) {
+            } else if (block.type === 'tap' && block.region) {
                 delay += delayIncrement;
                 setTimeout(() => {
                     const coords = showTapFeedback(block.region);
-                    logToConsole(`Executed tap at coordinates (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
+                    logToConsole(`Executed tap at (${Math.round(coords.x)}, ${Math.round(coords.y)})`, 'info');
                 }, delay);
             } else if (block.type === 'conditional') {
                 const currentImage = captureVideoFrame();
@@ -963,10 +963,14 @@ async function executeTask() {
         }
     }
 
-    await executeBlocks(state.currentTask.blocks);
-    setTimeout(() => {
-        logToConsole('Task execution completed', 'success');
-    }, delay + delayIncrement);
+    try {
+        await executeBlocks(state.currentTask.blocks);
+        setTimeout(() => {
+            logToConsole('Task execution completed', 'success');
+        }, delay + delayIncrement);
+    } catch (error) {
+        logToConsole('Error executing task: ' + error.message, 'error');
+    }
 }
 
 // Utilities
@@ -1087,23 +1091,10 @@ function showSelectionBox(region) {
     selectionBox.classList.remove('d-none');
 }
 
-// Add these new functions for function management
-async function loadFunctions() {
-    try {
-        const response = await fetch('/api/functions');
-        if (!response.ok) throw new Error('Failed to load functions');
-
-        functions = await response.json();
-        updateFunctionsList();
-    } catch (error) {
-        logToConsole('Error loading functions', 'error');
-    }
-}
-
+// Update the loadFunctions and updateFunctionsList functions
 function updateFunctionsList() {
     console.log('Updating functions list');
     const functionsList = document.getElementById('functionsList');
-    const addFunctionBtn = document.getElementById('addFunctionBtn');
 
     if (!functionsList) {
         console.error('Functions list element not found');
@@ -1118,59 +1109,58 @@ function updateFunctionsList() {
     // Add delete all functions option if there are functions
     if (window.functions && window.functions.length > 0) {
         console.log(`Found ${window.functions.length} functions`);
-        const deleteAllItem = document.createElement('li');
-        deleteAllItem.innerHTML = `
-            <button class="dropdown-item text-danger" type="button">
-                <i class="fas fa-trash-alt"></i> Delete All Functions
-            </button>
+        // Add delete all option
+        functionsList.innerHTML = `
+            <li>
+                <button class="dropdown-item text-danger" onclick="deleteAllFunctions()">
+                    Delete All Functions
+                </button>
+            </li>
+            <li><hr class="dropdown-divider"></li>
         `;
-        deleteAllItem.addEventListener('click', deleteAllFunctions);
-        functionsList.appendChild(deleteAllItem);
 
-        // Add divider
-        const divider = document.createElement('li');
-        divider.innerHTML = '<hr class="dropdown-divider">';
-        functionsList.appendChild(divider);
-
-        // Add function items
+        // Add individual functions
         window.functions.forEach(func => {
             console.log('Adding function to menu:', func.name);
-            const item = document.createElement('li');
-            item.className = 'd-flex justify-content-between align-items-center px-2';
-            item.innerHTML = `
-                <button class="dropdown-item function-item" data-function-id="${func.id}" type="button">
-                    ${func.name}
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-function-btn ms-2" 
-                        data-function-id="${func.id}" title="Delete function">×</button>
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="dropdown-item d-flex justify-content-between align-items-center">
+                    <span class="function-name" onclick="addFunctionBlock(${func.id})">${func.name}</span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFunction(${func.id})" title="Delete function">×</button>
+                </div>
             `;
-
-            // Add function to task
-            const functionBtn = item.querySelector('.function-item');
-            functionBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!state.currentTask) {
-                    logToConsole('Please create or select a task first', 'error');
-                    return;
-                }
-                addFunctionToTask(func);
-            });
-
-            // Delete function
-            const deleteBtn = item.querySelector('.delete-function-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteFunction(func.id);
-            });
-
-            functionsList.appendChild(item);
+            functionsList.appendChild(li);
         });
     } else {
         console.log('No functions available');
-        const emptyItem = document.createElement('li');
-        emptyItem.innerHTML = '<span class="dropdown-item disabled">No functions available</span>';
-        functionsList.appendChild(emptyItem);
+        functionsList.innerHTML = '<li><span class="dropdown-item disabled">No functions available</span></li>';
     }
+}
+
+// Update the addFunctionBlock function
+function addFunctionBlock(functionId) {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const func = window.functions.find(f => f.id === functionId);
+    if (!func) {
+        logToConsole('Function not found', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'function',
+        name: func.name,
+        description: func.description || '',
+        blocks: func.blocks || []
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole(`Added function: ${func.name}`, 'success');
 }
 
 async function deleteFunction(functionId) {
@@ -1209,7 +1199,6 @@ async function deleteAllFunctions() {
     }
 }
 
-// Previous code remains unchanged
 
 function addBlockToFunction(type, parentElement = null) {
     const container = parentElement ?
@@ -1401,23 +1390,12 @@ async function saveFunction() {
     }
 }
 
-async function addFunctionBlock(functionId) {
-    const func = functions.find(f => f.id === functionId);
-    if (!func) {
-        logToConsole('Function not found', 'error');
-        return;
-    }
-
-    if (!state.currentTask) {
-        logToConsole('Please create or select a task first', 'error');
-        return;
-    }
-
+async function addFunctionToTask(func) {
     const block = {
         type: 'function',
         name: func.name,
         description: func.description || '',
-        blocks: func.blocks // Store the function's blocks for reference
+        blocks: func.blocks
     };
 
     state.currentTask.blocks.push(block);
@@ -1625,7 +1603,6 @@ function handleIterationsChange(block, value, iterationsInput) {
     });
 }
 
-// Add addFunctionToTask function
 async function addFunctionToTask(func) {
     const block = {
         type: 'function',

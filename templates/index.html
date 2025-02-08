@@ -46,12 +46,14 @@
                             <button class="btn btn-outline-primary" id="addTapBtn">Add Tap</button>
                             <button class="btn btn-outline-success" id="addLoopBtn">Add Loop</button>
                             <button class="btn btn-outline-info" id="addConditionalBtn">Add Logic</button>
-                            <button class="btn btn-outline-light dropdown-toggle" id="addFunctionBtn" data-bs-toggle="dropdown">
-                                Add Function
-                            </button>
-                            <ul class="dropdown-menu" id="functionsList">
-                                <!-- Functions will be populated here -->
-                            </ul>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-light dropdown-toggle" type="button" id="addFunctionBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Functions
+                                </button>
+                                <ul class="dropdown-menu" id="functionsList" aria-labelledby="addFunctionBtn">
+                                    <!-- Functions will be populated here -->
+                                </ul>
+                            </div>
                         </div>
 
                         <!-- Function Creation Modal Button -->
