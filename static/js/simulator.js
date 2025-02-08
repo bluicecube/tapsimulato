@@ -129,6 +129,8 @@ window.processBlocks = function(blocks) {
                 addLoopBlock(block.iterations, block.blocks);
             } else if (block.type === 'tap') {
                 addTapBlock(null, block.region);
+            } else if (block.type === 'url') {
+                addUrlBlock(block.url);
             }
         });
         updateTaskDisplay();
@@ -234,15 +236,53 @@ async function loadTask(taskId) {
         if (!response.ok) throw new Error('Failed to load task blocks');
 
         const blocks = await response.json();
+
+        function deserializeBlock(block) {
+            const deserializedBlock = {
+                ...block,
+                type: block.type
+            };
+
+            // Restore type-specific data
+            switch (block.type) {
+                case 'tap':
+                    if (block.data && block.data.region) {
+                        deserializedBlock.region = block.data.region;
+                    }
+                    break;
+                case 'loop':
+                    deserializedBlock.iterations = block.data?.iterations || 1;
+                    if (block.blocks && block.blocks.length > 0) {
+                        deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+                    }
+                    break;
+                case 'function':
+                    deserializedBlock.functionId = block.data?.functionId;
+                    deserializedBlock.description = block.data?.description;
+                    if (block.blocks && block.blocks.length > 0) {
+                        deserializedBlock.blocks = block.blocks.map(deserializeBlock);
+                    }
+                    break;
+                case 'conditional':
+                    if (block.data) {
+                        deserializedBlock.data = {
+                            ...block.data,
+                            thenBlocks: (block.data.thenBlocks || []).map(deserializeBlock),
+                            elseBlocks: (block.data.elseBlocks || []).map(deserializeBlock)
+                        };
+                    }
+                    break;
+                case 'url':
+                    deserializedBlock.url = block.data?.url;
+                    break;
+            }
+
+            return deserializedBlock;
+        }
+
         state.currentTask = {
             id: taskId,
-            blocks: blocks.map(block => {
-                // Ensure all block data is properly loaded
-                if (block.type === 'tap' && block.data && block.data.region) {
-                    block.region = block.data.region;
-                }
-                return block;
-            }) || []
+            blocks: blocks.map(deserializeBlock) || []
         };
 
         // Save last opened task ID
@@ -523,14 +563,52 @@ async function saveCurrentTask() {
     if (!state.currentTask) return;
 
     try {
-        const blocks = state.currentTask.blocks.map(block => {
-            const blockData = { ...block };
-            // Ensure region data is saved in the block's data field
-            if (block.type === 'tap' && block.region) {
-                blockData.data = { ...blockData.data, region: block.region };
+        function serializeBlock(block) {
+            const serializedBlock = {
+                type: block.type,
+                name: block.name || null,
+                data: { ...block.data } || {},
+                order: block.order || 0
+            };
+
+            // Save type-specific data
+            switch (block.type) {
+                case 'tap':
+                    if (block.region) {
+                        serializedBlock.data.region = block.region;
+                    }
+                    break;
+                case 'loop':
+                    serializedBlock.data.iterations = block.iterations || 1;
+                    if (block.blocks && block.blocks.length > 0) {
+                        serializedBlock.blocks = block.blocks.map(serializeBlock);
+                    }
+                    break;
+                case 'function':
+                    serializedBlock.data.functionId = block.functionId;
+                    serializedBlock.data.description = block.description;
+                    if (block.blocks && block.blocks.length > 0) {
+                        serializedBlock.blocks = block.blocks.map(serializeBlock);
+                    }
+                    break;
+                case 'conditional':
+                    if (block.data) {
+                        serializedBlock.data = {
+                            ...block.data,
+                            thenBlocks: (block.data.thenBlocks || []).map(serializeBlock),
+                            elseBlocks: (block.data.elseBlocks || []).map(serializeBlock)
+                        };
+                    }
+                    break;
+                case 'url':
+                    serializedBlock.data.url = block.url;
+                    break;
             }
-            return blockData;
-        });
+
+            return serializedBlock;
+        }
+
+        const blocks = state.currentTask.blocks.map(serializeBlock);
 
         const response = await fetch(`/api/tasks/${state.currentTask.id}/blocks`, {
             method: 'POST',
@@ -807,6 +885,8 @@ function renderBlock(block, index) {
                 elseContainer.appendChild(renderBlock(nestedBlock, `${index}.else.${nestedIndex}`));
             });
         }
+    } else if (block.type === 'url') {
+        return renderUrlBlock(block, blockDiv, index);
     }
 
     return blockDiv;
@@ -829,8 +909,8 @@ function renderTapBlock(block, blockDiv, index) {
                 <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
             </div>
         </div>
-        <small class="text-muted region-text">Region: ${block.region ? 
-            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` : 
+        <small class="text-muted region-text">Region: ${block.region ?
+            `(${Math.round(block.region.x1)},${Math.round(block.region.y1)}) to (${Math.round(block.region.x2)},${Math.round(block.region.y2)})` :
             'No region set'}</small>
     `;
 
@@ -924,7 +1004,7 @@ async function executeTask() {
 
                     if (!response.ok) throw new Error('Failed to compare images');
 
-                                        const result = await response.json();
+                    const result = await response.json();
                     const blocksToExecute = result.similarity >= result.threshold ?
                         block.data.thenBlocks : block.data.elseBlocks;
 
@@ -933,6 +1013,8 @@ async function executeTask() {
                 } catch (error) {
                     logToConsole('Error executing conditional block: ' + error.message, 'error');
                 }
+            } else if (block.type === 'url') {
+                await executeUrlBlock(block);
             }
         }
     }
@@ -1150,8 +1232,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFunctions();
 });
 
-// Previous code remains unchanged
-
 function addBlockToFunction(type, parentElement = null) {
     const container = parentElement ?
         parentElement.querySelector('.nested-blocks') :
@@ -1358,7 +1438,8 @@ async function addFunctionBlock(functionId) {
         type: 'function',
         name: func.name,
         description: func.description || '',
-        blocks: func.blocks // Store the function's blocks for reference
+        blocks: func.blocks, // Store the function's blocks for reference
+        functionId: func.id
     };
 
     state.currentTask.blocks.push(block);
@@ -1367,7 +1448,6 @@ async function addFunctionBlock(functionId) {
     logToConsole(`Added function: ${func.name}`, 'success');
 }
 
-// Update the block data collection in saveBlocks
 function collectBlockData(block) {
     const data = {
         type: block.type,
@@ -1383,6 +1463,7 @@ function collectBlockData(block) {
         }
     } else if (block.type === 'function') {
         data.description = block.description;
+        data.functionId = block.functionId;
         if (block.blocks) {
             data.blocks = block.blocks.map(b => collectBlockData(b));
         }
@@ -1393,12 +1474,13 @@ function collectBlockData(block) {
             thenBlocks: block.data.thenBlocks.map(b => collectBlockData(b)),
             elseBlocks: block.data.elseBlocks.map(b => collectBlockData(b))
         };
+    } else if (block.type === 'url') {
+        data.url = block.url;
     }
 
     return data;
 }
 
-// Update save_blocks endpoint handling
 async function saveBlocks(taskId, blocks) {
     try {
         const processedBlocks = blocks.map(block => collectBlockData(block));
@@ -1418,7 +1500,6 @@ async function saveBlocks(taskId, blocks) {
     }
 }
 
-// Add new function to capture video frame
 function captureVideoFrame() {
     const video = document.getElementById('bgVideo');
     const canvas = document.createElement('canvas');
@@ -1429,7 +1510,6 @@ function captureVideoFrame() {
     return canvas.toDataURL('image/jpeg').split(',')[1]; // Return base64 data
 }
 
-// Add new function to add conditional block
 function addConditionalBlock() {
     if (!state.currentTask) {
         logToConsole('Please create or select a task first', 'error');
@@ -1453,7 +1533,6 @@ function addConditionalBlock() {
     logToConsole('Conditional block added', 'success');
 }
 
-// Update executeTask to handle conditional blocks
 async function executeTask() {
     if (!state.currentTask || !state.currentTask.blocks || !state.currentTask.blocks.length) {
         logToConsole('No blocks to execute', 'error');
@@ -1505,6 +1584,8 @@ async function executeTask() {
                 } catch (error) {
                     logToConsole('Error executing conditional block: ' + error.message, 'error');
                 }
+            } else if (block.type === 'url') {
+                await executeUrlBlock(block);
             }
         }
     }
@@ -1531,7 +1612,6 @@ window.addEventListener('beforeunload', async (e) => {
     }
 });
 
-// Update tap execution to use random coordinates
 function showTapFeedback(region) {
     // Calculate random coordinates within the region
     const x = Math.floor(Math.random() * (region.x2 - region.x1)) + region.x1;
@@ -1549,7 +1629,6 @@ function showTapFeedback(region) {
     return { x, y };
 }
 
-// Update iterations change handler to save immediately
 function handleIterationsChange(block, value, iterationsInput) {
     if (value < 1) {
         iterationsInput.value = 1;
@@ -1566,13 +1645,13 @@ function handleIterationsChange(block, value, iterationsInput) {
     });
 }
 
-// Add addFunctionToTask function
 async function addFunctionToTask(func) {
     const block = {
         type: 'function',
         name: func.name,
         description: func.description || '',
-        blocks: func.blocks
+        blocks: func.blocks,
+        functionId: func.id
     };
 
     state.currentTask.blocks.push(block);
@@ -1616,3 +1695,122 @@ async function deleteAllFunctions() {
         logToConsole('Error deleting all functions', 'error');
     }
 }
+
+// Add URL opening functionality at the end of the file
+function openUrlBlock(url) {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'url',
+        url: url || 'https://www.google.com',
+        description: 'Open URL'
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('URL block added', 'success');
+}
+
+function renderUrlBlock(block, blockDiv, index) {
+    blockDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">URL Block</h6>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary edit-url-btn">Edit URL</button>
+                <button class="btn btn-sm btn-outline-danger remove-block-btn">×</button>
+            </div>
+        </div>
+        <small class="text-muted url-text">${block.url || 'No URL set'}</small>
+    `;
+
+    // Add event handlers
+    const editUrlBtn = blockDiv.querySelector('.edit-url-btn');
+    editUrlBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = prompt('Enter URL:', block.url || 'https://www.google.com');
+        if (url) {
+            block.url = url;
+            blockDiv.querySelector('.url-text').textContent = url;
+            scheduleAutosave();
+        }
+    });
+
+    const removeBtn = blockDiv.querySelector('.remove-block-btn');
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeBlock(blockDiv);
+    });
+
+    return blockDiv;
+}
+
+async function executeUrlBlock(block) {
+    if (!block.url) {
+        logToConsole('No URL specified for URL block', 'error');
+        return;
+    }
+
+    try {
+        window.open(block.url, '_blank');
+        logToConsole(`Opened URL: ${block.url}`, 'success');
+    } catch (error) {
+        logToConsole(`Failed to open URL: ${error.message}`, 'error');
+    }
+}
+
+function addUrlBlock() {
+    if (!state.currentTask) {
+        logToConsole('Please create or select a task first', 'error');
+        return;
+    }
+
+    const block = {
+        type: 'url',
+        url: 'https://www.google.com'  // Default URL
+    };
+
+    state.currentTask.blocks.push(block);
+    updateTaskDisplay();
+    scheduleAutosave();
+    logToConsole('URL block added', 'success');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const addUrlBtn = document.createElement('button');
+    addUrlBtn.className = 'btn btn-outline-secondary';
+    addUrlBtn.textContent = 'Add URL';
+    addUrlBtn.id = 'addUrlBtn';
+
+    // Find the button group and add the new button
+    const btnGroup = document.querySelector('.btn-group.w-100.mb-3');
+    if (btnGroup) {
+        btnGroup.appendChild(addUrlBtn);
+        addUrlBtn.addEventListener('click', addUrlBlock);
+    }
+});
+
+const originalRenderBlock = renderBlock;
+renderBlock = function(block, index) {
+    if (block.type === 'url') {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `block url-block`;
+        blockDiv.dataset.index = index;
+        return renderUrlBlock(block, blockDiv, index);
+    }
+    return originalRenderBlock(block, index);
+};
+
+const originalExecuteBlocks = executeBlocks;
+executeBlocks = async function(blocks) {
+    for (const block of blocks) {
+        if (block.type === 'url') {
+            await executeUrlBlock(block);
+        } else {
+            await originalExecuteBlocks([block]); // Execute single block using original function
+        }
+    }
+};
