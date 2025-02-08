@@ -65,7 +65,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Selection events
     simulator.addEventListener('mousedown', startSelection);
     simulator.addEventListener('mousemove', updateSelection);
-    simulator.addEventListener('mouseup', stopSelection);
+
+    // Listen for mouseup on document to catch out-of-bounds releases
+    document.addEventListener('mouseup', (event) => {
+        if (isSelecting) {
+            const rect = simulator.getBoundingClientRect();
+            const simulatorX = event.clientX - rect.left;
+            const simulatorY = event.clientY - rect.top;
+
+            // Clamp coordinates to simulator bounds
+            const endX = Math.max(0, Math.min(rect.width, simulatorX));
+            const endY = Math.max(0, Math.min(rect.height, simulatorY));
+
+            finishSelection(endX, endY);
+            isSelecting = false;
+        }
+    });
+
+    // Continue selection when mouse re-enters simulator
+    simulator.addEventListener('mouseenter', (event) => {
+        if (isSelecting) {
+            updateSelection(event);
+        }
+    });
 
     // Remove the mouseleave handler that was forcing selection completion
     simulator.removeEventListener('mouseleave', () => {});
@@ -408,8 +430,7 @@ function removeBlock(blockElement) {
     });
 }
 
-
-// Selection Handling (Updated from edited snippet)
+// Selection Handling
 let isSelecting = false;
 let selectionStartX = 0;
 let selectionStartY = 0;
@@ -433,9 +454,12 @@ function startSelection(event) {
 function updateSelection(event) {
     if (!isSelecting) return;
 
-    const rect = event.target.getBoundingClientRect();
-    let currentX = event.clientX - rect.left;
-    let currentY = event.clientY - rect.top;
+    const simulator = document.getElementById('simulator');
+    const rect = simulator.getBoundingClientRect();
+
+    // Calculate position relative to simulator, clamped to simulator bounds
+    let currentX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    let currentY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
 
     const width = currentX - selectionStartX;
     const height = currentY - selectionStartY;
@@ -450,13 +474,12 @@ function updateSelection(event) {
 function stopSelection(event) {
     if (!isSelecting) return;
 
-    const rect = event.target.getBoundingClientRect();
-    let endX = event.clientX - rect.left;
-    let endY = event.clientY - rect.top;
+    const simulator = document.getElementById('simulator');
+    const rect = simulator.getBoundingClientRect();
 
-    // Clamp final coordinates to simulator bounds
-    endX = Math.min(Math.max(endX, 0), rect.width);
-    endY = Math.min(Math.max(endY, 0), rect.height);
+    // Get final coordinates, clamped to simulator bounds
+    let endX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    let endY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
 
     finishSelection(endX, endY);
     isSelecting = false;
