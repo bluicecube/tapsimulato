@@ -716,7 +716,7 @@ function renderBlock(block, index) {
     } else if (block.type === 'conditional') {
         blockDiv.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Conditional Block</h6>
+                <h6 class="mb-0">Logic Block</h6>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-primary capture-reference-btn">
                         ${block.data.referenceImage ? 'Update Reference' : 'Capture Reference'}
@@ -775,6 +775,15 @@ function renderBlock(block, index) {
             block.data.threshold = parseInt(e.target.value) || 90;
             scheduleAutosave();
         });
+
+        // Add delete handler
+        const removeBtn = blockDiv.querySelector('.remove-block-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBlock(blockDiv);
+            });
+        }
 
         // Add buttons for then/else blocks
         ['then', 'else'].forEach(section => {
