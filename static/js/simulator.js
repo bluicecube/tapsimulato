@@ -66,14 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
     simulator.addEventListener('mousedown', startSelection);
     simulator.addEventListener('mousemove', updateSelection);
     simulator.addEventListener('mouseup', stopSelection);
-    simulator.addEventListener('mouseleave', () => {
-        if (isSelecting) {
-            const rect = simulator.getBoundingClientRect();
-            const lastKnownX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-            const lastKnownY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-            finishSelection(lastKnownX, lastKnownY);
-        }
-    });
+
+    // Remove the mouseleave handler that was forcing selection completion
+    simulator.removeEventListener('mouseleave', () => {});
+
 
     // Setup video sharing
     setupVideoSharing();
@@ -406,6 +402,10 @@ function removeBlock(blockElement) {
 
 
 // Selection Handling (Updated from edited snippet)
+let isSelecting = false;
+let selectionStartX = 0;
+let selectionStartY = 0;
+
 function startSelection(event) {
     if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
 
@@ -487,8 +487,12 @@ function finishSelection(endX, endY) {
         // Show selection box for the newly set region
         showSelectionBox(region);
         updateTaskDisplay();
-        scheduleAutosave();
-        logToConsole('Region updated', 'success');
+        // Save immediately after region update
+        saveCurrentTask().then(() => {
+            logToConsole('Region updated and saved', 'success');
+        }).catch(error => {
+            logToConsole('Failed to save region', 'error');
+        });
     }
 }
 
