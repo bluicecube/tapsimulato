@@ -433,6 +433,7 @@ input[type="number"].iterations-input::-webkit-outer-spin-button {
     align-items: center;
     gap: 0.5rem;
     margin-right: 1rem;
+    margin-left: auto; /* Push to the right */
 }
 
 .function-overlay-control label {
