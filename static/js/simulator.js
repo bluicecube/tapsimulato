@@ -1248,20 +1248,21 @@ function finishSelection(endX, endY) {
 // Save blocks functionality
 
 // Enhanced scheduleAutosave to provide immediate feedback
-function scheduleAutosave() {
+async function scheduleAutosave() {
     if (state.autoSaveTimeout) {
         clearTimeout(state.autoSaveTimeout);
     }
 
-    state.autoSaveTimeout = setTimeout(async () => {
-        if (state.currentTask) {
-            try {
-                await saveCurrentTask();
-            } catch (error) {
-                console.error('Autosave failed:', error);
-            }
+    // Save immediately instead of scheduling
+    if (state.currentTask) {
+        try {
+            await saveCurrentTask();
+            logToConsole('Changes saved', 'success');
+        } catch (error) {
+            console.error('Autosave failed:', error);
+            logToConsole('Failed to save changes', 'error');
         }
-    }, 1000); // Reduced timeout for more responsive saving
+    }
 }
 
 // Add these utility functions for block interaction
@@ -2418,6 +2419,7 @@ async function updateTaskName(newName) {
         if (taskIndex !== -1) {
             state.tasks[taskIndex] = updatedTask;
             updateTaskList();
+            await scheduleAutosave(); // Save blocks after name update
         }
 
         logToConsole('Task name updated', 'success');
