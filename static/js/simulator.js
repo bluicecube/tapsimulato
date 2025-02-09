@@ -844,6 +844,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             finishSelection(endX, endY);
             isSelecting = false;
+
+            // Clear any ongoing selection visual
+            const selectionBox = document.getElementById('selectionBox');
+            if (selectionBox) {
+                selectionBox.style.width = '0';
+                selectionBox.style.height = '0';
+            }
         }
     });
 
@@ -1159,7 +1166,7 @@ function startSelection(event) {
 
     const simulator = document.getElementById('simulator');
     const rect = simulator.getBoundingClientRect();
-    
+
     isSelecting = true;
     selectionStartX = event.clientX - rect.left;
     selectionStartY = event.clientY - rect.top;
@@ -1235,6 +1242,7 @@ function finishSelection(endX, endY) {
             logToConsole('Failed to save region', 'error');
         });
     }
+    isSelecting = false; //Added to stop selection
 }
 
 // Save blocks functionality
@@ -1850,7 +1858,7 @@ function updateTaskList() {
 
 // Save current task function
 async function saveCurrentTask() {
-    if (!state.currentTask) return;
+    if(!state.currentTask) return;
 
     try {
         const blocks = state.currentTask.blocks.map(serializeBlock);
