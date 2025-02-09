@@ -951,35 +951,31 @@ async function loadTasks() {
         if (!response.ok) throw new Error('Failed to load tasks');
 
         state.tasks = await response.json();
-        updateTaskList();
-
-        if (state.tasks.length > 0) {
-            let taskToLoad;
-
-            // Try to load last viewed task from localStorage
-            const lastTaskId = localStorage.getItem('lastTaskId');
-            if (lastTaskId) {
-                taskToLoad = state.tasks.find(t => t.id === parseInt(lastTaskId));
-            }
-
-            // If no last task or it doesn't exist, load most recent task
-            if (!taskToLoad) {
-                taskToLoad = state.tasks[state.tasks.length - 1];
-            }
-
-            await loadTask(taskToLoad.id);
-        } else {
-            // Create a new task if none exist
+        
+        if (state.tasks.length === 0) {
             await createNewTask();
+            return;
         }
+
+        updateTaskList();
+        let taskToLoad;
+
+        // Try to load last viewed task from localStorage
+        const lastTaskId = localStorage.getItem('lastTaskId');
+        if (lastTaskId) {
+            taskToLoad = state.tasks.find(t => t.id === parseInt(lastTaskId));
+        }
+
+        // If no last task or it doesn't exist, load most recent task
+        if (!taskToLoad) {
+            taskToLoad = state.tasks[state.tasks.length - 1];
+        }
+
+        await loadTask(taskToLoad.id);
     } catch (error) {
         console.error('Error loading tasks:', error);
         logToConsole('Error loading tasks', 'error');
-
-        // Create a new task as fallback
-        if (!state.currentTask) {
-            await createNewTask();
-        }
+        await createNewTask();
     }
 }
 
