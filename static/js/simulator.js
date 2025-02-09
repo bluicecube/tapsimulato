@@ -17,14 +17,19 @@ window.state = {
 };
 
 // Document ready handler
-document.addEventListener('DOMContentLoaded', () => {
-    setupEventListeners();
-    loadFunctions();
-    loadTasks();
-    // Initialize video element
-    const video = document.getElementById('bgVideo');
-    if (video) {
-        video.style.display = 'none';
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await loadTasks();
+        setupEventListeners();
+        loadFunctions();
+        // Initialize video element
+        const video = document.getElementById('bgVideo');
+        if (video) {
+            video.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        logToConsole('Failed to initialize application', 'error');
     }
 });
 
@@ -952,9 +957,10 @@ async function loadTasks() {
 
         state.tasks = await response.json();
         
-        if (state.tasks.length === 0) {
-            await createNewTask();
-            return;
+        // Always create a new task if no tasks exist
+        if (!state.tasks || state.tasks.length === 0) {
+            const newTask = await createNewTask();
+            state.tasks = [newTask];
         }
 
         updateTaskList();
@@ -971,11 +977,26 @@ async function loadTasks() {
             taskToLoad = state.tasks[state.tasks.length - 1];
         }
 
-        await loadTask(taskToLoad.id);
+        if (taskToLoad) {
+            await loadTask(taskToLoad.id);
+        } else {
+            logToConsole('No task available to load', 'error');
+            const newTask = await createNewTask();
+            await loadTask(newTask.id);
+        }
     } catch (error) {
         console.error('Error loading tasks:', error);
         logToConsole('Error loading tasks', 'error');
-        await createNewTask();
+        // Attempt to create a new task as fallback
+        try {
+            const newTask = await createNewTask();
+            state.tasks = [newTask];
+            await loadTask(newTask.id);
+            updateTaskList();
+        } catch (createError) {
+            logToConsole('Failed to create new task', 'error');
+            console.error('Create task error:', createError);
+        }
     }
 }
 
