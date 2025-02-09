@@ -727,8 +727,7 @@ async function loadTask(taskId) {
             blocks: blocks.map(deserializeBlock)
         };
 
-        // Save last opened task ID
-        state.lastTaskId = taskId;
+        // Save last viewed task ID
         localStorage.setItem('lastTaskId', taskId);
 
         const taskTitle = document.getElementById('taskTitle');
@@ -957,20 +956,22 @@ async function loadTasks() {
         if (state.tasks.length > 0) {
             let taskToLoad;
 
-            // Try to load last opened task
-            if (state.lastTaskId) {
-                taskToLoad = state.tasks.find(t => t.id === parseInt(state.lastTaskId));
+            // Try to load last viewed task from localStorage
+            const lastTaskId = localStorage.getItem('lastTaskId');
+            if (lastTaskId) {
+                taskToLoad = state.tasks.find(t => t.id === parseInt(lastTaskId));
             }
 
-            // If no last task or it doesn't exist, load most recent
+            // If no last task or it doesn't exist, load most recent task
             if (!taskToLoad) {
-                taskToLoad = state.tasks[0];
+                taskToLoad = state.tasks[state.tasks.length - 1];
             }
 
             await loadTask(taskToLoad.id);
         } else {
-            // Only create a new task if there are no existing tasks
-            await createNewTask();        }
+            // Create a new task if none exist
+            await createNewTask();
+        }
     } catch (error) {
         console.error('Error loading tasks:', error);
         logToConsole('Error loading tasks', 'error');
