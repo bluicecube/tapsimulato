@@ -21,6 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadFunctions();
     loadTasks();
+    // Initialize video element
+    const video = document.getElementById('bgVideo');
+    if (video) {
+        video.style.display = 'none';
+    }
 });
 
 function setupEventListeners() {
@@ -1728,7 +1733,10 @@ function showTapFeedback(region) {
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
     if (!video) return;
+    
+    video.style.display = 'block';
     video.srcObject = null;
+    
     navigator.mediaDevices.getDisplayMedia({
         video: {
             cursor: "always"
@@ -1738,8 +1746,15 @@ function setupVideoSharing() {
         .then(stream => {
             video.srcObject = stream;
             logToConsole('Screen sharing started', 'success');
+            
+            // Handle stream end
+            stream.getVideoTracks()[0].onended = () => {
+                video.style.display = 'none';
+                logToConsole('Screen sharing ended', 'info');
+            };
         })
         .catch(error => {
+            video.style.display = 'none';
             logToConsole('Failed to start screen sharing: ' + error.message, 'error');
         });
 }
