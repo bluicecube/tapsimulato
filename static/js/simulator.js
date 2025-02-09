@@ -1167,49 +1167,63 @@ let selectionStartX = 0;
 let selectionStartY = 0;
 
 function startSelection(event) {
-    if (!state.pendingBlockConfiguration || event.button !== 0) return; // Only respond to left mouse button
+    if (!state.pendingBlockConfiguration || event.button !== 0) return;
 
     const simulator = document.getElementById('simulator');
+    if (!simulator) return;
+
     const rect = simulator.getBoundingClientRect();
+    const selectionBox = document.getElementById('selectionBox');
+    if (!selectionBox) return;
 
     isSelecting = true;
-    selectionStartX = event.clientX - rect.left;
-    selectionStartY = event.clientY - rect.top;
+    selectionStartX = Math.max(0, Math.min(simulator.clientWidth, event.clientX - rect.left));
+    selectionStartY = Math.max(0, Math.min(simulator.clientHeight, event.clientY - rect.top));
 
-    // Clamp start coordinates to simulator bounds
-    selectionStartX = Math.max(0, Math.min(simulator.clientWidth, selectionStartX));
-    selectionStartY = Math.max(0, Math.min(simulator.clientHeight, selectionStartY));
-
-    const selectionBox = document.getElementById('selectionBox');
     selectionBox.style.left = `${selectionStartX}px`;
     selectionBox.style.top = `${selectionStartY}px`;
     selectionBox.style.width = '0';
     selectionBox.style.height = '0';
     selectionBox.classList.remove('d-none');
+
+    // Prevent text selection during region selection
+    event.preventDefault();
 }
 
 function updateSelection(event) {
     if (!isSelecting) return;
 
     const simulator = document.getElementById('simulator');
-    const rect = simulator.getBoundingClientRect();
+    const selectionBox = document.getElementById('selectionBox');
+    if (!simulator || !selectionBox) return;
 
-    // Calculate position relative to simulator, clamped to simulator bounds
-    let currentX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-    let currentY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const rect = simulator.getBoundingClientRect();
+    const currentX = Math.max(0, Math.min(simulator.clientWidth, event.clientX - rect.left));
+    const currentY = Math.max(0, Math.min(simulator.clientHeight, event.clientY - rect.top));
 
     const width = currentX - selectionStartX;
     const height = currentY - selectionStartY;
 
-    const selectionBox = document.getElementById('selectionBox');
     selectionBox.style.width = `${Math.abs(width)}px`;
     selectionBox.style.height = `${Math.abs(height)}px`;
     selectionBox.style.left = `${width < 0 ? currentX : selectionStartX}px`;
     selectionBox.style.top = `${height < 0 ? currentY : selectionStartY}px`;
+
+    event.preventDefault();
 }
 
 
-function finishSelection(endX, endY) {
+function finishSelection(event) {
+    if (!isSelecting) return;
+
+    const simulator = document.getElementById('simulator');
+    const selectionBox = document.getElementById('selectionBox');
+    if (!simulator || !selectionBox || !state.pendingBlockConfiguration) return;
+
+    const rect = simulator.getBoundingClientRect();
+    const endX = Math.max(0, Math.min(simulator.clientWidth, event.clientX - rect.left));
+    const endY = Math.max(0, Math.min(simulator.clientHeight, event.clientY - rect.top));
+
     const region = {
         x1: Math.min(selectionStartX, endX),
         y1: Math.min(selectionStartY, endY),
@@ -1217,12 +1231,18 @@ function finishSelection(endX, endY) {
         y2: Math.max(selectionStartY, endY)
     };
 
+    // Minimum size check
+    if (Math.abs(region.x2 - region.x1) < 5 || Math.abs(region.y2 - region.y1) < 5) {
+        selectionBox.classList.add('d-none');
+        isSelecting = false;
+        return;
+    }
+
     const blockIndex = state.pendingBlockConfiguration.dataset.index;
     const indices = blockIndex.split('.');
     let targetBlock;
     let currentBlocks = state.currentTask.blocks;
 
-    // Navigate through nested blocks
     for (let i = 0; i < indices.length; i++) {
         const index = parseInt(indices[i]);
         if (i === indices.length - 1) {
@@ -1235,19 +1255,18 @@ function finishSelection(endX, endY) {
     if (targetBlock) {
         targetBlock.region = region;
         state.pendingBlockConfiguration = null;
-
-        // Show selection box for the newly set region
         showSelectionBox(region);
         updateTaskDisplay();
 
-        // Save immediately after region update
         saveCurrentTask().then(() => {
             logToConsole('Region updated and saved', 'success');
         }).catch(error => {
             logToConsole('Failed to save region', 'error');
         });
     }
-    isSelecting = false; //Added to stop selection
+
+    isSelecting = false;
+    event.preventDefault();
 }
 
 // Save blocks functionality
