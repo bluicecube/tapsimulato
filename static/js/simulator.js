@@ -1751,31 +1751,33 @@ function showTapFeedback(region) {
 // Fix the video sharing configuration
 function setupVideoSharing() {
     const video = document.getElementById('bgVideo');
-    if (!video) return;
-    
-    video.style.display = 'block';
-    video.srcObject = null;
-    
-    navigator.mediaDevices.getDisplayMedia({
-        video: {
-            cursor: "always"
-        },
-        audio: false
-    })
-        .then(stream => {
+    const shareButton = document.getElementById('setVideoSource');
+    if (!video || !shareButton) return;
+
+    shareButton.addEventListener('click', async () => {
+        try {
+            video.style.display = 'block';
+            video.srcObject = null;
+            
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always"
+                },
+                audio: false
+            });
+            
             video.srcObject = stream;
             logToConsole('Screen sharing started', 'success');
             
-            // Handle stream end
             stream.getVideoTracks()[0].onended = () => {
                 video.style.display = 'none';
                 logToConsole('Screen sharing ended', 'info');
             };
-        })
-        .catch(error => {
+        } catch (error) {
             video.style.display = 'none';
             logToConsole('Failed to start screen sharing: ' + error.message, 'error');
-        });
+        }
+    });
 }
 
 function logToConsole(message, type = 'info') {
