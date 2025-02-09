@@ -243,11 +243,48 @@ async function executeBlocks(blocks, parentIndex = null) {
 async function executeTapBlock(block) {
     return new Promise(resolve => {
         setTimeout(() => {
+            if (!block.region) {
+                logToConsole('No region set for tap block', 'error');
+                resolve();
+                return;
+            }
+
             const coords = showTapFeedback(block.region);
+            // Generate GCode
+            const gcode = `G0 X${coords.x.toFixed(2)} Y${coords.y.toFixed(2)}\nM400\nM25 ; Tap\n`;
+            logToConsole(`Generated GCode:\n${gcode}`, 'info');
             logToConsole(`Tapped at (${Math.round(coords.x)},${Math.round(coords.y)})`, 'success');
             resolve();
         }, 800);
     });
+}
+
+function showTapFeedback(region) {
+    const x = region.x1 + Math.random() * (region.x2 - region.x1);
+    const y = region.y1 + Math.random() * (region.y2 - region.y1);
+
+    const feedback = document.createElement('div');
+    feedback.className = 'tap-feedback';
+    feedback.style.left = `${x}px`;
+    feedback.style.top = `${y}px`;
+
+    const simulator = document.getElementById('simulator');
+    if (simulator) {
+        simulator.appendChild(feedback);
+        feedback.addEventListener('animationend', () => feedback.remove());
+    }
+
+    // Show function block execution
+    const executingFunctionBlock = document.querySelector('.function-block.executing');
+    if (executingFunctionBlock) {
+        const overlay = executingFunctionBlock.querySelector('.function-overlay');
+        if (overlay) {
+            overlay.classList.add('executing-animation');
+            setTimeout(() => overlay.classList.remove('executing-animation'), 500);
+        }
+    }
+
+    return { x, y };
 }
 
 // Block management functions
@@ -1071,12 +1108,39 @@ function startTapRegionSelection(blockElement) {
 
     // Clear any existing selection box
     const selectionBox = document.getElementById('selectionBox');
-    selectionBox.classList.add('d-none');
-    selectionBox.style.width = '0';
-    selectionBox.style.height = '0';
+    if (selectionBox) {
+        selectionBox.classList.add('d-none');
+        selectionBox.style.width = '0';
+        selectionBox.style.height = '0';
+    }
 
     state.pendingBlockConfiguration = blockElement;
+    state.focusedBlock = findBlockByElement(blockElement);
     logToConsole('Select tap region on the simulator', 'info');
+}
+
+function findBlockByElement(element) {
+    const index = element.dataset.index;
+    if (!index || !state.currentTask) return null;
+    
+    const indices = index.split('.');
+    let currentBlocks = state.currentTask.blocks;
+    let targetBlock = null;
+    
+    for (const idx of indices) {
+        const block = currentBlocks[parseInt(idx)];
+        if (!block) break;
+        
+        if (idx === indices[indices.length - 1]) {
+            targetBlock = block;
+        } else if (block.type === 'loop') {
+            currentBlocks = block.blocks;
+        } else if (block.type === 'function') {
+            currentBlocks = block.blocks;
+        }
+    }
+    
+    return targetBlock;
 }
 
 function addTapBlock(parentLoopIndex = null, region = null) {
